@@ -50,20 +50,20 @@ for k = 1:P
 end
 
 %Visuals
-visualise = 0; 
+visualise = 1; 
 if visualise
 
-    [X,Y,Z] = sphere(12);
-    
+    [XX,YY,ZZ] = sphere(12);
+    r = 1; 
     figure()
     
-    r = 1
     for k = 1:size(q,1); 
-        %surf(r*Xs+q(k,1),r*Ys+q(k,2),r*Zs+q(k,3),'EdgeColor','flat');
-        hSurface=surf(r*X+q(k,1),r*Y+q(k,2),r*Z+q(k,3));
+        
+        %surf(r*XX+q(k,1),r*YY+q(k,2),r*ZZ+q(k,3),'EdgeColor','flat');
+        hSurface=surf(r*XX+q(k,1),r*YY+q(k,2),r*ZZ+q(k,3));
         set(hSurface,'FaceColor',[1 0 0],'FaceAlpha',0.9,'FaceLighting','gouraud','EdgeColor','none')
         
-        %surf(r*Xs+q(k,1),r*Ys+q(k,2),r*Zs+q(k,3),'EdgeColor','blue','FaceColor','blue');
+        %surf(r*XX+q(k,1),r*YY+q(k,2),r*ZZ+q(k,3),'EdgeColor','blue','FaceColor','blue');
         hold on
         axis equal
     end
@@ -120,7 +120,7 @@ if opt.profile
 end
 
 % First, get check points on the surface to determine residuals in 
-b = ellipsoid(1,1,1);   % baseline object at the oridin, aligned
+b = ellipsoid_param(1,1,1);   % baseline object at the oridin, aligned
 b = setupsurfquad(b,[46,55]);
 
 rcheck = []; 

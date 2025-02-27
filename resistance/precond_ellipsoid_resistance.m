@@ -1,7 +1,7 @@
 function [Y,UU] = precond_ellipsoid_resistance(rin,rout)
 %PRECOND_ELLIPSOID_RESISTANCE Compute factors for the pseudoinverse for a single particle in a Stokes resistance problem, given source distribution rin and distribution of collocation point rout. 
 
-S = generate_stokes_matrix_vec_inout(rin,rout);
+S = generate_stokes_mat(rin,rout);
 
 % [L,U] = lu(S);
 % return

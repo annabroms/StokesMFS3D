@@ -5,7 +5,7 @@ if nargin<3
     q = [0 0 0]; %The particle is assumed to not be rotated
 end
 
-S = generate_stokes_matrix_vec_inout(rin,rout);
+S = generate_stokes_mat(rin,rout);
 Kout = getKmat(rout,q);
 Kin = getKmat(rin,q);
 

@@ -65,7 +65,7 @@ uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt);
 uvec = -uvec;
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres_mv(@(x) matvec_mobility(x,rvec_in,rvec_out,q,UU,Y,LL,opt),uvec,3*size(rvec_out,1),opt.maxit,gmres_tol);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvec_mobility(x,rvec_in,rvec_out,q,UU,Y,LL,opt),uvec,3*size(rvec_out,1),opt.maxit,gmres_tol);
 
 %chcek residual
 abs_res = norm(matvec_mobility(x_gmres,rvec_in,rvec_out,q,UU,Y,LL,opt)-uvec);

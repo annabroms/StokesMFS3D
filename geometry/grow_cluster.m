@@ -26,10 +26,10 @@ q(2,:) = (2+delta)*n; %store positions
 maxit = 100;
 %maxit = 50; 
 tol = 1e-5;
-visualise = 1; 
+visualise = 0; 
 
 for k = 1:P-2
-    k
+    k %check progress
     
     while true
 
