@@ -9,6 +9,7 @@ See publications:
 # Dependencies
 
 * FMM3D from Flatiron (if solving problems with many particles). I think I normally would switch at, say, 40 particles. 
-* SE_unified from Joar Bagge. Needed for evaluating direct sums of the fundamental solutions. If no images are in use, which is currently the case, this would only be needed for Stokeslets. You will then basically only need to compile SE0P_Stokeslet_direct.c. 
+* SE_unified from Joar Bagge. Needed for evaluating direct sums of the fundamental solutions. If no images are in use, which is currently the case, this would only be needed for Stokeslets. You will then basically only need to compile SE0P_Stokeslet_direct.c.
+* Spherical design nodes. See README in the geometry folder.
 
 Disclaimer! This is a private repo under construction. The code is not very organised.
