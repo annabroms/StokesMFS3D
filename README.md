@@ -12,4 +12,5 @@ See publications:
 * SE_unified from Joar Bagge. Needed for evaluating direct sums of the fundamental solutions. If no images are in use, which is currently the case, this would only be needed for Stokeslets. You will then basically only need to compile SE0P_Stokeslet_direct.c.
 * Spherical design nodes. See README in the geometry folder.
 
-Disclaimer! This is a private repo under construction. The code is not very organised.
+Disclaimer! This is a private repo under construction. All code is not very organised. The use of images and code for ellipsoidal particles will be added.
+
