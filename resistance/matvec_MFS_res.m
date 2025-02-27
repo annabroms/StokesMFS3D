@@ -1,5 +1,5 @@
-function res = matvec_MFS_images3(tau,rin,rout,rimage,weights,q,Uii,Yii,vars,R)
-% construct matvec
+function res = matvec_MFS_res(tau,rin,rout,rimage,weights,q,Uii,Yii,vars,R)
+% construct matvec for the Stokes resistance problem. If images are not in use, ignore everything dealing with other source types than Stokeslets.
 
 N = size(q,1); %number of particles
 

@@ -1,8 +1,5 @@
-function M = generate_stokes_matrix_vec_inout(rin,rout)
-%%GENERATE_STOKES_MATRIX_VEC(r,q,a) generates the blob-blob matrix N for all
-%%blobs in the system, where the blob radius is a and the blobs positions
-%%are given in the matrix r of size (number of blobs x 3). The matrix q
-%%contains the center coordinate for all the multiblob particles. 
+function M = generate_stokes_mat(rin,rout)
+%%GENERATE_STOKES_MAT(rin,rout) generates the Stokeslet matrix from sources in rin to targets in rout
 
 %Create main block of the mobility: 
 

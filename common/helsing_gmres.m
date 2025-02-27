@@ -1,5 +1,5 @@
-function [x,it,resvec,trueres] = helsing_gmres_mv(f,b,n,m,tol,debug,grid)
-% *** GMRES with low-threshold stagnation control ***
+function [x,it,resvec,trueres] = helsing_gmres(f,b,n,m,tol,debug,grid)
+% *** GMRES with low-threshold stagnation control taken from Johan Helsing***
 if nargin < 6
     debug = 0;
 end

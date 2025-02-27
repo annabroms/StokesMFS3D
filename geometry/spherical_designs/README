@@ -1,0 +1,24 @@
+Directory for files of spherical design quadrature points on S^2.
+
+Due to size, these are not shipped in the GitHub repo.
+
+The user will need to set up this directory, as follows (in linux/OSX):
+
+wget https://web.maths.unsw.edu.au/~rsw/Sphere/Points/SF/SF29-Nov-2012.zip
+unzip SF29-Nov-2012.zip
+mv SF29-Nov-2012/* .
+rm -f *.zip
+rmdir SF29-Nov-2012
+
+This downloads about 28 MB then creates 73 MB of files in this directory.
+
+These are created by:
+Rob Womersley
+School of Mathematics and Statistics
+UNSW Sydney.
+
+They have equal weights 4pi/N.
+They are exact for the degree t, and given in filename sf{t}.{N}
+where N ~ t^2/2, being only asymptotically 2/3 as efficient as Lebedev points,
+in terms of exact quadrature of spherical harmonics.
+However, they are (much) more uniform in distribution.

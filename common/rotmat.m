@@ -1,4 +1,5 @@
 function [c,s]=rotmat(a,b)
+%Help function in helsing_gmres_mv. Computes givens rotations
 if  b==0
 c=1;
 s=0;
