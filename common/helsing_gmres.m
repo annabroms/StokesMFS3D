@@ -36,8 +36,8 @@ resvec(it) = myerr;
         it
         myerr
         
-        y=triu(H(1:it,1:it))\s(1:it);             
-        x=fliplr(V(:,1:it))*flipud(y);
+       % y=triu(H(1:it,1:it))\s(1:it);             
+       % x=fliplr(V(:,1:it))*flipud(y);
 
        %  res = f(x);
        %  err = res-b;

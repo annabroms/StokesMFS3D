@@ -1,4 +1,5 @@
 function res = getFlow(tau_stokes,rin,rout,vars)
+%getFlow 
 %Compute velocity field given source
 %strengths tau_stokes located in source points rin evaluated in target
 %points rout. If vars.fmm FMM3D is used for the evaluation. 
@@ -19,7 +20,7 @@ if vars.fmm
     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
 
-    res = 1/4/pi*U.pottarg(:);
+    res = U.pottarg(:);
 
     clear U srcinfo;
 else

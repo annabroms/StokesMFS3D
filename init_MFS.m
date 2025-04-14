@@ -49,7 +49,7 @@ opt.design = 1; %use spherical designs
 opt.fib = 0; %fibonacci grid instead?
 
 opt.eps = 1e-8; %used for FMM
-opt.eps = 1e-10; %change tol in fmm to see effect
+%opt.eps = 1e-10; %change tol in fmm to see effect
 opt.ellipsoid = 0; 
 opt.fmm = 0; 
 opt.disc = 0;

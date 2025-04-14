@@ -1,5 +1,5 @@
 function [Fvec,iters,lambda_norm,err_res] = solve_resistance(q,U,fmm,Rg,N)
-%SOVLE_RESISTANCE(q,Uvec,fmm,Rg,N) solves a Stokes resistance problem for
+%SOLVE_RESISTANCE(q,Uvec,fmm,Rg,N) solves a Stokes resistance problem for
 %spherical particles centered at q moving with translational and angular
 %velocities in  U (of size 6P, for each particle a translational velocity
 %of size 3 x 1 followed by an angular velocity of size 3 x 1). q is of size
@@ -57,7 +57,7 @@ if visualise
     r = 1; 
     figure()
     
-    for k = 1:size(q,1); 
+    for k = 1:size(q,1)
         
         %surf(r*XX+q(k,1),r*YY+q(k,2),r*ZZ+q(k,3),'EdgeColor','flat');
         hSurface=surf(r*XX+q(k,1),r*YY+q(k,2),r*ZZ+q(k,3));
@@ -142,7 +142,7 @@ end
 ubdry = getFlow(lambda_gmres,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 
-err_res = max(uerr_vec); 
+err_res = max(uerr_vec) 
 
 
 lambda_norm = norm(lambda_gmres,inf);

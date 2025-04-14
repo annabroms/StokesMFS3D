@@ -80,52 +80,56 @@ for i = 1:N
     end
 end
 
-res = tau; 
+
 
 if vars.profile
     memorygraph('label','compute FMM');
 end
 
-%Do one call to FMM (or direct evaluation)
-if vars.fmm && ~vars.image
-    nd = 1;
-    srcinfo.nd = nd;
-    
-    ifppreg = 0;
-    ifppregtarg = 1;
-    
-    srcinfo.sources = rin';
-    srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    
-    targ = rout';  
-    %eps = 1e-6; % was -6
-    eps = vars.eps; 
-    
-    U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
-    %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
-    if vars.precond
-        res = res + 1/4/pi*weights.*U.pottarg(:);
-    else
-        res = res + 1/4/pi*U.pottarg(:);
-    end
-    
-    %Do this with the routine from SE instead. Better? 
-    % srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    % U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ'));
-    %    % instead for comparison
-    % U = U';
-    % res = res + 1/8/pi*U(:);
-    % U2 = 1/8/pi*U(:); %for debugging only
+ %Do one call to FMM (or direct evaluation)
+res = getFlow(tau_stokes,rin,rout,vars);
 
+res = res+tau;
 
-    clear U srcinfo;
-else
-    targ = rout; 
-    srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
-       % instead for comparison
-    U = U';
-    res = res + 1/8/pi*U(:);
+% if vars.fmm && ~vars.image
+%     nd = 1;
+%     srcinfo.nd = nd;
+% 
+%     ifppreg = 0;
+%     ifppregtarg = 1;
+% 
+%     srcinfo.sources = rin';
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+% 
+%     targ = rout';  
+%     %eps = 1e-6; % was -6
+%     eps = vars.eps; 
+% 
+%     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
+%     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
+%     if vars.precond
+%         res = res + 1/4/pi*weights.*U.pottarg(:);
+%     else
+%         res = res + 1/4/pi*U.pottarg(:);
+%     end
+% 
+%     %Do this with the routine from SE instead. Better? 
+%     % srcinfo.stoklet = reshape(tau_stokes,3,[]);
+%     % U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ'));
+%     %    % instead for comparison
+%     % U = U';
+%     % res = res + 1/8/pi*U(:);
+%     % U2 = 1/8/pi*U(:); %for debugging only
+% 
+% 
+%     clear U srcinfo;
+% else
+%     targ = rout; 
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+%     U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
+%        % instead for comparison
+%     U = U';
+%     res = res + 1/8/pi*U(:);
 
     %% Add image contributions
     %% First from rotlets
@@ -149,7 +153,7 @@ else
     end
 
 
-end
+%end
 
 if vars.profile
     memorygraph('label','subtract self_interaction');

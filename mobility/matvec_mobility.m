@@ -43,68 +43,73 @@ for i = 1:N
 
 end
 
-res = tau; 
-
+%% Evaluate flow field
 %Do one call to FMM (or direct evaluation)
-if vars.fmm 
-    nd = 1;
-    srcinfo.nd = nd;
-    
-    ifppreg = 0;
-    ifppregtarg = 1;
-    
-    srcinfo.sources = rin';
-    srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    
-    targ = rout';  
-    %eps = 1e-6; % was -6
-    eps = vars.eps; 
-    
-    U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
-    %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
+res = getFlow(tau_stokes,rin,rout,vars);
+res = res+tau;
 
-    res = res + 1/4/pi*U.pottarg(:);
-    
-    
-    %Do this with the routine from SE instead. Better? 
-    % srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    % U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ'));
-    %    % instead for comparison
-    % U = U';
-    % res = res + 1/8/pi*U(:);
-    % U2 = 1/8/pi*U(:); %for debugging only
-
-
-    clear U srcinfo;
-else
-    targ = rout; 
-    srcinfo.stoklet = reshape(tau_stokes,3,[]);
-    U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
-       % instead for comparison
-    U = U';
-    res = res + 1/8/pi*U(:);
-
-%     %% Add image contributions
-%     %% First from rotlets
-%     
-%     srcinfo.rotlet = reshape(tau_rot,3,[]);
+% res = tau; 
 % 
-%     U = SE0P_Rotlet_direct_full_ext_mex(rimage, srcinfo.rotlet', struct('eval_ext_x', targ));
-%     % instead for comparison
+% %Do one call to FMM (or direct evaluation)
+% if vars.fmm 
+%     nd = 1;
+%     srcinfo.nd = nd;
+% 
+%     ifppreg = 0;
+%     ifppregtarg = 1;
+% 
+%     srcinfo.sources = rin';
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+% 
+%     targ = rout';  
+%     %eps = 1e-6; % was -6
+%     eps = vars.eps; 
+% 
+%     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
+%     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
+% 
+%     res = res + 1/4/pi*U.pottarg(:);
+% 
+% 
+%     %Do this with the routine from SE instead. Better? 
+%     % srcinfo.stoklet = reshape(tau_stokes,3,[]);
+%     % U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ'));
+%     %    % instead for comparison
+%     % U = U';
+%     % res = res + 1/8/pi*U(:);
+%     % U2 = 1/8/pi*U(:); %for debugging only
+% 
+% 
+%     clear U srcinfo;
+% else
+%     targ = rout; 
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+%     U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
+%        % instead for comparison
 %     U = U';
-%     res = res+1/8/pi*U(:);
-%    
+%     res = res + 1/8/pi*U(:);
 % 
-%     %% Add the contribution from  potential dipoles
-%     srcinfo.potdip = reshape(tau_pot,3,[]);
+% %     %% Add image contributions
+% %     %% First from rotlets
+% %     
+% %     srcinfo.rotlet = reshape(tau_rot,3,[]);
+% % 
+% %     U = SE0P_Rotlet_direct_full_ext_mex(rimage, srcinfo.rotlet', struct('eval_ext_x', targ));
+% %     % instead for comparison
+% %     U = U';
+% %     res = res+1/8/pi*U(:);
+% %    
+% % 
+% %     %% Add the contribution from  potential dipoles
+% %     srcinfo.potdip = reshape(tau_pot,3,[]);
+% % 
+% %     U = SE0P_Potdip_direct_full_ext_mex(rimage, srcinfo.potdip', struct('eval_ext_x', targ));
+% %     % instead for comparison
+% %     U = U';
+% %     res = res+1/4/pi*U(:);
 % 
-%     U = SE0P_Potdip_direct_full_ext_mex(rimage, srcinfo.potdip', struct('eval_ext_x', targ));
-%     % instead for comparison
-%     U = U';
-%     res = res+1/4/pi*U(:);
-
-
-end
+% 
+% end
 
 
 %Correct self evaluation. Subtract interaction 
