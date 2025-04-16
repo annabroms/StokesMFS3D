@@ -15,14 +15,13 @@ if vars.fmm
     
     targ = rout';  
     eps = vars.eps; % was -6
-    
-    
+     
     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
-    %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
 
     res = U.pottarg(:);
 
     clear U srcinfo;
+
 else
     targ = rout; 
     srcinfo.stoklet = reshape(tau_stokes,3,[]);

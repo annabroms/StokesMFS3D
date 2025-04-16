@@ -1,11 +1,13 @@
 function res = matvec_MFS_res(tau,rin,rout,rimage,weights,q,Uii,Yii,vars,R)
-% construct matvec for the Stokes resistance problem. If images are not in use, ignore everything dealing with other source types than Stokeslets.
+%matvec_MFS_res matrix vector product for solving a Stokes resistance
+%problem using MFS in 3D
+%If images are not in use, ignore everything dealing with other source types than Stokeslets.
 
 N = size(q,1); %number of particles
 
 N_large = size(rout,1)/N; %points per particle on outer grids
 N_small = size(rin,1)/N; %points per particle on proxy surface
-N_image = size(rimage,1)/N; %Number of images per particle. NB: For now assumed equal on all particles
+
 
 
 %alpha = sum(vars.sing_vec(2:end)); %how many types of singularities to deal with 
@@ -86,50 +88,12 @@ if vars.profile
     memorygraph('label','compute FMM');
 end
 
- %Do one call to FMM (or direct evaluation)
+%% Evaluate flow 
+% Proxy sources rin, target points rout -- one call to FMM (or direct evaluation)
 res = getFlow(tau_stokes,rin,rout,vars);
 
 res = res+tau;
 
-% if vars.fmm && ~vars.image
-%     nd = 1;
-%     srcinfo.nd = nd;
-% 
-%     ifppreg = 0;
-%     ifppregtarg = 1;
-% 
-%     srcinfo.sources = rin';
-%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
-% 
-%     targ = rout';  
-%     %eps = 1e-6; % was -6
-%     eps = vars.eps; 
-% 
-%     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
-%     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
-%     if vars.precond
-%         res = res + 1/4/pi*weights.*U.pottarg(:);
-%     else
-%         res = res + 1/4/pi*U.pottarg(:);
-%     end
-% 
-%     %Do this with the routine from SE instead. Better? 
-%     % srcinfo.stoklet = reshape(tau_stokes,3,[]);
-%     % U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ'));
-%     %    % instead for comparison
-%     % U = U';
-%     % res = res + 1/8/pi*U(:);
-%     % U2 = 1/8/pi*U(:); %for debugging only
-% 
-% 
-%     clear U srcinfo;
-% else
-%     targ = rout; 
-%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
-%     U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
-%        % instead for comparison
-%     U = U';
-%     res = res + 1/8/pi*U(:);
 
     %% Add image contributions
     %% First from rotlets
@@ -183,7 +147,7 @@ for i = 1:N
    
     %U = st3ddir(srcinfo,targ,ifppregtarg); %Small self-evaluation blocks, use direction summation
 
-    %% Need to also subtract blocks corresponding to images
+    %% If images are in use, we need to also subtract blocks corresponding to images
     if vars.image
         %Start with rotlets
         rim_i = rimage(N_image*(i-1)+1:N_image*i,:);

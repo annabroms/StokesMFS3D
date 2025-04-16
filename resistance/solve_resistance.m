@@ -94,6 +94,8 @@ if opt.profile
     memorygraph('label','start matvec resistance');
 end
 
+
+
 %Solve problem
 [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvec_MFS_res(x,rvec_in,rvec_out,[],[],q,UU,Y,opt,[]),u_bndry',3*size(rvec_out,1),opt.maxit,gmres_tol,0);
 
