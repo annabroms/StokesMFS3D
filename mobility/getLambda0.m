@@ -1,5 +1,5 @@
-function lambda0 = getLambda0(F,T,Kin)
+function [lambda0,A] = getLambda0(F,T,Kin)
     D = Kin'*Kin;
-    ab = D\[F;T];
-    lambda0 = Kin*ab;
+    A = D\[F;T]; % rbm corresponding to the force and torque.
+    lambda0 = Kin*A;
 end

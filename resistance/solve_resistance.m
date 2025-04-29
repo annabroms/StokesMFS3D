@@ -82,6 +82,9 @@ end
 %% compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
 
+%S = generate_stokes_mat(rin,rout);
+%S2 = generate_stokes_mat(rin2,rout2);
+
 [Yk,UUk] = precond_ellipsoid_resistance(rin,rout);
 
 %The format is used to prepare for the case when different shapes are is
