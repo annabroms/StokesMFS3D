@@ -14,14 +14,18 @@ Rp_c = 0.3;
 % Rp_c = 0.2;
 % Nc = 700;
 % Rp_c = 0.68;
+% Nc = 500;
+% Rp_c = 0.5;
 Nf = 700;
 Rp_f = 0.68;
+Nf = Nc;
+Rp_f = Rp_c; 
 
 %initialize a bunch of parameters. Do not change if you don't really want.
 opt = init_MFS(Nc);
 opt.fmm = fmm; 
 opt.maxit = 200; %max number of gmres iterations
-gmres_tol = 1e-7;
+gmres_tol = 1e-10;
 opt.plot = 0; 
 
 optf = init_MFS(Nf);
@@ -46,7 +50,8 @@ Mf = size(rout_f,1); %numer of collocation points per particle, fine grid
 
 rvec_in_c = [];
 rvec_out_c = [];
-lambda_vec = []; 
+lambda_fine = []; 
+lambda_coarse = []; 
 
 %Create grid on every particle. Also create completion source on every
 %particle, given force and torque.
@@ -60,16 +65,21 @@ for k = 1:P
     %Create right hand side, given forces and torques on the particles
     F = Fvec(6*(k-1)+1:6*(k-1)+3);
     T = Fvec(6*(k-1)+4:6*k);
-    lambda_k = getLambda0(F,T,Kin_c);
-    lambda_vec = [lambda_vec; lambda_k];
+    [lambda_k,A] = getLambda0(F,T,Kin_f);
+    lambda_fine = [lambda_fine; lambda_k];
+    lambda_coarse = [lambda_coarse; Kin_c*A];
  
 end
 
 %Get flow field due to completion source.
-uvec = getFlow(lambda_vec,rvec_in_c,rvec_out_c,opt); 
-uvec = -uvec;
+uc = getFlow(lambda_coarse,rvec_in_c,rvec_out_c,opt); 
 
-uvec = [uvec; zeros(size(uvec)); zeros(size(rout_f,1)*P*3,1)]; %extended system now, as we have the dummy variables too
+ucut = getTruncField(P,q,rin_c,rout_c,lambda_coarse,Lcut);
+ufine = getTruncField(P,q,rin_f,rout_f,lambda_fine,Lcut);
+
+uvec = [-uc; -ucut; -ufine];
+
+%uvec = [uvec; zeros(size(uvec)); zeros(size(rout_f,1)*P*3,1)]; %extended system now, as we have the dummy variables too
 
 
 % figure()
@@ -121,14 +131,14 @@ lambda_norm = norm(lambda_gmres,inf);
 
 %% Check residual
 %Get check points, assuming we work with spheres!
-test_vel = 0; 
+test_vel = 1; 
 
 if test_vel
     b = ellipsoid_param(1,1,1);   % baseline object at the origin, aligned
     b = setupsurfquad(b,[46,55]);
     
     rcheck = []; 
-    for k = 1:size(q,1)
+    for k = 1:P
         x = q(k,:)' + b.x;    % rot then transl, b just for vis
         rcheck = [rcheck; x'];    
     end
@@ -139,22 +149,33 @@ if test_vel
     
     %Assign velocities at checkpoints
     ucheck = zeros(n_check*3*size(q,1),1); 
-    for k = 1:size(q,1)
+    for k = 1:P
         Kcheck = getKmat(rcheck(n_check*(k-1)+1:k*n_check,:),q(k,:));
         ucheck((k-1)*3*n_check+1:3*k*n_check) = Kcheck*U((k-1)*6+1:k*6);
         
     end
     
-    for i =1:size(q,1)
-        densityK_particle = (eye(3*N)-LL)*lambda_gmres(3*(i-1)*N+1:i*3*N)'+lambda_vec(3*(i-1)*N+1:i*3*N);
-        densityK(3*(i-1)*N+1:i*3*N) = densityK_particle;
+    for i =1:P
+        densityK_particle = (eye(3*Nc)-Lc)*lambda_gmres(3*(i-1)*Nc+1:i*3*Nc)'+lambda_coarse(3*(i-1)*Nc+1:i*3*Nc);
+        densityCoarse(3*(i-1)*Nc+1:i*3*Nc) = densityK_particle;
+
+        densityK_particle = (eye(3*Nc)-Lc)*lambda_gmres(3*(i-1)*Nc+1+3*P*Nc:i*3*Nc+3*P*Nc)'+lambda_coarse(3*(i-1)*Nc+1:i*3*Nc);
+        densityCut(3*(i-1)*Nc+1:i*3*Nc) = densityK_particle;
+
+        densityK_particle = (eye(3*Nf)-Lf)*lambda_gmres(3*(i-1)*Nf+1+6*P*Nc:i*3*Nf+6*P*Nc)'+lambda_fine(3*(i-1)*Nf+1:i*3*Nf);
+        densityFine(3*(i-1)*Nf+1:i*3*Nf) = densityK_particle;
     end
     
-    %get flow and comare
+    %get flow and compare
     
-    ubdry = getFlow(densityK,rvec_in,rcheck,opt);
+    ucoarse = getFlow(densityCoarse,rvec_in_c,rcheck,opt);
+    ucut = getTruncField(P,q,rin_c,b.x',densityCut',Lcut);
+    ufine = getTruncField(P,q,rin_f,b.x',densityFine',Lcut);
+    ubdry = ucoarse+ucut+ufine;
+    ubdry = ucoarse-ucut+ufine;
+
     uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
-    uerr = max(uerr_vec);
+    uerr = max(uerr_vec)
 else
 
     uerr = [];

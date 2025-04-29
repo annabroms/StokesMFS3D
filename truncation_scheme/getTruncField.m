@@ -1,5 +1,7 @@
 function u = getTruncField(P,q,rin_base,rout_base,lambda,Lcut)
-%getTruncatedField(P,q,rin_base,rout_base,lambda,Lcut)
+%getTruncField(P,q,rin_base,rout_base,lambda,Lcut)
+
+assert(size(lambda,2) == 1,'Density lambda has wrong dimension. Must be translated.')
 
 M = size(rout_base,1);
 N = size(rin_base,1); 
@@ -24,6 +26,10 @@ for k = 1:P
 
     u((k-1)*3*M+1:k*3*M) = getFlow(lambda_in,rin,rout,vars);
        
+%     figure()
+%     scatter3(rin(:,1),rin(:,2),rin(:,3));
+%     hold on
+%     scatter3(rout(:,1),rout(:,2),rout(:,3));
 
 end
 
