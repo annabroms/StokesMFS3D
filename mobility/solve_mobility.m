@@ -12,6 +12,8 @@ function [U,iters,lambda_norm,uerr] = solve_mobility(q,Fvec,fmm,Rp,N)
 %magnitude of the source vector (bad if far too large (loss of accuracy).
 %uerr is the max relative residual at the surface. 
 
+P = size(q,1);
+
 if nargin < 4
     Rp = 0.68; %proxy radius
     N = 700; % approximate number of proxy sources on every particle
@@ -78,8 +80,8 @@ abs_res = norm(matvec_mobility(x_gmres,rvec_in,rvec_out,q,UU,Y,LL,opt)-uvec);
 
 
 %% Determine velocities and Map back to the sought density in source points
-U = zeros(6*size(q,1),1);
-for i = 1:size(q,1) %
+U = zeros(6*P,1);
+for i = 1:P
     lambda_gmres((i-1)*3*N+1:i*3*N) = Y*(UU*x_gmres((i-1)*3*M+1:i*3*M));
     lambda_i = Y*(UU*x_gmres((i-1)*3*M+1:i*3*M));
     U(6*(i-1)+1:6*i) = -Kin'*lambda_i;  %Test scaling here
@@ -93,7 +95,7 @@ b = ellipsoid_param(1,1,1);   % baseline object at the origin, aligned
 b = setupsurfquad(b,[46,55]);
 
 rcheck = []; 
-for k = 1:size(q,1)
+for k = 1:P
     x = q(k,:)' + b.x;    % rot then transl, b just for vis
     rcheck = [rcheck; x'];    
 end
@@ -110,7 +112,7 @@ for k = 1:size(q,1)
     
 end
 
-for i =1:size(q,1)
+for i =1:P
     densityK_particle = (eye(3*N)-LL)*lambda_gmres(3*(i-1)*N+1:i*3*N)'+lambda_vec(3*(i-1)*N+1:i*3*N);
     densityK(3*(i-1)*N+1:i*3*N) = densityK_particle;
 end

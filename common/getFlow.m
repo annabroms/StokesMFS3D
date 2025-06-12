@@ -42,6 +42,7 @@ if vars.fmm
     srcinfo.sources = rin';           % Transpose: 3 x N
     srcinfo.stoklet = reshape(tau_stokes, 3, []); % Format: 3 x N
     
+
     targ = rout';                     % Transpose target: 3 x M
     eps = vars.eps;                   % FMM precision (e.g., 1e-6)
     
@@ -50,6 +51,14 @@ if vars.fmm
     
     % Extract and reshape velocity result
     res = U.pottarg(:); 
+
+    targ = rout';  
+    eps = vars.eps; % was -6
+     
+    U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
+
+    res = U.pottarg(:);
+
 
     clear U srcinfo;
 
