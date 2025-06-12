@@ -121,14 +121,7 @@ end
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
 
-<<<<<<< HEAD
 [Yk,UUk] = oneBodyPrecondRes(rin,rout);
-=======
-%S = generate_stokes_mat(rin,rout);
-%S2 = generate_stokes_mat(rin2,rout2);
-
-[Yk,UUk] = precond_ellipsoid_resistance(rin,rout);
->>>>>>> 82ed721856b9a58dce35c77c45c825af66111d5c
 
 %The format is used to prepare for the case when different shapes are is
 %use
@@ -140,15 +133,8 @@ if opt.profile
     memorygraph('label','start matvec resistance');
 end
 
-<<<<<<< HEAD
 %% Solve problem
 [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,[]),u_bndry',3*size(rvec_out,1),opt.maxit,gmres_tol,0);
-=======
-
-
-%Solve problem
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvec_MFS_res(x,rvec_in,rvec_out,[],[],q,UU,Y,opt,[]),u_bndry',3*size(rvec_out,1),opt.maxit,gmres_tol,0);
->>>>>>> 82ed721856b9a58dce35c77c45c825af66111d5c
 
 if opt.profile
     memorygraph('label','done matvec resistance, remap and determine force')

@@ -1,6 +1,5 @@
 clear;
 close all
-<<<<<<< HEAD
 %% Demo for Stokes MFS in 3D for a random configuration of P spherical particles: 
 % We solve 
 % 1. A resistance problem with no-slip bc set from random RBM (rigid body
@@ -10,11 +9,8 @@ close all
 %
 % The "2-way" error is determined by comparing the given RBM (the input to
 % 1) to the computed RBM from 2. 
-=======
-rng(6);
->>>>>>> 82ed721856b9a58dce35c77c45c825af66111d5c
 %%  Generate center coordinates for the particles
-P = 1; %number of bodies
+P = 10; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 
@@ -23,10 +19,8 @@ delta = 1; %smallest particle particle distance
 %q = set_position(P,L,delta); %Random in a qube or in a layer, with minimum
 %distance
 [q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
-q = [0 0 0];
   
 fmm = 0; %only activate if many particles (say, more than 40)
-fprintf('Using fmm %u\n',fmm)
 
 %% Solve resistance problem first (given velocities)
 disp('Start with resistance: ')
