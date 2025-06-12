@@ -9,11 +9,12 @@ This code demonstrates the basic algorithm using source points on proxy surfaces
 
 ## Features
 
-- Solves Stokes mobility and resistance problems via MFS coupled to the fast multipole method (FMM).
+- Solves Stokes mobility and resistance problems via MFS.
+- Large scale rigid sphere suspensions simulated at low cost.
 - Demonstrates the method using minimal input (`demo.m`)
-- For mobility, the number of GMRES iterations is constant for a growing number of particles, P, and the algorithm is therefore linear in P.
+- One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
 
-## Prerequisites
+## Dependencies
 
 To run simulations effectively, ensure the following dependencies are available:
 
@@ -22,7 +23,7 @@ To run simulations effectively, ensure the following dependencies are available:
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for direct evaluation of fundamental solutions.  
-  Only `SE0P_Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` folder.
+  Only `Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` folder.
 
 - **Spherical Design Nodes**  
   Used to construct the source/target geometry. See `geometry/README.md` for details.
@@ -41,7 +42,7 @@ This work is based on the following research papers:
 
 2. **A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility Problems**  
    *A. Broms, A.H. Barnett, A.-K. Tornberg*, to appear in *Adv. Comput. Math.* (2025)  
-   [https://arxiv.org/abs/2409.04215](https://arxiv.org/abs/2409.04215)
+   [https://arxiv.org/abs/2409.04215](https://arxiv.org/abs/2409.04215) 
 
 ## Roadmap
 
