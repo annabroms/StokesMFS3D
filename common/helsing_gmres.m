@@ -1,5 +1,5 @@
-function [x,it,resvec,trueres] = helsing_gmres(f,b,n,m,tol,debug,grid)
-% *** GMRES with low-threshold stagnation control taken from Johan Helsing***
+function [x,it,resvec,trueres] = helsing_gmres(f,b,n,m,tol,debug)
+% *** GMRES with low-threshold stagnation control taken from Johan Helsing's RCIP demo***
 if nargin < 6
     debug = 0;
 end
@@ -35,43 +35,7 @@ resvec(it) = myerr;
     if debug
         it
         myerr
-        
-       % y=triu(H(1:it,1:it))\s(1:it);             
-       % x=fliplr(V(:,1:it))*flipud(y);
-
-       %  res = f(x);
-       %  err = res-b;
-       % 
-       %  err = err(1:end/2)+1i*err(end/2+1:end); 
-       % % err_max = [err_max; max(abs(err))];
-       % 
-       %  figure(58)
-       %  clf; 
-       %  plot(res)
-       %  hold on
-       %  plot(b,'+')
-       %  %pause(1);
-       % 
-       %  figure(59)
-       %  clf;
-       %  scatter(real(grid),imag(grid),10,log10(abs(err)),'filled'); 
-       %  colorbar
-       %  caxis([-6,1])
-       %  str = sprintf('Max err %1.3e',max(abs(err)));
-       %  title(str)
-        %pause(1);
-        
-%         figure(60)
-%         clf; 
-%         plot(x)
-
-
-
     end
-
-
-
-
 
 if (myerr<=tol)||(it==m)                     
   disp(['predicted residual = ' num2str(myerr)])

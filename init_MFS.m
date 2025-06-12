@@ -54,7 +54,7 @@ opt.ellipsoid = 0;
 opt.fmm = 0; 
 opt.disc = 0;
 opt.get_traction = 0; 
-opt.ls_glob = 1.2; %M (number of collocation point) > N (number of sources on proxy surface)
+opt.a_glob = 1.2; %M (number of collocation point) > N (number of sources on proxy surface)
 
 %% discretisation with images
 opt.lines = 1; 

@@ -1,51 +1,49 @@
-function [Y,UU,LL,Kin,Kout] = getSL(rin,rout,q)
-%getSL(rin,rout) Compute factors for the pseudoinverse for the mobility 
-% matrix of a single particle, given discretisation 
-if nargin<3   
-    q = [0 0 0]; %The particle is assumed to not be rotated
+function [Y, UU, LL, Kin, Kout] = getSL(rin, rout, q)
+%GETSL Preconditioner factors for the Stokes mobility matrix (single body).
+%
+%   [Y, UU, LL, Kin, Kout] = GETSL(rin, rout, q)
+%
+%   Constructs preconditioner and pseudoinverse factors for a single particle
+%   in the Stokes mobility problem using the Method of Fundamental Solutions (MFS).
+%   The function builds and factorizes a one-body matrix that enforces force/torque
+%   constraints while ensuring minimal-norm source densities.
+%
+%   INPUTS:
+%       rin  - N x 3 matrix of proxy source points.
+%       rout - M x 3 matrix of collocation points.
+%       q    - (Optional) 1 x 3 vector for the particle center. Default: [0 0 0].
+%
+%   OUTPUTS:
+%       Y     - Right-side pseudoinverse factor from getPseudoFactors.
+%       UU    - Left-side projection factor from getPseudoFactors.
+%       LL    - Force/torque projection matrix: LL = Kin * inv(Kinᵗ Kin) * Kinᵗ.
+%       Kin   - Mapping from source strength to net force and torque.
+%       Kout  - Mapping from RBM velocity to velocity on boundary.
+%
+%   DEPENDENCIES:
+%       - generate_stokes_mat, getKmat, getPseudoFactors
+%
+% Anna Broms, June 12, 2025
+
+if nargin < 3
+    q = [0 0 0];
 end
 
-S = generate_stokes_mat(rin,rout);
-Kout = getKmat(rout,q);
-Kin = getKmat(rin,q);
+% Build MFS and rigid-body matrices
+S    = generate_stokes_mat(rin, rout);
+Kin  = getKmat(rin, q);
+Kout = getKmat(rout, q);
 
-%Get projection matrix: 
-% tic
-% for k = 1:200
-% LL = getProjection(Kin,rin,q);
-% end
-% toc
-% 
-% %KtK = getKtK(rin,q); 
-% 
-% %Lr = Kout*Kin';
-% 
-% tic
-% for k = 1:200
-% LL2 = Kin*((Kin'*Kin)\Kin');
-% end
-% toc
-Lr = Kout*Kin';
-LL = Kin*((Kin'*Kin)\Kin'); 
+% Construct the force/torque projection matrix
+LL = Kin * ((Kin' * Kin) \ Kin');
 
-%Form 1-body matrix explicitly
-A = (S*(eye(size(LL))-LL)+Lr);
+% Build one-body operator
+A = S * (eye(size(LL)) - LL) + Kout * Kin';
 
-%cond(A) %or skeel(A) for debug.
-
-
-[U,SS,V] = svd(A,"econ");
-SS = diag(SS);
-%tol = 1e-14; 
-%ra = sum(SS>max(SS)*tol); 
-%iS = 1./SS(1:ra); % rank
-%Y = V(:,1:ra)*diag(iS); 
-%UU = U(:,1:ra)'
-
-iS = 1./SS; % rank
-
-Y = V*diag(iS); 
-UU = U';
-
+% Compute pseudoinverse factors 
+tol = 1e-15;
+visualise = 0; 
+[Y, UU] = getPseudoFactors(A,tol,visualise);
 
 end
+

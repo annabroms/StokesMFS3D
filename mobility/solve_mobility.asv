@@ -1,4 +1,4 @@
-function [U,iters,lambda_norm,uerr] = solve_mobility(q,Fvec,fmm,Rg,N)
+function [U,iters,lambda_norm,uerr] = solve_mobility(q,Fvec,fmm,Rp,N)
 %SOVLE_MOBILITY(q,Fvec,fmm,Rg,N) solves a Stokes mobility problem for
 %spherical particles centered at q affected by forces and torques in Fvec
 %(of size 6P, for each particle a force of size 3 x 1 followed by a torque
@@ -13,16 +13,18 @@ function [U,iters,lambda_norm,uerr] = solve_mobility(q,Fvec,fmm,Rg,N)
 %uerr is the max relative residual at the surface. 
 
 if nargin < 4
-    Rg = 0.68; %proxy radius
+    Rp = 0.68; %proxy radius
     N = 700; % approximate number of proxy sources on every particle
 elseif nargin < 5
     N = 700;
 end
 
+P = size(q,1);
+
 %initialize a bunch of parameters. Do not change if you don't really want.
 opt = init_MFS(N);
 %opt = init_MFS(1000);
-opt.Rg = Rg;
+opt.Rp = Rp;
 opt.fmm = fmm; 
 opt.maxit = 200; %max number of gmres iterations
 gmres_tol = 1e-7;
@@ -30,11 +32,12 @@ opt.plot = 0;
 
 
 % Inner proxy surface, outer collocation grid for single sphere using spherical design nodes
-[rin,rout,~,~] =  getGrids(opt.Rg,opt); 
+[rin,rout] =  getDesignGrid(opt.Rp,opt); 
 
 %Create pseudoinverse of self-interaction matrix, to be used in one-body
 %preconditioning
-[Y,UU,LL,Kin,~] = getSL(rin,rout);
+[Y,UU,LL,Kin,~] = oneBodyPrecondMob(rin,rout);
+
 
 N = size(rin,1); %number of sources per particle
 M = size(rout,1); %numer of collocation points per particle
@@ -46,7 +49,7 @@ lambda_vec = [];
 %Create grid on every particle. Also create completion source on every
 %particle, given force and torque.
 
-for k = 1:size(q,1)
+for k = 1:P
 
     %Create grid 
     rvec_in = [rvec_in; rin+q(k,:)];
@@ -55,7 +58,7 @@ for k = 1:size(q,1)
     %Create right hand side, given forces and torques on the particles
     F = Fvec(6*(k-1)+1:6*(k-1)+3);
     T = Fvec(6*(k-1)+4:6*k);
-    lambda_k = getLambda0(F,T,Kin);
+    lambda_k = getRecompletionSource(F,T,Kin);
     lambda_vec = [lambda_vec; lambda_k];
  
 end
@@ -65,7 +68,7 @@ uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt);
 uvec = -uvec;
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres_mv(@(x) matvec_mobility(x,rvec_in,rvec_out,q,UU,Y,LL,opt),uvec,3*size(rvec_out,1),opt.maxit,gmres_tol);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,0,[],LL),uvec,3*size(rvec_out,1),opt.maxit,gmres_tol);
 
 %chcek residual
 abs_res = norm(matvec_mobility(x_gmres,rvec_in,rvec_out,q,UU,Y,LL,opt)-uvec);
@@ -109,7 +112,7 @@ for i =1:size(q,1)
     densityK(3*(i-1)*N+1:i*3*N) = densityK_particle;
 end
 
-%get flow and comare
+%get flow and compare
 
 ubdry = getFlow(densityK,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
