@@ -1,19 +1,56 @@
-function [U,iters,lambda_norm,uerr] = solve_mobility(q,Fvec,fmm,Rp,N)
-%SOVLE_MOBILITY(q,Fvec,fmm,Rg,N) solves a Stokes mobility problem for
-%spherical particles centered at q affected by forces and torques in Fvec
-%(of size 6P, for each particle a force of size 3 x 1 followed by a torque
-%fo size 3 x 1). q is of size P x 3. The flag fmm sets if FMM3D is in use.
-%Optional params Rg and N set radius of proxy surface and number of source
-%points. 
-% 
-%Returns a vector of RBM velocities (translational / rotational) of
-%size 6P with the same format as the input force/torque vector. it is the
-%number of iterations required by GMRES and lambda_norm the maximum
-%magnitude of the source vector (bad if far too large (loss of accuracy).
-%uerr is the max relative residual at the surface. 
+function [U, iters, lambda_norm, uerr] = solve_mobility(q, Fvec, fmm, Rp, N)
+%SOLVE_MOBILITY Solve a Stokes mobility problem for spherical particles.
+%
+%   [U, iters, lambda_norm, uerr] = SOLVE_MOBILITY(q, Fvec, fmm, Rp, N)
+%
+%   Solves a mobility problem in Stokes flow for spherical particles using
+%   the Method of Fundamental Solutions (MFS). Given the applied forces and
+%   torques on each particle, the function computes the resulting translational
+%   and angular velocities.
+%
+%   INPUTS:
+%       q       - P x 3 matrix of particle centers.
+%       Fvec    - 6P x 1 vector of forces and torques on particles.
+%                 Format: [F1; T1; F2; T2; ...] with Fi, Ti in R^3.
+%       fmm     - Logical flag indicating whether to use FMM3D for fast evaluation.
+%       Rp      - (Optional) Radius of the proxy surface around each particle.
+%                 Default: 0.68.
+%       N       - (Optional) Number of proxy source points per particle.
+%                 Default: 700.
+%
+%   OUTPUTS:
+%       U           - 6P x 1 vector of rigid body velocities of the particles.
+%                     Format: [u1; omega1; u2; omega2; ...] with each in R^3.
+%       iters       - Number of GMRES iterations used to reach the tolerance.
+%       lambda_norm - Infinity norm of the final source density vector.
+%                     (Large values may signal unfavourable representation
+%                     for the problem, e.g. more sources needed or proxy surface 
+%                     needs to be closer to the particle surface).
+%       uerr        - Maximum relative velocity residual on the particle surfaces.
+%                     
+%
+%   METHOD OVERVIEW:
+%       - Initializes proxy and collocation grids on a unit sphere.
+%       - Constructs MFS RHS using "completion sources" based on input forces/torques.
+%       - Solves the MFS linear system using GMRES with one-body preconditioning.
+%       - Maps the solution source vector to rigid body velocity for each particle.
+%       - Validates accuracy by checking surface residuals at points different from the collocation nodes.
+%
+%   DEPENDENCIES:
+%       - init_MFS, getDesignGrid, oneBodyPrecondMob, getCompletionSource, getFlow, helsing_gmres,
+%         matvecStokesMFS, getKmat
+%
+%   EXAMPLE USAGE:
+%       q = [0 0 0; 2 0 0];
+%       Fvec = [1; 0; 0; 0; 0; 0; -1; 0; 0; 0; 0; 0];
+%       [U, iters, lambda_norm, uerr] = solve_mobility(q, Fvec, true);
+%
+% Anna Broms June 13, 2025
+
 
 P = size(q,1);
 
+% Set default values if Rg and N are not provided
 if nargin < 4
     Rp = 0.68; %proxy radius
     N = 700; % approximate number of proxy sources on every particle
@@ -21,24 +58,23 @@ elseif nargin < 5
     N = 700;
 end
 
-P = size(q,1);
-
-%initialize a bunch of parameters. Do not change if you don't really want.
+% initialize a bunch of parameters. Do not change if you don't really want.
 opt = init_MFS(N);
 %opt = init_MFS(1000);
 opt.Rp = Rp;
 opt.fmm = fmm; 
 opt.maxit = 200; %max number of gmres iterations
 gmres_tol = 1e-7;
-opt.plot = 0; 
+opt.plot = 0; %visualise?
 
-
+%% Discretize one body
 % Inner proxy surface, outer collocation grid for single sphere using spherical design nodes
 [rin,rout] =  getDesignGrid(opt.Rp,opt); 
 
-%Create pseudoinverse of self-interaction matrix, to be used in one-body
-%preconditioning
+%% One-body preconditioning
+%Create pseudoinverse of self-interaction matrix,
 [Y,UU,LL,Kin,~] = oneBodyPrecondMob(rin,rout);
+
 %The format is used to prepare for the case when different shapes are is
 %use
 Yii{1} = Y;
@@ -47,44 +83,16 @@ UUii{1} = UU;
 N = size(rin,1); %number of sources per particle
 M = size(rout,1); %numer of collocation points per particle
 
+%% Assemble grid and completion source
+%Create grid on every particle. Also create completion source on every
+%particle, given force and torque.
+
 rvec_in = [];
 rvec_out = [];
 lambda_vec = []; 
 
-%Create grid on every particle. Also create completion source on every
-%particle, given force and torque.
-
 for k = 1:P
 
-    %Create grid % if vars.fmm 
-%     nd = 1;
-%     srcinfo.nd = nd;
-% 
-%     ifppreg = 0;
-%     ifppregtarg = 1;
-% 
-%     srcinfo.sources = rin';
-%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
-% 
-%     targ = rout';  
-%     eps = vars.eps; % was -6
-% 
-% 
-%     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
-%     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
-% 
-%     res = U.pottarg(:);
-% 
-%     clear U srcinfo;
-% else
-%     targ = rout; 
-%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
-%     U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
-%        % instead for comparison
-%     U = U';
-%     res = 1/8/pi*U(:);
-% 
-% end
     rvec_in = [rvec_in; rin+q(k,:)];
     rvec_out = [rvec_out; rout+q(k,:)];
     
@@ -96,48 +104,47 @@ for k = 1:P
  
 end
 
-%Get flow field due to completion source.
+%% Get flow field due to completion source.
 uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt); 
 uvec = -uvec;
+
 
 %% Solve for source strengths
 [x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UUii,Yii,opt,0,[],LL),uvec,3*size(rvec_out,1),opt.maxit,gmres_tol);
 
-%chcek residual
-abs_res = norm(matvec_mobility(x_gmres,rvec_in,rvec_out,q,UU,Y,LL,opt)-uvec);
+%check residual
+abs_res = norm(matvecStokesMFS(x_gmres,rvec_in,rvec_out,q,UUii,Yii,opt,0,[],LL)-uvec);
 
 
-%% Determine velocities and Map back to the sought density in source points
+%% Map back to the sought density in source points, determine rigid body velocities 
 U = zeros(6*P,1);
 for i = 1:P
     lambda_gmres((i-1)*3*N+1:i*3*N) = Y*(UU*x_gmres((i-1)*3*M+1:i*3*M));
     lambda_i = Y*(UU*x_gmres((i-1)*3*M+1:i*3*M));
-    U(6*(i-1)+1:6*i) = -Kin'*lambda_i;  %Test scaling here
+    U(6*(i-1)+1:6*i) = -Kin'*lambda_i;  
 end
 lambda_norm = norm(lambda_gmres,inf);
 
 
 %% Check residual
-%Get check points
-b = ellipsoid_param(1,1,1);   % baseline object at the origin, aligned
-b = setupsurfquad(b,[46,55]);
+% Get new nodes for evaluating velocity residuals
+opt.des_n = 2000; %fine grid
+[~, rout_check] = getDesignGrid(opt.Rp, opt);
+n_check = size(rout_check,1); 
 
-rcheck = []; 
+% Assemble all check points
+rcheck = [];
 for k = 1:P
-    x = q(k,:)' + b.x;    % rot then transl, b just for vis
-    rcheck = [rcheck; x'];    
+    x = q(k,:) + rout_check;
+    rcheck = [rcheck; x];
 end
-n_check = size(b.x,2);
 
-
-%plot3(rcheck(:,1),rcheck(:,2),rcheck(:,3),'m.');
 
 %Assign velocities at checkpoints
 ucheck = zeros(n_check*3*size(q,1),1); 
 for k = 1:size(q,1)
     Kcheck = getKmat(rcheck(n_check*(k-1)+1:k*n_check,:),q(k,:));
-    ucheck((k-1)*3*n_check+1:3*k*n_check) = Kcheck*U((k-1)*6+1:k*6);
-    
+    ucheck((k-1)*3*n_check+1:3*k*n_check) = Kcheck*U((k-1)*6+1:k*6);   
 end
 
 for i =1:P
@@ -145,8 +152,7 @@ for i =1:P
     densityK(3*(i-1)*N+1:i*3*N) = densityK_particle;
 end
 
-%get flow and compare
-
+%get flow and compare RHS and LHS of representation
 ubdry = getFlow(densityK,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);

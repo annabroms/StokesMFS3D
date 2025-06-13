@@ -25,7 +25,7 @@ function G = generate_stokes_mat(rin, rout)
 %
 %   EXAMPLE USAGE:
 %       rin = rand(10,3);
-%       rout = rand(5,3);
+%       rout = rand(12,3);
 %       S = generate_stokes_mat(rin, rout);
 %
 %   Anna Broms June, 12, 2025

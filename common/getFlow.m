@@ -27,8 +27,9 @@ function res = getFlow(tau_stokes, rin, rout, vars)
 %       - Otherwise, it falls back to direct evaluation via a mex interface to SE0P_Stokeslet_direct_full_ext_mex.
 %
 %   DEPENDENCIES:
-%       - FMM3D (https://github.com/flatironinstitute/fmm3d)
-%       - SE0P_Stokeslet_direct_full_ext_mex (precompiled, for direct evaluation)
+%       - Accelerated evaluation: FMM3D (https://github.com/flatironinstitute/fmm3d)
+%       - Direct evaluation: SE0P_Stokeslet_direct_full_ext_mex
+%       (https://github.com/annabroms/Stokes_Direct -- precompiled binary exists)
 %
 % Anna Broms June 12, 2025
 

@@ -30,7 +30,7 @@ function [Fvec,iters,lambda_norm,err_res] = solve_resistance(q,U,fmm,Rp,N)
 %
 %   METHOD OVERVIEW:
 %       - Builds inner (proxy) and outer (collocation) grids for each particle.
-%       - Constructs velocity boundary conditions from given velocities.
+%       - Constructs velocity boundary conditions from given rigid body velocities.
 %       - Applies a one-body preconditioned GMRES solver to solve for source strengths.
 %       - Computes forces and torques 
 %       - Validates accuracy by evaluating flow at checkpoint nodes and

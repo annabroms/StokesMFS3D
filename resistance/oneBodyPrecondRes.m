@@ -26,7 +26,7 @@ function [Y, U] = oneBodyPrecondRes(rin, rout)
 %         many-body resistance solve.
 %
 %   NOTES:
-%       - Singular values below tol * max(Σ) are truncated, with a
+%       - Singular values below tol * max(Σ) are truncated, with
 %         tol=1e-15 as a default.
 %       - The condition number of S and its spectrum are not returned but could
 %         be visualized for diagnostics with the flag visualise = 1. 

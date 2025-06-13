@@ -34,6 +34,10 @@ function K = getKmat(r, q)
 %     as per: https://en.wikipedia.org/wiki/Cross_product
 
 % Construct helper function to get cross product matrix (used for omega × x)
+
+assert(size(r,2)==3,"r must be transposed")
+assert(size(q,2)==3,"q must be transposed")
+
 cross_mat = @(x) -[0    -x(3)  x(2);
                    x(3)  0    -x(1);
                   -x(2)  x(1)   0];
@@ -41,10 +45,6 @@ cross_mat = @(x) -[0    -x(3)  x(2);
 NP = size(r,1);       % Total number of surface points
 P = size(q,1);       % Number of particles
 N = NP / P;          % Number of points per particle (assumed equal)
-
-% Transpose for easier column-wise indexing
-r = r';              % 3 x NP
-q = q';              % 3 x P
 
 % Initialize K
 K = zeros(3*NP, 6*P); % Final matrix to fill
@@ -58,7 +58,7 @@ for i = 1:P
     % Compute (r - q_i) for each point on particle i
     for k = 1:N
         idx = (i-1)*N + k;         % global index for point
-        B(3*(k-1)+1:3*k,:) = cross_mat(r(:,idx) - q(:,i));
+        B(3*(k-1)+1:3*k,:) = cross_mat(r(idx,:) - q(i,:));
     end
 
     % Assemble 3N x 6 block: [I; skew]

@@ -15,7 +15,8 @@ function [rbase_in, rbase_out] = getDesignGrid(Rp, opt)
 %                          points, N, Typically, M \approx 1.2N. 
 %
 %   NOTE: Spherical designs do not exist for all integers, so the true
-%         number of proxy points N will be close to des_n
+%         number of proxy points N will be close to des_n. The same is true
+%         for choosing M.
 %
 %   OUTPUTS:
 %     rbase_in  - (N x 3) matrix of 3D Cartesian coordinates for the inner spherical 

@@ -1,7 +1,7 @@
 function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag,R,L)
 %MATVECSTOKESMFS Matrix-vector product for basic Stokes MFS (without image enhancement) 
 %
-%   res = MATVECSTOKESMFS(mu, rin, rout, q, Uii, Yii, vars, R,resistance_flag,R,L)
+%   res = MATVECSTOKESMFS(mu, rin, rout, q, Uii, Yii, vars, R, resistance_flag,R,L)
 %
 %   Computes the matrix-vector product A*mu for the linear system arising
 %   in a 1-body precomputed Stokes problem solved via the Method of Fundamental Solutions (MFS).
@@ -19,7 +19,7 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 %       vars   - Struct with solver settings and flags:
 %                - vars.fmm: if true, use FMM3D to evaluate flow.
 %                - vars.profile: if true, calls memorygraph profiling tool.
-%                - vars.ellipsoid: if true, includes rotation matrices in R.
+%                - vars.ellipsoid: if true, need rotation matrices in R.
 %       resistance_flag - boolean to determine whether a resistance or mobility
 %                   problem is solved
 %       R      - (Optional) Cell array of 3x3 rotation matrices for ellipsoidal particles.
@@ -27,17 +27,18 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 %      
 %
 %   OUTPUT:
-%       res    - Resulting 3*M*P x 1 vector corresponding to A*mu.
+%       res    - Resulting 3*M*P x 1 velocity vector corresponding to A*mu.
 %
 %   METHOD:
 %       1. Applies preconditioner mapping: source density from boundary
-%       data: lambda <- mu. If mobility, computes lambda <- (I-L)lambda
-%       2. Uses FMM or direct sum to evaluate flow at all collocation points.
+%       data: lambda <- mu. If mobility, also computes lambda <- (I-L)lambda
+%       2. Uses FMM or direct sum to evaluate flow at all collocation
+%       points due to all sources.
 %       3. Correct identity blocks: Adds mu and removes diagonal
 %       self-interaction contributions to improve stability and conditioning
 %
 %   ASSUMPTIONS:
-%       - All particles have the same geometry and source setup up to rotations (however
+%       - All particles have the same geometry and source setup, up to rotations (however
 %       easy to modify). 
 %
 %   DEPENDENCIES:
@@ -107,7 +108,7 @@ if vars.profile
     memorygraph('label','compute FMM');
 end
 
-%% Do one call to FMM (or direct evaluation) with all source and target
+%% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
 res = getFlow(lambda_stokes,rin,rout,vars);
 
