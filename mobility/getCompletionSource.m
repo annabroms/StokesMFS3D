@@ -1,7 +1,7 @@
-function lambda0 = getRecompletionSource(F, T, Kin)
-%GETRECOMPLETIONSOURCE Construct recompletion source lambda0 for a particle in Stokes flow.
+function lambda0 = getCompletionSource(F, T, Kin)
+%GETCOMPLETIONSOURCE Construct recompletion source lambda0 for a particle in Stokes flow.
 %
-%   lambda0 = GETRECOMPLETIONSOURCE(F, T, Kin)
+%   lambda0 = GETCOMPLETIONSOURCE(F, T, Kin)
 %
 %   Computes the Stokeslet source density lambda0 on a proxy surface (inner
 %   surface) such that it reproduces the specified net force F and

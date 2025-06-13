@@ -20,7 +20,7 @@ delta = 1; %smallest particle particle distance
 %distance
 [q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
   
-fmm = 0; %only activate if many particles (say, more than 40)
+fmm = 1; %only activate if many particles (say, more than 40)
 
 %% Solve resistance problem first (given velocities)
 disp('Start with resistance: ')

@@ -54,7 +54,7 @@ function [Fvec,iters,lambda_norm,err_res] = solve_resistance(q,U,fmm,Rp,N)
 %   Anna Broms, June 12, 2025
 
 %% Parameters 
-% Handle optional inputs Rg (proxy radius) and N (number of proxy points).
+% Handle optional inputs Rp (proxy radius) and N (number of proxy points).
 % If not provided, use default values.
 if nargin < 4
     Rp = 0.68; 

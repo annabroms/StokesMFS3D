@@ -56,14 +56,42 @@ lambda_vec = [];
 
 for k = 1:P
 
-    %Create grid 
+    %Create grid % if vars.fmm 
+%     nd = 1;
+%     srcinfo.nd = nd;
+% 
+%     ifppreg = 0;
+%     ifppregtarg = 1;
+% 
+%     srcinfo.sources = rin';
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+% 
+%     targ = rout';  
+%     eps = vars.eps; % was -6
+% 
+% 
+%     U = stfmm3d(eps,srcinfo,ifppreg,targ,ifppregtarg);    
+%     %U = st3ddir(srcinfo,targ,ifppregtarg); %Try to use this one
+% 
+%     res = U.pottarg(:);
+% 
+%     clear U srcinfo;
+% else
+%     targ = rout; 
+%     srcinfo.stoklet = reshape(tau_stokes,3,[]);
+%     U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
+%        % instead for comparison
+%     U = U';
+%     res = 1/8/pi*U(:);
+% 
+% end
     rvec_in = [rvec_in; rin+q(k,:)];
     rvec_out = [rvec_out; rout+q(k,:)];
     
     %Create right hand side, given forces and torques on the particles
     F = Fvec(6*(k-1)+1:6*(k-1)+3);
     T = Fvec(6*(k-1)+4:6*k);
-    lambda_k = getRecompletionSource(F,T,Kin);
+    lambda_k = getCompletionSource(F,T,Kin);
     lambda_vec = [lambda_vec; lambda_k];
  
 end

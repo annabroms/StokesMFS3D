@@ -9,21 +9,22 @@ This code demonstrates the basic algorithm using source points on proxy surfaces
 
 ## Features
 
-- Solves Stokes mobility and resistance problems via MFS.
-- Large scale rigid sphere suspensions simulated at low cost.
 - Demonstrates the method using minimal input (`demo.m`)
+- Large scale rigid sphere suspensions simulated at low cost.
 - One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
 
 ## Dependencies
 
-To run simulations effectively, ensure the following dependencies are available:
+To run simulations, ensure the following dependencies are available:
 
 - **[FMM3D](https://github.com/flatironinstitute/FMM3D)**  
   Recommended for accelerating calculations with many particles (typically >40 with default settings)
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for direct evaluation of fundamental solutions.  
-  Only `Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` folder.
+  Only `SE0P_Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` repository.
+
+To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getFlow.m.
 
 - **Spherical Design Nodes**  
   Used to construct the source/target geometry. See `geometry/README.md` for details.
