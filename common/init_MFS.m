@@ -12,7 +12,7 @@ opt.tol = 1e-14; %default tolerance for the truncated SVD
 opt.plot = 0; % debug parameter
 
 opt.maxit = 400;  %max number of GMRES iterations
-opt.gmres_tol = 1e-6; %GMRES tol
+opt.gmres_tol = 1e-7; %GMRES tol
 
 opt.profile = 0; %activate profiling
 

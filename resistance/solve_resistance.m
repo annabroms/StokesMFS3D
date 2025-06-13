@@ -1,100 +1,60 @@
-function [Fvec,iters,lambda_norm,err_res] = solve_resistance(q,U,fmm,Rp,N)
-%SOLVE_RESISTANCE Solve a Stokes resistance problem for spherical particles.
+function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec_out, U, opt, R, E0)
+%SOLVE_RESISTANCE Solve a Stokes resistance problem for a configuration of ellipsoidal particles using MFS.
 %
-%   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE(q, U, fmm, Rp,N)
+%   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE(q, rvec_in, rvec_out, U, opt, R, E0)
 %
-%   Computes the hydrodynamic forces and torques on spherical particles
-%   immersed in Stokes flow, given prescribed translational and rotational
-%   velocities. The function is based on the Method of Fundamental Solutions (MFS)
-%   with proxy source points placed on inner spherical surfaces and boundary
-%   velocity conditions enforced at a slightly larger number of collocation
-%   points at the true particle surfaces.
+%   Given prescribed translational and angular velocities, the function computes the resulting hydrodynamic forces 
+%   and torques acting on each particle.
 %
 %   INPUTS:
-%       q       - Px3 matrix of particle centers, with P the number of particles.
-%       U       - 6P x 1 vector of prescribed translational and angular velocities.
-%                 Format: [u1; omega1; u2; omega2; ...], each ui and omegai is 3x1.
-%       fmm     - Logical flag: if true, use FMM3D acceleration.
-%       Rp      - (Optional) Radius of the proxy surface around each particle.
-%                 Default is 0.68.
-%       N       - (Optional) Number of proxy source points per particle.
-%                 Default is 700.
+%       q         - P × 3 matrix of particle center positions, x,y,z
+%       rvec_in   - 3NP × 1 vector of proxy source points (stacked).
+%       rvec_out  - 3MP × 1 vector of collocation points on particle surfaces (stacked).
+%       U         - 6P × 1 vector of prescribed rigid body velocities: [u1; omega1; u2; omega2; ...].
+%       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
+%       R         - P × 1 cell array of rotation matrices for the P particles.
+%       E0        - 1 × 3 vector of semiaxes [a, b, c] of the ellipsoidal particles.
 %
 %   OUTPUTS:
-%       Fvec        - 6P x 1 vector of computed forces and torques on each particle.
-%                     Format matches input velocity vector.
-%       iters       - Number of GMRES iterations used to reach tolerance.
-%       lambda_norm - Infinity norm of the source density vector; a large value
-%                     may indicate loss of accuracy or ill-conditioning.
-%       err_res     - Maximum relative error in velocity on the particle surface.
+%       Fvec        - 6P × 1 vector of computed forces and torques: [F1; T1; F2; T2; ...].
+%       iters       - Number of GMRES iterations until convergence.
+%       lambda_norm - Infinity norm of the final source density vector (for diagnostic use).
+%       err_res     - Maximum relative residual in velocity on the particle surfaces.
 %
 %   METHOD OVERVIEW:
-%       - Builds inner (proxy) and outer (collocation) grids for each particle.
-%       - Constructs velocity boundary conditions from given rigid body velocities.
-%       - Applies a one-body preconditioned GMRES solver to solve for source strengths.
-%       - Computes forces and torques 
-%       - Validates accuracy by evaluating flow at checkpoint nodes and
-%       comparing to known Dirichlet boundary data.
-%
-%   NOTES:
-%       - Assumes all particles are identical and spherical.
-%       - The function can visualize the configuration if 'visualise' is enabled.
-%       - Uses spherical design nodes
-%       - Matrix-free GMRES 
+%       - Builds MFS representation from collocation and proxy surfaces.
+%       - Enforces rigid body velocity boundary conditions on the true particle surfaces.
+%       - Computes surface force densities using a one-body preconditioned GMRES solve.
+%       - Extracts the resulting net forces and torques.
+%       - Validates accuracy by evaluating velocity residuals in new check points.
 %
 %   DEPENDENCIES:
-%       - init_MFS, getDesignGrid, getKmat, oneBodyPrecondRes,
-%         helsing_gmres, getFlow
+%       init_MFS, getDesignGrid, getVelocityData, matvecStokesMFS,
+%       oneBodyPrecondRes, helsing_gmres, getKmat, getFlow
 %
-%   EXAMPLE USAGE:
-%       q = [0 0 0; 3 0 0]; % Two particles separated by delta = 1.
-%       U = [1; 0; 0; 0; 0; 0; -1; 0; 0; 0; 0; 0]; 
-%       [F, iters, lambda_norm, err] = solve_resistance(q, U, false);
+%   See also: LARGE_ELLIPSOID_EX, SOLVE_MOBILITY
 %
-%   Anna Broms, June 12, 2025
+%   Anna Broms, June 13, 2025
 
-%% Parameters 
-% Handle optional inputs Rp (proxy radius) and N (number of proxy points).
-% If not provided, use default values.
-if nargin < 4
-    Rp = 0.68; 
-    N = 700;
-elseif nargin < 5
-    N = 700;
-end
-
-% Initialize MFS options 
-opt = init_MFS(N);
-opt.Rp = Rp;
-opt.fmm = fmm;          % Enable or disable FMM acceleration
-opt.maxit = 600;        % GMRES max iterations
-gmres_tol = 1e-7;       % GMRES tolerance
 
 P = size(q,1); %number of spheres
 
-
-%% Particle geometry
-% Build inner (proxy) and outer (collocation) surfaces for a unit sphere.
-% These will later be translated to each particle center.
-[rin, rout] = getDesignGrid(opt.Rp, opt);
-
-% Get number of proxy and collocation points
-N = size(rin,1);
-M = size(rout,1);
-
-rvec_in = [];   % proxy source points on everybody
-rvec_out = [];  % collocation points on surfaces of everybody
-
-for k = 1:P
-    rvec_in = [rvec_in; rin + q(k,:)];     % translate inner points
-    rvec_out = [rvec_out; rout + q(k,:)];  % translate outer points
+if nargin < 6
+    R = eye(3);
+    E0 = [1 1 1];
+elseif nargin < 7
+    E0 = [1 1 1];
 end
+
+
+N = size(rvec_in,1)/P;
+M = size(rvec_out,1)/P;
 
 
 %% Visualize geometry
 % Optional block for displaying the particle configuration 
-visualise = 1;
-if visualise
+
+if opt.plot
     [XX,YY,ZZ] = sphere(12);
     r = 1; % assumed unit sphere
     figure()
@@ -112,16 +72,24 @@ end
 
 
 %% Assign RHS in resistance problem
-Kout = getKmat(rout,[0,0,0]);
+
+Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
 %For each particle, get data at surface, given rigid body motion
 for k = 1:P
+    if opt.ellipsoid
+        Kout = getKmat(rvec_out(M*(k-1)+1:k*M,:),q(k,:)); %If spheres, this will be the same matrix for every one.
+    end
     u_bndry((k-1)*3*M+1:3*k*M) = Kout*U((k-1)*6+1:k*6);
 end
 
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
-
-[Yk,UUk] = oneBodyPrecondRes(rin,rout);
+if opt.ellipsoid
+    [Yk,UUk] = oneBodyPrecondRes((R{1}'*rvec_in(1:N,:)')',...
+    (R{1}'*rvec_out(1:M,:)')');
+else
+    [Yk,UUk] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:));
+end
 
 %The format is used to prepare for the case when different shapes are is
 %use
@@ -134,7 +102,7 @@ if opt.profile
 end
 
 %% Solve problem
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,[]),u_bndry',3*size(rvec_out,1),opt.maxit,gmres_tol,0);
+[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry',3*size(rvec_out,1),opt.maxit,opt.gmres_tol,0);
 
 if opt.profile
     memorygraph('label','done matvec resistance, remap and determine force')
@@ -144,9 +112,15 @@ end
 % lambda <- mu. Then, determine forces and torques on particles, given lambda
 
 Fvec = zeros(6*size(q,1),1);
-Kin = getKmat(rin,[0,0,0]);
+Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
 for i = 1:P
-    lambda_i = Y{1}*(UU{1}*(mu_gmres((i-1)*3*M+1:i*3*M)));
+    if opt.ellipsoid
+        temp_i = Y{1}*(UU{1}*(rotate_vector(mu_gmres((i-1)*3*M+1:i*3*M),R{i}')));
+        lambda_i = rotate_vector(temp_i,R{i});
+        Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
+    else
+        lambda_i = Y{1}*(UU{1}*(mu_gmres((i-1)*3*M+1:i*3*M)));
+    end
     lambda_gmres(3*(i-1)*N+1:i*3*N) = lambda_i;
     Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
 end
@@ -162,16 +136,21 @@ if opt.profile
 end
 
 % Get new nodes for evaluating velocity residuals
-opt.des_n = 2000; %fine grid
-[~, rout_check] = getDesignGrid(opt.Rp, opt);
-n_check = size(rout_check,1); 
+b = ellipsoid_param(E0(1),E0(2),E0(3));   % baseline object at the oridin, aligned
+b = setupsurfquad(b,[46,55]);
 
-% Assemble all check points
-rcheck = [];
+rcheck = []; 
 for k = 1:P
-    x = q(k,:) + rout_check;
+    if opt.ellipsoid
+        x = q(k,:)+(R{k}*b.x)';
+    else
+        x = q(k,:) + b.x'; 
+    end
+
     rcheck = [rcheck; x];
+ 
 end
+n_check = size(b.x,2);
 
 % Assign expected velocity at check points using prescribed U
 ucheck = zeros(n_check*3*P,1);

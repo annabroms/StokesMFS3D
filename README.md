@@ -1,16 +1,16 @@
 
 # StokesMFS3D
 
-**StokesMFS3D** provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving the **Stokes resistance** and **mobility problems** for spherical rigid bodies.
+**StokesMFS3D** provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving the **Stokes resistance** and **mobility problems** for spherical or ellipsoidal rigid bodies.
 
 This code demonstrates the basic algorithm using source points on proxy surfaces only. 
 
-> **Note**: The advanced image enhancement technique presented in [Broms et al. (2024)](#publications) is *not yet included* in this version. It is therefore recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
+> **Note**: The advanced image enhancement technique for spheres presented in [Broms et al. (2024)](#publications) is *not yet included* in this version. It is therefore recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
 
 ## Features
 
-- Demonstrates the method using minimal input (`demo.m`)
-- Large scale rigid sphere suspensions simulated at low cost.
+- Demonstrates the method using minimal input.
+- Large scale suspensions of spheres or ellipsoidals simulated at low cost.
 - One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
 
 ## Dependencies
@@ -29,9 +29,13 @@ To use your own method for accelerated or direct evaluation of Stokeslets, just 
 - **Spherical Design Nodes**  
   Used to construct the source/target geometry. See `geometry/README.md` for details.
 
-## Example
+- **[Memorygraph](https://github.com/ahbarnett/memorygraph)**
+Used for profiling and checks on memory usage.
 
-Run `demo.m` to reproduce a basic simulation for spherical particles using the MFS.
+## Example
+In the experiments folder:
+- Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
+- Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.
 
 ## Publications
 
@@ -50,7 +54,6 @@ This work is based on the following research papers:
 Planned additions include:
 
 - Lubrication-based image enhancement (as in [1])
-- Support for ellipsoidal particle geometries
 
 ![Clustered particles](cluster.png)
 

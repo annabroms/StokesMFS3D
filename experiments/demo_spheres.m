@@ -15,7 +15,7 @@ close all
 % Mobility Problems). To do so, generate configurations with [q,B] = grow_cluster(P,delta);
 % below and loop over delta or P. 
 %%  Generate center coordinates for the particles
-P = 40; %number of bodies
+P = 20; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 
@@ -30,13 +30,16 @@ fmm = 1; %only activate if many particles (say, more than 40)
 %% Solve resistance problem first (given velocities)
 disp('Start with resistance: ')
 Uref = rand(6*P,1); 
+Fref = rand(6*P,1);
 
 %Note, for resistance, the number of GMRES iters will grow with P. For both
 %resistance and mobility, GMRES iters will increase with decreasing delta.
-
-[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,Uref,fmm); 
-
-[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,Fvec,fmm); 
+[rvec_in,rvec_out,opt] = init_spheres(q);
+opt.fmm = fmm;
+[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
+Rp = 1-1.05*(1-opt.Rp);
+[rvec_in,rvec_out,opt] = init_spheres(q,Rp);
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt); 
 
 %might want to change proxy radius a little to get fair 2-way error, when solving resistance followed by mobility. 
 % Use Rp as extra argument to solve_mobility (see commented code below)
@@ -49,16 +52,6 @@ disp('Residual in resistance problem')
 err_res
 
 
-% %% Solve mobility problem first 
-% disp('Start with mobility: ')
-% Fref = rand(6*P,1); 
-% Rp = 0.63;
-% U = solve_mobility(q,Fref,fmm,1.01*Rp);
-% 
-% [Fvec,it,lambda_norm2] = solve_resistance(q,U,fmm,Rp); 
-% 
-% disp('Two way error')
-% norm(Fvec-Fref,inf)/norm(Fref,inf)
 
 
 
