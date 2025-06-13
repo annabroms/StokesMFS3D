@@ -8,9 +8,14 @@ close all
 % input. Returns computed RBM.
 %
 % The "2-way" error is determined by comparing the given RBM (the input to
-% 1) to the computed RBM from 2. 
+% 1. to the computed RBM from 2. 
+%
+% This demo code can be used to generate Examples 1 and 2 in paper [2] 
+% (A Method of Fundamental Solutions for Large-Scale 3D Elastance and
+% Mobility Problems). To do so, generate configurations with [q,B] = grow_cluster(P,delta);
+% below and loop over delta or P. 
 %%  Generate center coordinates for the particles
-P = 10; %number of bodies
+P = 40; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 
@@ -20,7 +25,7 @@ delta = 1; %smallest particle particle distance
 %distance
 [q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
   
-fmm = 0; %only activate if many particles (say, more than 40)
+fmm = 1; %only activate if many particles (say, more than 40)
 
 %% Solve resistance problem first (given velocities)
 disp('Start with resistance: ')
