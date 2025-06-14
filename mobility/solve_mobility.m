@@ -52,7 +52,7 @@ P = size(q,1);
 N = size(rvec_in,1)/P; %number of sources per particle
 M = size(rvec_out,1)/P; %numer of collocation points per particl
 
-%Create pseudoinverse of self-interaction matrix,delta= 0.2; %minimum distance between particles
+%Create pseudoinverse of self-interaction matrix,
 if opt.ellipsoid
     [Y,UU,LL,Kin,~] = oneBodyPrecondMob((R{1}'*rvec_in(1:N,:)')',...
         (R{1}'*rvec_out(1:M,:)')',q(1,:));

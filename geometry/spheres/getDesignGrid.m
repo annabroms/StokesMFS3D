@@ -40,11 +40,39 @@ function [rbase_in, rbase_out] = getDesignGrid(Rp, opt)
 %
 % Anna Broms June 12, 2025
 
+if nargin<1
+    self_test();
+    return;
+end
+
 [X, ~] = get_sphdesign(opt.des_n);
 rbase_in = Rp * X;
 
 [X, ~] = get_sphdesign(ceil(opt.a_glob * opt.des_n));
 rbase_out = X;
+
+end
+
+function self_test()
+
+% Parameters
+Rp = 0.6;
+opt.des_n = 100;
+opt.a_glob = 1.2;
+
+% Get grids
+[rbase_in, rbase_out] = getDesignGrid(Rp, opt);
+
+figure;
+scatter3(rbase_in(:,1), rbase_in(:,2), rbase_in(:,3), 36, 'b', 'filled'); hold on;
+scatter3(rbase_out(:,1), rbase_out(:,2), rbase_out(:,3), 36, 'r', 'filled');
+
+axis equal;
+xlabel('x'); ylabel('y'); zlabel('z');
+legend('Inner grid (radius 0.6)', 'Outer grid (radius 1)');
+title('Spherical design grids: close to uniform distributions');
+view(3);
+grid on;
 
 end
 

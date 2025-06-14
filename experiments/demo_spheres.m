@@ -1,19 +1,34 @@
 clear;
 close all
-%% Demo for Stokes MFS in 3D for a random configuration of P spherical particles: 
-% We solve 
-% 1. A resistance problem with no-slip bc set from random RBM (rigid body
-% motion). Returns vector of net forces/torques on every particle. 
-% 2. A mobility problem with the computed net forces/torques from 1. as
-% input. Returns computed RBM.
+%%%%%% Demo for Stokes MFS in 3D for a random configuration of P spherical
+% particles:
+%
+% We solve 1. A resistance problem with no-slip bc set from random RBM
+% (rigid body motion). Returns vector of net forces/torques on every
+% particle. 2. A mobility problem with the computed net forces/torques from
+% 1. as input. Returns computed RBM.
 %
 % The "2-way" error is determined by comparing the given RBM (the input to
-% 1. to the computed RBM from 2. 
+% 1. to the computed RBM from 2.
 %
-% This demo code can be used to generate Examples 1 and 2 in paper [2] 
-% (A Method of Fundamental Solutions for Large-Scale 3D Elastance and
-% Mobility Problems). To do so, generate configurations with [q,B] = grow_cluster(P,delta);
-% below and loop over delta or P. 
+% This demo code can be modified to generate 
+%
+% * Example 1 in paper [1] (Accurate close interactions of Stokes spheres
+% using lubrication-adapted image systems, JCP 2024). To do so, generate
+% configurations with q = set_position(P,L,delta); below and solve only the
+% resistance problem with given randomly sampled translational and angular
+% velocities.
+%
+% * Example 2 in paper [1]. To do so, generate
+% configurations with [q,B] = grow_cluster(P,delta) below and set boundary
+% conditions from a background flow in the resistance problem.
+% 
+% * Examples 1 and 2 in paper [2] (A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility
+% Problems, ACOM, 2025). To do so, generate configurations with [q,B] =
+% grow_cluster(P,delta) below and loop over delta or P. Solve a resistance
+% problem, followed by a mobility problem. 
+% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Generate center coordinates for the particles
 P = 20; %number of bodies
 delta = 1; %smallest particle particle distance 

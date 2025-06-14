@@ -3,7 +3,10 @@ function [q,B] = grow_cluster(P,delta,dim)
 %delta away from at least one neighbour. dim can be set to 2 or 3 for 2D or 3D
 % Anna Broms 4/12/24
 
-if nargin<3
+if nargin <1
+    self_test();
+    return;
+elseif nargin<3
     dim = 3;
     c = 0;
 end
@@ -130,3 +133,44 @@ end
 res = min(vecnorm(q-qnew,2,2)-2);
 
 end
+
+
+function self_test()
+
+%Visualise a cluster with P=10 spheres in 3D.
+
+% Parameters
+P = 10;
+delta = 0.1;
+dim = 3;
+
+% Generate configuration
+[q, ~] = grow_cluster(P, delta, dim);
+
+% Create unit sphere mesh
+[X, Y, Z] = sphere(20);  % higher resolution than default
+
+% Plot spheres
+figure;
+hold on;
+for k = 1:P
+    surf( ...
+        q(k,1) + X, ...
+        q(k,2) + Y, ...
+        q(k,3) + Z, ...
+        'EdgeColor', 'none', ...
+        'FaceColor', rand(1,3) ...
+    );
+end
+axis equal;
+xlabel('x'); ylabel('y'); zlabel('z');
+title(sprintf('Cluster of %d spheres (\\delta = %.2f)', P, delta));
+camlight; lighting gouraud;
+view(3);
+grid on;
+
+end
+
+
+
+

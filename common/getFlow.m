@@ -25,6 +25,8 @@ function res = getFlow(tau_stokes, rin, rout, vars)
 %       - If vars.fmm is true, the function uses the FMM3D interface `stfmm3d`
 %         (requires FMM3D to be installed and compiled).
 %       - Otherwise, it falls back to direct evaluation via a mex interface to SE0P_Stokeslet_direct_full_ext_mex.
+%       - Modify this function for solving MFS with other fast summation
+%         technique or implementation of direction summation. 
 %
 %   DEPENDENCIES:
 %       - Accelerated evaluation: FMM3D (https://github.com/flatironinstitute/fmm3d)

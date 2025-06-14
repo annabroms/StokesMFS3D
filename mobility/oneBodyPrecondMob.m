@@ -29,7 +29,10 @@ function [Y, UU, LL, Kin, Kout] = oneBodyPrecondMob(rin, rout, q)
 %
 % Anna Broms, June 12, 2025
 
-if nargin < 3
+if nargin<1
+    self_test();
+    return;
+elseif nargin < 3
     q = [0 0 0];
 end
 
@@ -52,4 +55,44 @@ visualise = 0;
 UU = UU';
 
 end
+
+function self_test()
+% Self-test for oneBodyPrecondMob and getCompletionSource.
+% Verifies projection behavior.
+
+% Setup proxy and boundary points 
+Rp = 0.7;
+opt.des_n = 100;
+opt.a_glob = 1.2;
+[rbase_in, rbase_out] = getDesignGrid(Rp, opt);  % Unit test geometry
+
+% -Compute pseudoinverse and projection matrix 
+[Y, UU, LL, Kin, Kout] = oneBodyPrecondMob(rbase_in, rbase_out);
+
+% Define prescribed net force and torque 
+F = [1; 0; 0];   % Unit force in x
+T = [0; 0; 1];   % Unit torque about z
+
+% Construct completion source 
+lambda0 = getCompletionSource(F, T, Kin);
+
+% Check that (I - L) * lambda0 = 0 
+I = eye(size(LL));
+residual = norm((I - LL) * lambda0);
+fprintf('Relative residual ||(I - L) * lambda0|| = %.2e\n', residual);
+
+if residual > 1e-12
+    warning('(I - L) * lambda0 is not small — test failed!');
+end
+
+%Verify that Kin' * lambda0 = [F; T] 
+checkFT = Kin' * lambda0;
+fprintf('Error in F: %g, T: %g\n', norm(checkFT(1:3)-F), norm(checkFT(4:6)-T));
+
+%Check LL is a projection (i.e., L^2 = L) 
+Lerr = norm(LL*LL - LL);
+fprintf('Projection error ||L^2 - L|| = %.2e\n', Lerr);
+
+end
+
 

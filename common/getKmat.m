@@ -33,10 +33,15 @@ function K = getKmat(r, q)
 %     The sign convention for the cross product matrix follows the right-hand rule,
 %     as per: https://en.wikipedia.org/wiki/Cross_product
 
-% Construct helper function to get cross product matrix (used for omega × x)
+if nargin<1
+    self_test();
+    return;
+end
 
 assert(size(r,2)==3,"r must be transposed")
 assert(size(q,2)==3,"q must be transposed")
+
+% Construct helper function to get cross product matrix (used for omega × x)
 
 cross_mat = @(x) -[0    -x(3)  x(2);
                    x(3)  0    -x(1);
@@ -71,6 +76,40 @@ for i = 1:P
 end
 
 end
+
+function self_test()
+%   Visualizes surface velocities induced by rigid translation and rotation.
+
+% Generate a spherical design grid
+[r,~] = get_sphdesign(100);
+
+% Particle center
+q = [0, 0, 0];  % single sphere centered at origin
+
+% Compute mapping matrix K
+K = getKmat(r, q);
+
+% Define rigid body motion
+U_translate = [1; 0; 0; 0; 0; 0];  % translation in x, no rotation
+U_rotate    = [0; 0; 0; 0; 0; 1];  % rotation about z-axis
+
+% Compute surface velocities
+v_trans = reshape(K * U_translate, 3, [])';  % NP x 3
+v_rot   = reshape(K * U_rotate,    3, [])';  % NP x 3
+
+% Visualization
+figure;
+subplot(1,2,1);
+quiver3(r(:,1), r(:,2), r(:,3), v_trans(:,1), v_trans(:,2), v_trans(:,3), 0.8);
+title('Translation in x only'); axis equal; view(3); xlabel x; ylabel y; zlabel z;
+subplot(1,2,2);
+quiver3(r(:,1), r(:,2), r(:,3), v_rot(:,1), v_rot(:,2), v_rot(:,3), 0.8);
+title('Rotation about z only'); axis equal; view(3); xlabel x; ylabel y; zlabel z;
+sgtitle('Surface velocity from rigid body motion')
+end
+
+
+
 
 
 
