@@ -46,8 +46,8 @@ This work is based on the following research papers:
    [https://doi.org/10.1016/j.jcp.2024.113636](https://doi.org/10.1016/j.jcp.2024.113636)
 
 2. **A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility Problems**  
-   *A. Broms, A.H. Barnett, A.-K. Tornberg*, to appear in *Adv. Comput. Math.* (2025)  
-   [https://arxiv.org/abs/2409.04215](https://arxiv.org/abs/2409.04215) 
+   *A. Broms, A.H. Barnett, A.-K. Tornberg*, *Adv. Comput. Math.* (2025)  
+   [https://doi.org/10.1007/s10444-025-10258-4](https://doi.org/10.1007/s10444-025-10258-4) 
 
 ## Roadmap
 
@@ -56,6 +56,4 @@ Planned additions include:
 - Lubrication-based image enhancement (as in [1])
 
 ![Clustered particles](cluster.png)
-
-
 
