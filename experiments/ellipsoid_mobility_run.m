@@ -1,4 +1,4 @@
-function ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name)
+function ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name,lr)
 %ELLIPSOID_MOBILITY_RUN Runs a mobility problem for a cluster of ellipsoids.
 %
 %   ELLIPSOID_MOBILITY_RUN(P, delta, Nv, visualise, solve_res,read_name,save_name)
@@ -18,6 +18,8 @@ function ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_na
 %                         this name
 %                         (rather than generated within the function).
 %       save_name     - string: save to file with this name
+%       lr              - flag to invoke long range preconditioning via
+%                         deflation
 %
 %   NOTES:
 %       - In the large-scale test shown in Example 4 / Fig. 1 of the
@@ -37,10 +39,11 @@ function ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_na
 %
 % Anna Broms, June 13, 2025
 
+
 %% Set aspect ratio of ellipsoid and distance to others
 E0 = [.5 .5 1]; %Type S in the mobility paper
 %E0 = [1 1 1]; % Sphere
-E0 = [.4 .6 1]; %Type T in the mobility paper
+%E0 = [.4 .6 1]; %Type T in the mobility paper
 
 
 if nargin<1
@@ -62,6 +65,8 @@ elseif nargin<6
     save_name = "test_ellipsoids";
 elseif nargin < 7
     save_name ="test_ellipsoids";
+elseif nargin < 8
+    lr = 0; %default is no long range precond for now
 end
 
 if ~isempty(read_name)
@@ -140,11 +145,15 @@ disp('Grids computed...')
 
 opt = init_MFS();
 opt.ellipsoid = 1; 
+opt.lr = lr;
+
 
 if solve_res
     Uref = rand(6*P,1);
+    opt.gmres_tol = 1e-7;
     [Fvec, iter_r, lambda_norm_r, uerr_r] = solve_resistance(q,rin,rout,Uref, opt,R,E0);
     [rin,rout,~,~] = getEllipsoidGrids(E0,P,delta,0.75*Nv,Nv,sep*1.05,R,qvec); %avoid "inverse crimes"
+    opt.gmres_tol = 1e-7;
     [Uvec, iter_m, lambda_norm, uerr] = solve_mobility(q,rin,rout,Fvec, opt,R,E0);
     fprintf("Two way error: %1.2e, resistance residual %1.2e, mobility residual %1.2e\n",...
         norm(Uref-Uvec,inf)/norm(Uref,inf),uerr_r,uerr)
@@ -209,7 +218,7 @@ end
 
 %end
 if ~isempty(save_name)
-    save(save_file,'iter_m','E0','Uvec','Fvec','labeltimes','labelstrings','sep','Nv',...
+    save(save_file,'iter_m','iter_r','E0','Uvec','Fvec','labeltimes','labelstrings','sep','Nv',...
         'R','qvec','delta','maxRAM')
 end
 
@@ -223,7 +232,7 @@ end
 function show_basic_test()
     P = 7;
     Nv = 40;
-    delta = 0.5; 
+    delta = 0.5; % minimum particle separation      
     visualise = 1;
     solve_res = 1; %in addition to mobility, solve a resistance problem and display error metrics
     read_name = [];

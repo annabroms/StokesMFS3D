@@ -40,17 +40,19 @@ delta = 1; %smallest particle particle distance
 %distance
 [q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
   
-fmm = 1; %only activate if many particles (say, more than 40)
+fmm = 0; %only activate if many particles (say, more than 40)
 
 %% Solve resistance problem first (given velocities)
 disp('Start with resistance: ')
 Uref = rand(6*P,1); 
 Fref = rand(6*P,1);
 
+
 %Note, for resistance, the number of GMRES iters will grow with P. For both
 %resistance and mobility, GMRES iters will increase with decreasing delta.
 [rvec_in,rvec_out,opt] = init_spheres(q);
 opt.fmm = fmm;
+opt.lr = 1;
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 Rp = 1-1.05*(1-opt.Rp);
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp);

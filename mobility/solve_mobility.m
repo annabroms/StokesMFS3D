@@ -50,7 +50,10 @@ P = size(q,1);
 
 %% One-body preconditioning
 N = size(rvec_in,1)/P; %number of sources per particle
-M = size(rvec_out,1)/P; %numer of collocation points per particl
+M = size(rvec_out,1)/P; %numer of collocation points per particle
+
+opt.N = N;
+opt.M = M;
 
 %Create pseudoinverse of self-interaction matrix,
 if opt.ellipsoid

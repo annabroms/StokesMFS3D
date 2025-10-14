@@ -18,7 +18,7 @@ P = size(q,1);
 % initialize a bunch of parameters. Do not change if you don't really want.
 opt = init_MFS(N);
 opt.a_glob = a_glob;
-
+opt.lr = 0; %no deflation based long-range preconditioning
 opt.Rp = Rp;
 opt.fmm = 0; 
 opt.maxit = 200; %max number of gmres iterations

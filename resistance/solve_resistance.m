@@ -50,6 +50,9 @@ end
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P;
 
+opt.N = N;
+opt.M = M; 
+
 
 %% Visualize geometry
 % Optional block for displaying the particle configuration 
@@ -71,7 +74,7 @@ if opt.plot
 end
 
 
-%% Assign RHS in resistance problem
+%% Assign RHS in resistance problem    
 
 Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
 %For each particle, get data at surface, given rigid body motion
@@ -101,8 +104,51 @@ if opt.profile
     memorygraph('label','start matvec resistance');
 end
 
+%% What do eigvals look like for the system matrix?
+
+debug = 0; 
+if debug
+    x = zeros(3*M*P,1);
+    tic
+    for k = 1:3*M*P
+        k
+        x(:) = 0; 
+        x(k) = 1; 
+        uu = matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,R);
+        CC(:,k) = uu;
+    end
+    toc
+    figure(13);
+    clf; 
+    imagesc(log10(abs(CC)))
+    colorbar
+    skeel(CC)
+
+    figure(5)
+    [V,D] = eig(CC);
+    D = diag(D); 
+    plot(real(D),imag(D),'ro')
+end
+
+%% Prepare long-range preconditioning with deflation
+u_bndry = u_bndry';
+if opt.lr
+    [Rinv,AN,AM] = get_long_range_precond(q,rvec_in,rvec_out,opt);
+    tau_coarse = AN*Rinv*(AM'*u_bndry); %need a faster way to get tau_coarse
+    disp('Done coarse projection')
+else
+    disp('No deflation')
+end
+
+
 %% Solve problem
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry',3*size(rvec_out,1),opt.maxit,opt.gmres_tol,0);
+verbose = 0; 
+if opt.lr
+    Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,AN,AM,opt); 
+    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,AN,AM),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
+else
+    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
+end
 
 if opt.profile
     memorygraph('label','done matvec resistance, remap and determine force')
@@ -111,19 +157,40 @@ end
 %% Determine source strengths on proxy sources from the solution at the boundary,
 % lambda <- mu. Then, determine forces and torques on particles, given lambda
 
-Fvec = zeros(6*size(q,1),1);
+Fvec = zeros(6*P,1);
 Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
 for i = 1:P
     if opt.ellipsoid
         temp_i = Y{1}*(UU{1}*(rotate_vector(mu_gmres((i-1)*3*M+1:i*3*M),R{i}')));
         lambda_i = rotate_vector(temp_i,R{i});
-        Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
+        if ~opt.lr
+            Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
+        end
     else
         lambda_i = Y{1}*(UU{1}*(mu_gmres((i-1)*3*M+1:i*3*M)));
     end
     lambda_gmres(3*(i-1)*N+1:i*3*N) = lambda_i;
-    Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
+
+    if ~opt.lr
+        Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
+    end
 end
+
+if opt.lr
+    lambda_gmres_old = lambda_gmres';
+    tau_stokes = applyQmat(lambda_gmres_old,rvec_in,rvec_out,Rinv,AN,AM,opt);
+    lambda_gmres = tau_stokes+tau_coarse; 
+    for i = 1:P
+        if opt.ellipsoid
+            Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
+        end
+
+        lambda_i = lambda_gmres(3*(i-1)*N+1:i*3*N);
+        Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
+    end
+
+end
+
 
 % lambda_norm gives a sanity check on the source distribution. If large,
 % the representation for the problem is not optimal.

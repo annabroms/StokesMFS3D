@@ -48,8 +48,8 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 
 P = size(q,1); %number of particles
 
-M = size(rout,1)/P; %points per particle on outer grids
-N = size(rin,1)/P; %points per particle on proxy surface
+M = vars.M; %points per particle on outer grids
+N = vars.N; %points per particle on proxy surface
 
 %For now, we assume everyone has the same shape
 U = Uii{1};

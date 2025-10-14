@@ -1,7 +1,10 @@
-function [x,it,resvec,trueres] = helsing_gmres(f,b,n,m,tol,debug)
+function [x,it,resvec,trueres] = helsing_gmres(f,b,n,m,tol,debug,verbose)
 % *** GMRES with low-threshold stagnation control taken from Johan Helsing's RCIP demo***
 if nargin < 6
     debug = 0;
+    verbose = 0;
+elseif nargin < 7 
+    verbose = 1;
 end
 V=zeros(n,m+1);
 H=zeros(m);
@@ -37,14 +40,17 @@ resvec(it) = myerr;
         myerr
     end
 
-if (myerr<=tol)||(it==m)                     
-  disp(['predicted residual = ' num2str(myerr)])
+if ((myerr<=tol)||(it==m))                  
+  
   y=triu(H(1:it,1:it))\s(1:it);             
   x=fliplr(V(:,1:it))*flipud(y);
   %trueres=norm(A*x-b)/bnrm2;
   trueres=norm(f(x)-b)/bnrm2;
-  disp(['true residual      = ',num2str(trueres)])
-  disp(['iterations taken:' ,num2str(it)])
+  if verbose
+    disp(['predicted residual = ' num2str(myerr)])
+    disp(['true residual      = ',num2str(trueres)])
+    disp(['iterations taken:' ,num2str(it)])
+  end
   break
 end
 end
