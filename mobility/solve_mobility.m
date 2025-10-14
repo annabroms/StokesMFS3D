@@ -32,7 +32,7 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS, 
 %       oneBodyPrecondMob, helsing_gmres, getKmat
 %
-%   See also: LARGE_ELLIPSOID_EX, SOLVE_RESISTANCE
+%   See also: SOLVE_RESISTANCE
 %
 %   Anna Broms, June 13, 2025
 
