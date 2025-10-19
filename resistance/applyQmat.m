@@ -1,7 +1,7 @@
-function lambda_fine = applyQmat(lambda, rvec_in, rvec_out, Rinv, Z, Y, opt)
+function lambda_fine = applyQmat(lambda, rvec_in, rvec_out, Rinv, Zi,Yi,R, opt)
 %APPLYQMAT  Apply long-range preconditioning projection matrix on sources
 %
-%   lambda_fine = APPLYQMAT(vel, rvec_in, rvec_out, Rinv, Z, Y, opt)
+%   lambda_fine = APPLYQMAT(vel, rvec_in, rvec_out, Rinv, Zi, Yi, opt)
 %
 %   Applies the projection operator 
 %
@@ -15,8 +15,11 @@ function lambda_fine = applyQmat(lambda, rvec_in, rvec_out, Rinv, Z, Y, opt)
 %     rvec_out  - PM×3 array of target surface points where the flow is evaluated.
 %     Rinv      - (3Pk×3Pk) inverse of the coarse interaction matrix R,
 %                 where k is the number of coarse basis functions per body per coordinate.
-%     Y         - (3PM×3Pk) matrix mapping from surface flow to coarse space.
-%     Z         - (3PN×3Pk) matrix mapping from proxy source space to coarse space.
+%     Yi         - (3M×k) matrix mapping from surface flow to coarse space
+%                  for a single body (a diagonal block of Y) 
+%     Zi         - (3N×k) matrix mapping from proxy source space to coarse space 
+%                   for a single body (a diagonal block of Z).
+%     R         - Cell array of P rotation matrices (needed for ellipsoids)
 %     opt       - Struct with flow options (e.g., FMM flags, kernel type).
 %
 %   OUTPUT:
@@ -33,7 +36,7 @@ function lambda_fine = applyQmat(lambda, rvec_in, rvec_out, Rinv, Z, Y, opt)
 % Anna Broms, Oct 14, 2025
 
 proj_vel = getFlow(lambda, rvec_in, rvec_out, opt); 
-lambda_proj = Z*Rinv*(Y'*proj_vel);
+lambda_proj = getCoarseSource(proj_vel,Rinv,Zi,Yi,R,opt);
 
 lambda_fine = lambda-lambda_proj;
 

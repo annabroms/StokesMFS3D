@@ -52,6 +52,7 @@ M = size(rvec_out,1)/P;
 
 opt.N = N;
 opt.M = M; 
+opt.P = P; 
 
 
 %% Visualize geometry
@@ -133,8 +134,9 @@ end
 %% Prepare long-range preconditioning with deflation
 u_bndry = u_bndry';
 if opt.lr
-    [Rinv,AN,AM] = get_long_range_precond(q,rvec_in,rvec_out,opt);
-    tau_coarse = AN*Rinv*(AM'*u_bndry); %need a faster way to get tau_coarse
+    [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt);
+    opt.db = db; 
+    tau_coarse = getCoarseSource(u_bndry,Rinv,Zi,Yi,R,opt);
     disp('Done coarse projection')
 else
     disp('No deflation')
@@ -142,10 +144,10 @@ end
 
 
 %% Solve problem
-verbose = 0; 
+verbose = 1; 
 if opt.lr
-    Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,AN,AM,opt); 
-    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,AN,AM),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
+    Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt); 
+    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,Zi,Yi),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
 else
     [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
 end
@@ -178,8 +180,9 @@ end
 
 if opt.lr
     lambda_gmres_old = lambda_gmres';
-    tau_stokes = applyQmat(lambda_gmres_old,rvec_in,rvec_out,Rinv,AN,AM,opt);
+    tau_stokes = applyQmat(lambda_gmres_old,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt);
     lambda_gmres = tau_stokes+tau_coarse; 
+
     for i = 1:P
         if opt.ellipsoid
             Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
@@ -187,6 +190,7 @@ if opt.lr
 
         lambda_i = lambda_gmres(3*(i-1)*N+1:i*3*N);
         Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
+        
     end
 
 end

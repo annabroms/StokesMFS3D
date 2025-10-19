@@ -3,10 +3,10 @@ clear;
 close all;
 
 %% Generate geometry
-P = 200; %number of bodies
+P = 5; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0; 0 2+delta 0]+[1 1 2]; %center coordiante matrix for P particles, x,y,z: size P x 3
-%q = [0 0 0];
+q = [0 0 0];
 %random configurations
 %L = 10; %set size of domain
 %q = set_position(P,L,delta); %Random in a qube or in a layer, with minimum
@@ -57,3 +57,53 @@ disp('Residual in resistance problem')
 err_res0
 err_res1
 err_res2
+
+%%
+Pvec = 20:20:200;
+delta = 0.2; 
+Rp = 0.2;
+N = 100;
+for k = 1:length(Pvec)
+    P = Pvec(k);
+    if P > 100
+        opt.fmm = 1;
+    end
+    [q,B] = grow_cluster(P,delta);
+    [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N);
+
+    opt.lr = 1;  
+    disp('...solve with deflation 1...')
+    [Fvec1,it_res1,lambda_norm_res1,err_res1] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
+    opt.lr = 2; 
+    disp('...solve with deflation 2...')
+    [Fvec,it_res2,lambda_norm_res2,err_res2] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
+    
+    
+    %Compare to the number of iterations needed for mobility
+    disp('...solve mobility problem...')
+    [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N); %use a very coarse resolution for now
+    [U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt); 
+
+    iters1(k) = it_res1;
+    iters2(k) = it_res2;
+    itersm(k) = it_mob;
+
+end
+%%
+title = sprintf('lr_pvec_run_delta%1.3e.mat',delta);
+save(title,'Pvec','iters1','iters2','itersm')
+
+%%
+% Pvec = Pvec(1:8);
+% itersm = itersm(1:8);
+% iters1 = iters1(1:8);
+% iters2 = iters2(1:8);
+
+%figure()
+plot(Pvec,itersm,'b+:','MarkerSize',5)
+hold on
+plot(Pvec,iters1,'k+:','MarkerSize',5)
+plot(Pvec,iters2,'m+:','MarkerSize',5)
+ylim([0,80])
+xlim([20,max(Pvec)])
+

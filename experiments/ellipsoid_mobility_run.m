@@ -99,10 +99,12 @@ if read_from_file
     qvec = f.qvec; %center coordinates
     R = f.R; %rotation matrices
     Fvec = f.Fvec; %vector of forces and torques
+    Uref = f.Uvec;
     for k = 1:P
         q(k,:) = qvec{k}';
     end
 else
+    Uref = rand(6*P,1);
     Pmax = 500;
     if P<Pmax
         [E R qvec xnear] = ellipsoid_cluster(E0,P,delta);
@@ -149,7 +151,7 @@ opt.lr = lr;
 
 
 if solve_res
-    Uref = rand(6*P,1);
+    
     opt.gmres_tol = 1e-7;
     [Fvec, iter_r, lambda_norm_r, uerr_r] = solve_resistance(q,rin,rout,Uref, opt,R,E0);
     [rin,rout,~,~] = getEllipsoidGrids(E0,P,delta,0.75*Nv,Nv,sep*1.05,R,qvec); %avoid "inverse crimes"

@@ -1,7 +1,7 @@
-function res = applyPmat(vel,rvec_in,rvec_out,Rinv,Z,Y,opt)
+function res = applyPmat(vel,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt)
 %APPLYPMAT  Apply long-range preconditioning projection matrix to a velocity field.
 %
-%   res = APPLYPMAT(vel, rvec_in, rvec_out, Rinv, Z, Y, opt)
+%   res = APPLYPMAT(vel, rvec_in, rvec_out, Rinv, Zi, Yi, opt)
 %
 %   Applies the projector 
 %
@@ -14,10 +14,10 @@ function res = applyPmat(vel,rvec_in,rvec_out,Rinv,Z,Y,opt)
 %     vel       - 3PM×1 velocity vector at the M boundary points of P bodies.
 %     rvec_in   - PNx3 array of source points for the projection flow.
 %     rvec_out  - PMx3 array of target points where the projection flow is evaluated.
-%     Z         - (3PN×3Pk) matrix mapping coarse coefficients to proxy forces. k is
-%                 set by the number of coarse basis functions per body
-%     Y         - (3PM×3Pk) matrix such that Y' maps surface flow to coarse space.
-%     Rinv      - (3Pk×3Pk) inverse of coarse interaction matrix R.  (
+%     Zi         - (3N×k) matrix mapping coarse coefficients to proxy forces for a single body (diagonal block in Z). 
+%                 k is set by the number of coarse basis functions per body
+%     Yi         - (3M×k) matrix such that Y' maps surface flow to coarse space for a single body.
+%     Rinv      - (Pk×Pk) inverse of coarse interaction matrix R.  
 %     opt       - Struct with fmm and lr flags etc
 %
 %   OUTPUT:
@@ -34,10 +34,9 @@ function res = applyPmat(vel,rvec_in,rvec_out,Rinv,Z,Y,opt)
 %
 % Anna Broms Oct 14, 2025
 
-lambda = Z*Rinv*(Y'*vel);
+lambda = getCoarseSource(vel,Rinv,Zi,Yi,R,opt);
 
 %compute velocities using these source strengths
-
 
 proj_vel = getFlow(lambda, rvec_in, rvec_out, opt); 
 

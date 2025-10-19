@@ -1,7 +1,7 @@
-function [Rinv,Z,Y] = get_long_range_precond(q,rin,rout,opt)
+function [Rinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt)
 %GET_LONG_RANGE_PRECOND  Construct coarse-space projection matrices for long-range preconditioning.
 %
-%   [Rinv, Z, Y] = GET_LONG_RANGE_PRECOND(q, rin, rout, opt)
+%   [Rinv, Zi,Yi,db] = GET_LONG_RANGE_PRECOND(q, rin, rout, opt)
 %
 %   Constructs the matrices used in the long-range preconditioner:
 %   the coarse-to-fine mappings AN and AM, and the inverse coarse interaction matrix Rinv.
@@ -28,8 +28,8 @@ function [Rinv,Z,Y] = get_long_range_precond(q,rin,rout,opt)
 %     Rinv     - (3Pk×3Pk) inverse of coarse interaction matrix R = AM'*U,
 %                where U is the coarse-flow matrix at the PM targets from
 %                the Pk coarse basis functions
-%     Z       - (3PM×3Pk) matrix mapping coarse coefficients to proxy source strengths.
-%     Y       - (3PN×3Pk) matrix whose transpose, Y', maps to coarse velocity space.
+%     Zi       - (3M×k) matrix mapping coarse coefficients to proxy source strengths for a single body (diagonal block in Z).
+%     Yi       - (3N×k) matrix whose transpose, Y', maps to coarse velocity space for a single body (diagonal block in Y).
 %
 %   NOTES:
 %     - The function assumes block structure per body and constructs
@@ -46,21 +46,24 @@ M = opt.M;
 N = opt.N; 
 P = size(q,1);
 
-%Use different matrices Z and Y using ones matrices instead!
+
 if lr == 1
-    for k = 1:P % not the fastest way to generate this...
-        %ones in the x,y,z direction, both for Z and Y
-        blocksN{k} = repmat(eye(3),N,1);
-        blocksM{k} = repmat(eye(3),M,1);
-       
-    end  
+    %Use matrices Zi and Yi constructed with ones matrices
+    Zi = repmat(eye(3),N,1);
+    Yi = repmat(eye(3),M,1);
     db = 3; %dimension per body of the coarse source    
 
 elseif lr == 2
-    for k = 1:P
-        blocksN{k} = getKmat(rin(N*(k-1)+1:k*N,:),q(k,:)); % apply rotations intead?
-        blocksM{k} = getKmat(rout(M*(k-1)+1:k*M,:),q(k,:));
+    %Zi = getKmat(rin(1:N,:),q(1,:)); %need to apply rotations with this one?
+    %Yi = getKmat(rout(1:M,:),q(1,:));
+    if opt.ellipsoid
+        Zi = getKmat((RR{1}'*rin(1:N,:)')',q(1,:));
+        Yi = getKmat((RR{1}'*rout(1:M,:)')',q(1,:));
+    else
+        Zi = getKmat(rin(1:N,:),q(1,:));
+        Yi = getKmat(rout(1:M,:),q(1,:));
     end
+
     db = 6; %dimension per body of the coarse source
 else
     error("not yet implemented")
@@ -74,22 +77,47 @@ else
     s=6;
 end
 
+if opt.ellipsoid
+    Kbase = getKmat((RR{1}'*rin(1:N,:)')',q(1,:));
+else
+    Kbase = getKmat(rin(1:N,:),q(1,:));
+end
+
+
 for k = 1:P
-    if lr == 1
-        blocks{k} = block;
-    elseif lr == 2
-        block = getKmat(rin(N*(k-1)+1:k*N,:),q(k,:));
-        blocks{k} = block;
+    if lr == 2
+        if opt.ellipsoid
+            Rk = RR{k};
+            %block = getKmat(rin(N*(k-1)+1:k*N,:),q(k,:));
+            %same thing
+            block = kron(eye(N),Rk)*Kbase*[Rk' zeros(3); zeros(3) Rk'];
+        else
+            block = Kbase;
+        end
     end
     for i = 1:s
         u(:,(k-1)*s+i) = getFlow(block(:,i),rin(N*(k-1)+1:k*N,:),rout,opt);
     end
 end
 
-Z = blkdiag(blocksN{:});
-Y = blkdiag(blocksM{:});
+for k = 1:P
+    
+    if lr == 2
+        if opt.ellipsoid 
+            Rk = RR{k};
+            %Yik = getKmat(rout(M*(k-1)+1:k*M,:),q(k,:)); % same thing
+            Yik = kron(eye(M),Rk)*Yi*[Rk' zeros(3); zeros(3) Rk'];
+            R((k-1)*db+1:k*db,:) = Yik'*u((k-1)*3*M+1:k*3*M,:);
+        else
+            R((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
+        end
 
-R = Y'*u;
+    else
+        R((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
+    end
+
+    
+end
 
 % Faster computation using FMM??
 
