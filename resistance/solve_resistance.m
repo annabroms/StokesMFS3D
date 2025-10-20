@@ -89,10 +89,10 @@ end
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
 if opt.ellipsoid
-    [Yk,UUk] = oneBodyPrecondRes((R{1}'*rvec_in(1:N,:)')',...
+    [Yk,UUk,Si] = oneBodyPrecondRes((R{1}'*rvec_in(1:N,:)')',...
     (R{1}'*rvec_out(1:M,:)')');
 else
-    [Yk,UUk] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:));
+    [Yk,UUk,Si] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:));
 end
 
 %The format is used to prepare for the case when different shapes are is
@@ -134,7 +134,11 @@ end
 %% Prepare long-range preconditioning with deflation
 u_bndry = u_bndry';
 if opt.lr
-    [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt);
+    if opt.lr > 2 %use svd for single body
+        [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt,Yk*diag(Si),UUk');
+    else
+        [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt);
+    end
     opt.db = db; 
     tau_coarse = getCoarseSource(u_bndry,Rinv,Zi,Yi,R,opt);
     disp('Done coarse projection')
@@ -190,7 +194,7 @@ if opt.lr
 
         lambda_i = lambda_gmres(3*(i-1)*N+1:i*3*N);
         Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
-        
+
     end
 
 end

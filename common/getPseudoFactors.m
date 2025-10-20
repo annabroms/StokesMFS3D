@@ -1,9 +1,9 @@
-function [Y, U] = getPseudoFactors(N, tol, visualise)
+function [Y, U, S] = getPseudoFactors(N, tol, visualise)
 %GETPSEUDOFACTORS Computes factors that provide the matrix psuedoinverse from 
 % a truncated SVD 
 %
 % Syntax:
-%   [Y, U] = getPseudoFactors(N, tol, visualise)
+%   [Y, U, S] = getPseudoFactors(N, tol, visualise)
 %
 % Inputs:
 %   N         - Input matrix for which to compute a pseudoinverse
@@ -15,6 +15,7 @@ function [Y, U] = getPseudoFactors(N, tol, visualise)
 %   Y - Product VS⁺, where:
 %         - S⁺ is a diagonal matrix with entries 1/σ for retained singular values
 %         - V contains the corresponding right singular vectors
+%   S     - Diagonal matric with σ on the diagonal
 %
 % Description:
 %   Computes a truncated SVD of matrix N and returns factor matrices U and Y such that:

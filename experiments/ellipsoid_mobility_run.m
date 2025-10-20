@@ -135,6 +135,9 @@ else
     Fvec = rand(6*P,1);
 end
 
+%just for debugging
+%R{1} = eye(3); 
+
 %Now we have the center coordinates and orientations of everybody and can
 %generate the proxy and collocation points. 
 sep = 0.125; %separation between proxy and collocation surfaces (in normal direction) good choice for E0 = [.5 .5 1];

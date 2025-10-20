@@ -3,10 +3,11 @@ clear;
 close all;
 
 %% Generate geometry
-P = 5; %number of bodies
-delta = 1; %smallest particle particle distance 
+P = 200; %number of bodies
+P = 50; 
+delta = 0.2; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0; 0 2+delta 0]+[1 1 2]; %center coordiante matrix for P particles, x,y,z: size P x 3
-q = [0 0 0];
+%q = [0 0 0];
 %random configurations
 %L = 10; %set size of domain
 %q = set_position(P,L,delta); %Random in a qube or in a layer, with minimum
@@ -27,16 +28,18 @@ Rp = 0.2;
 N = 100;
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N);
+%[rvec_in,rvec_out,opt] = init_spheres(q); %more well-resolved
 opt.fmm = fmm;
 opt.lr = 0; % no long range precond
 disp('...solve without deflation...')
 
 [Fvec0,it_res0,lambda_norm_res0,err_res0] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
-% Now, with long range precond
+% % Now, with long range precond
 opt.lr = 1;  
 disp('...solve with deflation 1...')
 [Fvec1,it_res1,lambda_norm_res1,err_res1] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
-opt.lr = 2; 
+opt.lr = 30;
+%opt.lr = 50; 
 disp('...solve with deflation 2...')
 [Fvec,it_res2,lambda_norm_res2,err_res2] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 Rp = 1-1.05*(1-opt.Rp);
@@ -70,6 +73,8 @@ for k = 1:length(Pvec)
     end
     [q,B] = grow_cluster(P,delta);
     [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N);
+    
+    Uref = rand(6*P,1);
 
     opt.lr = 1;  
     disp('...solve with deflation 1...')

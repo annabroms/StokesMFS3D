@@ -1,4 +1,4 @@
-function [Y, U] = oneBodyPrecondRes(rin, rout)
+function [Y, U, Si] = oneBodyPrecondRes(rin, rout)
 %ONEBODYPRECONDRES Construct preconditioner for one-body Stokes resistance problem.
 %
 %   [Y, UU] = ONEBODYPRECONDRES(rin, rout)
@@ -41,7 +41,7 @@ visualise = 0;
 
 S = generate_stokes_mat(rin,rout);
 
-[Y, U] = getPseudoFactors(S, tol, visualise);
+[Y, U, Si] = getPseudoFactors(S, tol, visualise);
 U = U'; 
 
 end
