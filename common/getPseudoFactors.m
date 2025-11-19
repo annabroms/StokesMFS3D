@@ -79,6 +79,7 @@ if visualise
     % title('Relative decay rate of sing vals','interpreter','latex')
 end
 
+%ra = ra-1; %remove null-space
 S = S(1:ra);  %get pseudoinverse of S
 iS = 1./S; 
 Y = V(:,1:ra)*diag(iS); 

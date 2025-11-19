@@ -63,7 +63,7 @@ Gplus = Y*U';
 figure()
 semilogy(abs(d));
 
-S_RPY  = generate_blob_matrix(rvec_out,q,0.1);
+S_RPY  = generate_RPY_matrix(rvec_out,0.1);
 [V_RPY,D_RPY] = eig(S_RPY); 
 hold on
 semilogy(diag(D_RPY));

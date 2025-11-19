@@ -3,6 +3,7 @@
 *.asv
 
 spherical_designs/
+data/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux

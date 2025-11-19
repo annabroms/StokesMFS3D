@@ -1,5 +1,5 @@
 function [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a_glob)
-%INIT_SPHERES(q,Rp,N) 
+%INIT_SPHERES(q,Rp,N,a) 
 
 % Set default values if Rg and N are not provided
 if nargin < 2
