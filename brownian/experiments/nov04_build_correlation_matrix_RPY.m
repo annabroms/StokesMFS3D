@@ -24,8 +24,8 @@ N = 700;
 % Rp = 0.15; %Proxy sphere radius -- very coarse resolution
 % N = 50;  % Number of proxy sources
 % % 
-% Rp = 0.30;
-% N = 100; 
+Rp = 0.30;
+N = 100; 
 
 a = 1.2; %Determines oversampling factor for the collocation points
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a); %Assign source and collocation points
@@ -65,6 +65,6 @@ end
 
 %%
 figure()
-loglog(avec,err)
+loglog(avec,err,'.-')
 ylabel('$\|M-UU^T\|_2/\|M\|_2$','interpreter','latex')
 xlabel('Regularisaiton parameter a','interpreter','latex')

@@ -109,11 +109,20 @@ end
 
 %% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
-res = getFlow(lambda_stokes,rin,rout,vars);
+res_stokes = getFlow(lambda_stokes,rin,rout,vars);
 
 %just for now
-T = getTraction(rin,rout,nn);
-res = -T*res;
+%T = getTraction(rin,rout,nn);
+%res = -T*res;
+
+T_self = getTraction(rin(1:N,:),rout(1:M,:),rout(1:M,:)-q(1));
+
+res = zeros(3*N*P,1); 
+
+for k = 1:P
+    res(3*(k-1)*N+1:3*k*N) = -T_self*res_stokes(3*(k-1)*M+1:k*3*M);
+end
+    
 
 %% Adjust to obtain identity blocks on diagonal of system matrix
 res = res+mu; 

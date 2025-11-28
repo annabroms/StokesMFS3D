@@ -7,7 +7,7 @@ close all; clear;
 %data.
 
 %% Set initial particle coordinates
-P=1;
+P=2;
 delta = 5; 
 if P==1
     q = [0 0 0];
@@ -26,10 +26,10 @@ N = 50;  % Number of proxy sources
 % Rp = 0.10;
 % N = 20; 
 
-Rp = 0.63; %fine resolution
-N = 700;
+% Rp = 0.63; %fine resolution
+% N = 700;
 
-a = 2; %Determines oversampling factor for the collocation points
+a = 3; %Determines oversampling factor for the collocation points
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a); %Assign source and collocation points
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P; 
@@ -37,10 +37,18 @@ M = size(rvec_out,1)/P;
 %% Get all the necessary discretised operators
 %rvec_in = rvec_in(1,:);
 n = repmat(rvec_out(1:M,:),P,1);
-T = getTraction(rvec_in,rvec_out,n); 
+if P == 1
+    T = getTraction(rvec_in,rvec_out,n);
+else
+    %Remember T should be block diagonal
+    Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:));
+    T = kron(eye(P),Tblock);
+end
 S = generate_stokes_mat(rvec_in, rvec_out);
+
 visualise = 1; 
 tol = 1e-10;
+tol = 1e-15;
 
 A = -T*S;
 
@@ -74,17 +82,17 @@ F_traction3 = M*Kin'*A2*Kin*Urand/4/pi;
 
 norm(F_orig-F_traction1,inf)/norm(F_orig,inf)
 norm(F_orig-F_traction2,inf)/norm(F_orig,inf)
-norm(F_orig-F_traction3,inf)/norm(F_orig,inf)
+%norm(F_orig-F_traction3,inf)/norm(F_orig,inf)
 
 % What does the resistance matrix look like?
 R_orig = Kin'*Y*(U'*Kout);
 R_trac1 = M*Kin'*YT*(UT'*Kin)/4/pi;
 R_trac2 = -Kin'*YT*(UT'*T*Kout);
-R_trac3 = M*Kin'*A2*Kin/4/pi;
+%R_trac3 = M*Kin'*A2*Kin/4/pi;
 
 norm(R_orig-R_trac1,2)/norm(R_orig,2)
 norm(R_orig-R_trac2,2)/norm(R_orig,2)
-norm(R_orig-R_trac3,2)/norm(R_orig,2)
+%norm(R_orig-R_trac3,2)/norm(R_orig,2)
 
 %% Look for accuracy in flow field: evaluate on surface in a new set of points
 if P == 1

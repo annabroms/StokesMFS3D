@@ -2,10 +2,13 @@
 
 clear; close all;
 
-P = 1; %number of bodies
+P = 2; %number of bodies
 delta = 1; %smallest particle particle distance 
-q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
-q = [0 0 0]; 
+if P == 2
+    q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
+else
+    q = [0 0 0]; 
+end
 
 %random configurations
 %[q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
@@ -18,8 +21,8 @@ N = 100;
 a = 1.2; 
 a = 2; %or play with SVD truncation level
 
-Rp = 0.68; %proxy radius
-N = 700; % approximate number of proxy sources on every particle
+%Rp = 0.68; %proxy radius
+%N = 700; % approximate number of proxy sources on every particle
 
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
@@ -28,7 +31,8 @@ n = repmat(rvec_out(1:M,:),P,1);
 T = getTraction(rvec_in,rvec_out,n); 
 S = generate_stokes_mat(rvec_in, rvec_out);
 
-A  = -T*S; 
+A  = -T*S;
+
 
 %Do eigval decomp
 [V,D] = eig(A);
@@ -50,6 +54,7 @@ dW1 = rand(size(S,1),1);
 dW2 = rand(size(A,1),1);
 [y,iter_errv1] = KrylovSqrtMsing(S,dW1,tol);
 [y,iter_errv2] = KrylovSqrtMsing(A,dW2,tol);
+[y,iter_errv3] = KrylovSqrtMsing(A+A',dW2,tol);
 y2 = krylov_sqrt(A,dW2,20);
 norm(y-y2,inf)/norm(y,inf)
 %%
@@ -57,10 +62,11 @@ figure()
 semilogy(iter_errv1,'+-');
 hold on
 semilogy(iter_errv2,'o-');
+semilogy(iter_errv3,'*-');
 xlabel('Iteration number')
 ylabel('Estimated error using Lanczos')
 axis tight
-legend('RPY tensor','TS')
+legend('RPY tensor','TS','Symmetrized TS')
 
 
 

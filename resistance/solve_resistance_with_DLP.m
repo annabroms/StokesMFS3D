@@ -268,8 +268,8 @@ end
 function test_solve
 rng(5); %reproducable
 
-P = 3; %number of bodies
-delta = 1; %smallest particle particle distance 
+P = 10; %number of bodies
+delta = 2; %smallest particle particle distance 
 q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
 
