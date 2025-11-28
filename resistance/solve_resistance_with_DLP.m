@@ -128,7 +128,7 @@ if debug
         k
         x(:) = 0; 
         x(k) = 1; 
-        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,nvec,q,UU,Y,opt,1,R);
+        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt,1,R);
         CC(:,k) = uu;
     end
     toc
@@ -169,7 +169,7 @@ if opt.lr
     Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt); 
     [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,Zi,Yi),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
 else
-    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,nvec,q,UU,Y,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
+    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
 end
 
 if opt.profile

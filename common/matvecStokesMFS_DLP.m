@@ -1,4 +1,4 @@
-function res = matvecStokesMFS_DLP(mu, rin, rout, nn, q, Uii, Yii, vars, resistance_flag,R,L)
+function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, resistance_flag,R,L)
 %MATVECSTOKESMFS Matrix-vector product for basic Stokes MFS (without image enhancement) 
 %
 %   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, R, resistance_flag,R,L)
@@ -84,7 +84,7 @@ for i = 1:P
        
             Ri = R{i};
         
-            step0 = rotate_vector(mu((i-1)*3*M+1:M*i*3),Ri');
+            step0 = rotate_vector(mu((i-1)*3*N+1:N*i*3),Ri');
             step1 = U*step0; 
             tau_mapped1 = Y*step1;
             tau_mapped2 = rotate_vector(tau_mapped1,Ri);
@@ -92,7 +92,7 @@ for i = 1:P
             lambda_i = tau_mapped2-rotate_vector(L*tau_mapped1,Ri);
             
         else
-            step1 = U*mu((i-1)*3*M+1:M*i*3);
+            step1 = U*mu((i-1)*3*N+1:N*i*3);
             tau_mapped = Y*step1; 
             lambda_i = tau_mapped-L*tau_mapped; 
         end

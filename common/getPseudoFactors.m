@@ -1,4 +1,4 @@
-function [Y, U, S] = getPseudoFactors(N, tol, visualise)
+function [Y, U, S] = getPseudoFactors(N, tol, vis_fig)
 %GETPSEUDOFACTORS Computes factors that provide the matrix psuedoinverse from 
 % a truncated SVD 
 %
@@ -8,7 +8,8 @@ function [Y, U, S] = getPseudoFactors(N, tol, visualise)
 % Inputs:
 %   N         - Input matrix for which to compute a pseudoinverse
 %   tol       - Relative truncation threshold; singular values σ are kept if σ > max(σ) * tol
-%   visualise - Logical flag: plot singular values (true/false)
+%   vis_fig   - figure number to plot singular values (true/false). No plot
+%               if 0
 %
 % Outputs:
 %   U - Matrix of left singular vectors corresponding to retained singular values
@@ -45,9 +46,9 @@ S = diag(S);
 ra = sum(S>max(S)*tol); 
 
 
-if visualise
+if vis_fig
    
-    figure(57)
+    figure(vis_fig)
    % clf;
     semilogy(S,'o-');
     hold on
