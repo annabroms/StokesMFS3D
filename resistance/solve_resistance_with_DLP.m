@@ -83,7 +83,7 @@ Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
 
 %For comparison with Kin
 Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
-T = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1));
+Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1));
 %For each particle, get data at surface, given rigid body motion
 for k = 1:P
     if opt.ellipsoid
@@ -93,7 +93,7 @@ for k = 1:P
 
     %should give the exact same thing, but turns out to give slightly
     %smaller residual.
-    u_bndry((k-1)*3*N+1:3*k*N) = -T*Kout*U((k-1)*6+1:k*6);
+    u_bndry((k-1)*3*N+1:3*k*N) = -Tblock*Kout*U((k-1)*6+1:k*6);
 
 
 end
@@ -128,7 +128,7 @@ if debug
         k
         x(:) = 0; 
         x(k) = 1; 
-        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt,1,R);
+        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,opt,1,R);
         CC(:,k) = uu;
     end
     toc
@@ -169,7 +169,7 @@ if opt.lr
     Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt); 
     [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,Zi,Yi),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
 else
-    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
+    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
 end
 
 if opt.profile

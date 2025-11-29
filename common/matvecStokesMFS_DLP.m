@@ -1,4 +1,4 @@
-function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, resistance_flag,R,L)
+function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,vars, resistance_flag,R,L)
 %MATVECSTOKESMFS Matrix-vector product for basic Stokes MFS (without image enhancement) 
 %
 %   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, R, resistance_flag,R,L)
@@ -115,12 +115,10 @@ res_stokes = getFlow(lambda_stokes,rin,rout,vars);
 %T = getTraction(rin,rout,nn);
 %res = -T*res;
 
-T_self = getTraction(rin(1:N,:),rout(1:M,:),rout(1:M,:)-q(1));
-
 res = zeros(3*N*P,1); 
 
 for k = 1:P
-    res(3*(k-1)*N+1:3*k*N) = -T_self*res_stokes(3*(k-1)*M+1:k*3*M);
+    res(3*(k-1)*N+1:3*k*N) = -Tblock*res_stokes(3*(k-1)*M+1:k*3*M);
 end
     
 
@@ -129,7 +127,6 @@ res = res+mu;
 
 vars.fmm = 0; %a small block, fmm not needed. Maybe better compute full matrix vector product?
 %Correct self evaluation: subtract self-interaction 
-T_self = getTraction(rin(1:N,:),rout(1:M,:),rout(1:M,:)-q(1));
 for i = 1:P
 
     rin_i = rin(N*(i-1)+1:N*i,:); %sources on body i    
@@ -138,7 +135,7 @@ for i = 1:P
     u_self = getFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
    
     
-    u_self = -T_self*u_self; 
+    u_self = -Tblock*u_self; 
     res((i-1)*3*N+1:i*3*N) = res((i-1)*3*N+1:i*3*N)-u_self;
 
 end

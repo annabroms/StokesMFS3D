@@ -1,4 +1,4 @@
-function [Y, UU, LL, Kin] = oneBodyPrecondMobDLP(rin, rout, q)
+function [Y, UU, LL, Kin, Kout] = oneBodyPrecondMobDLP(rin, rout, q)
 %oneBodyPrecondMobDLP Determines pseudoinverse factors for the single body MFS
 % Stokes mobility system matrix constructed as blkdiag(T)*S, with T a
 % double layer matrix and S a target-from-source matrix of Stokeslets
@@ -47,7 +47,7 @@ LL = Kin * ((Kin' * Kin) \ Kin');
 
 % Build one-body operator that does not contribute to force/torque. The
 % last term takes care of velocity constraint.
-T = getTraction(rin,rout,rout-q(1));
+T = getTraction(rin,rout,rout-q(1,:));
 A = -T*S * (eye(size(LL)) - LL) + -T*Kout*Kin';
 
 % Compute pseudoinverse factors 

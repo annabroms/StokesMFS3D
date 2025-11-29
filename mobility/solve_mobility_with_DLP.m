@@ -97,16 +97,16 @@ end
 uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt); 
 %uvec = -uvec;
 % Now, apply the block-diagonal T here:
-T = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1));
+Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
 
 uvec_T = zeros(3*N*P,1);
 for k = 1:P
-    uvec_T((k-1)*3*N+1:k*3*N) = T*uvec((k-1)*3*M+1:k*3*M);
+    uvec_T((k-1)*3*N+1:k*3*N) = Tblock*uvec((k-1)*3*M+1:k*3*M);
 end
 
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,1);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,1);
 
 
 %% Map back to the sought density in source points, determine rigid body velocities 

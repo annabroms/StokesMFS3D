@@ -37,10 +37,10 @@ function [Y, U, Si] = oneBodyPrecondResDLP(rin, rout,n)
 %   DEPENDENCIES:
 %       - generate_stokes_mat.m, getTraction.m getPseudoFactors.m
 %
-%  Anna Broms, June 12, 2025
+%  Anna Broms, Nov 28, 2025
 
 tol = 1e-10; %will be resolution dependent
-visualise = 1; 
+visualise = 0; 
 
 S = generate_stokes_mat(rin,rout);
 T = getTraction(rin,rout,n);

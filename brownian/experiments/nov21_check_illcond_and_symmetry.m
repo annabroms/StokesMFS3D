@@ -5,15 +5,16 @@ close all;
 %eigenvalues and singular values
 
 P=2;
-delta = 1; 
+delta = 10; 
 if P==1
     q = [0 0 0];
 else
-    delta = 3; %initial particle particle distance
     q = [0 0 0; 2+delta 0 0];
+    q = q+[1 1 1];
 end
 
 [q,B] = grow_cluster(P,delta);
+q = q+rand(1,3); 
 
 % Set resolution
 Rp = 0.63; %fine resolution
@@ -36,15 +37,15 @@ for a = 2 %; %[1 1.2 1.5 2 3] %Determines oversampling factor for the collocatio
     N = size(rvec_in,1)/P;
     MM = size(rvec_out,1)/P; 
     
-    n = repmat(rvec_out(1:MM,:),P,1);
+    n = repmat(rvec_out(1:MM,:)-q(1,:),P,1);
     %remember T is a block diagonal matrix
     if P==1
         T = getTraction(rvec_in,rvec_out,n); 
         Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:));
         T = T+Nmat;
     else
-        Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:MM,:),rvec_out(1:MM,:));
-        Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:));
+        Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:MM,:),rvec_out(1:MM,:)-q(1,:));
+        %Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:));
         %Tblock = Tblock+Nmat; 
         T = kron(eye(P),Tblock);
     end
@@ -63,8 +64,9 @@ for a = 2 %; %[1 1.2 1.5 2 3] %Determines oversampling factor for the collocatio
     hold on
 
     [V,D] = eig((A+A')/2); 
+    dsym = diag(D);
     figure(2)
-    semilogy(diag(D),'+-');
+    semilogy(dsym,'+-');
     hold on
 
 end
