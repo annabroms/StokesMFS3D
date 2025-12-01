@@ -199,14 +199,17 @@ delta = 2; %smallest particle particle distance
   
 fmm = 0; %only activate if many particles (say, more than 40)
 
-%% Solve resistance problem (given velocities)
-disp('Start with resistance: ')
+%% Solve mobility problem (given forces/torques)
 Fref = rand(6*P,1); 
 
 %Test first with very low resolution
 Rp = 0.30;
 N = 100; 
 a = 1.2; 
+
+Rp = 0.15; %Proxy sphere radius -- very coarse resolution
+N = 50;  % Number of proxy sources
+a = 2; 
 %a = 2; %or play with SVD truncation level
 
 % Rp = 0.68; %proxy radius
@@ -217,9 +220,9 @@ a = 1.2;
 %[rvec_in,rvec_out,opt] = init_spheres(q);
 opt.fmm = fmm;
 opt.lr = 0;
-%opt.gmres_tol = 1e-10; %does this matter for the accuracy? 
+opt.gmres_tol = 1e-5; %does this matter for the accuracy? 
 [Uvec,it_res,lambda_norm_res,err_res] = solve_mobility_with_DLP(q,rvec_in,rvec_out,Fref, opt);
-%opt.gmres_tol = 1e-7; 
+opt.gmres_tol = 1e-10; 
 [Uvec2,it_res2,lambda_norm_res2,err_res2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt); 
 
 norm(Uvec-Uvec2,inf)/norm(Uvec2,inf)

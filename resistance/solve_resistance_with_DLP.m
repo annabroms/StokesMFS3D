@@ -269,7 +269,7 @@ function test_solve
 rng(5); %reproducable
 
 P = 10; %number of bodies
-delta = 2; %smallest particle particle distance 
+delta = 7; %smallest particle particle distance 
 q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
 
@@ -285,7 +285,10 @@ Uref = rand(6*P,1);
 %Test first with very low resolution
 Rp = 0.30;
 N = 100; 
-a = 1.2; 
+
+Rp = 0.15; %Proxy sphere radius -- very coarse resolution
+N = 50;  % Number of proxy sources
+a = 2; 
 %a = 2; %or play with SVD truncation level
 
 % Rp = 0.68; %proxy radius
@@ -295,10 +298,11 @@ a = 1.2;
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
 %[rvec_in,rvec_out,opt] = init_spheres(q);
 opt.fmm = fmm;
+opt.gmres_tol = 1e-3;
 opt.lr = 0;
 %opt.gmres_tol = 1e-10; %does this matter for the accuracy? 
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance_with_DLP(q,rvec_in,rvec_out,Uref, opt);
-%opt.gmres_tol = 1e-7; 
+opt.gmres_tol = 1e-10; 
 [Fvec2,it_res2,lambda_norm_res2,err_res2] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 
 norm(Fvec-Fvec2,inf)/norm(Fvec2,inf)

@@ -1,4 +1,4 @@
-function [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,randvel, opt,sqrtA,R,E0)
+function [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,randvel, opt,sqrtA,dW,R,E0)
 %SOLVE_BROWNIAN_MOBILITY Solve a Stokes mobility problem with fluctuating velocity field for a configuration of ellipsoidal particles using MFS.
 %
 %   [U, iters, lambda_norm, uerr] = SOLVE_BROWNIAN_MOBILITY(q, rvec_in, rvec_out, Fvec, opt, sqrtA,W)

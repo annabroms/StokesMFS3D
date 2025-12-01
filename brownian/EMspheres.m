@@ -1,7 +1,8 @@
 clear;
 close all
 
-solve_dense = 1;
+solve_dense = 0;
+iterate_RFD = 1;
 
 rng(5);
 
@@ -14,6 +15,7 @@ if P==1
     q = [0 0 0];
 else
     delta = 3; %initial particle particle distance
+    warning('Choose according to equilibrium distribution')
     q = [0 0 0; 2+delta 0 0];
 end
 
@@ -22,22 +24,23 @@ end
 Rp = 0.15; %Proxy sphere radius -- very coarse resolution
 N = 50;  % Number of proxy sources
 
-N = 100; 
-Rp = 0.30; 
+% N = 100; 
+% Rp = 0.30; 
 
 % 
-%Rp = 0.10;
+%Rp = 0.10;´
 %N = 20; 
 
 % Rp = 0.63; %fine resolution
 % N = 700;
-a = 1.5; %Determines oversampling factor for the collocation points
+
+a = 2; %Determines oversampling factor for the collocation points
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a); %Assign source and collocation points
 
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P;
 
-%One-body preconditioning will be the same for everyone -- precompute!
+%% One-body preconditioning will be the same for everyone -- precompute!
 % if solve_dense
 %     [Y,UU,LL,Kin,B] = oneBodyPrecondMob(rvec_in(1:N,:),rvec_out(1:M,:),q(1,:)); 
 %     [Ys,UUs] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:)); 
@@ -49,12 +52,12 @@ M = size(rvec_out,1)/P;
 
 %for debugging to check the action of the square root of the mobility
 %matrix.
-if P == 2 && solve_dense
+%if P == 2 && solve_dense
     Ktot = blkdiag(Kin,Kin);
     Btot = blkdiag(B,B); 
-end
+%end
 
-
+%% If dense solve, stuff can be precomputed
 % if P == 1
 %     % Get sqrt of mobility matrix for single body
 %     R = Kin'*Ys*(UUs*B);
@@ -68,17 +71,23 @@ end
 %     %sqrtA = U*(ss_sqrt*V');
 % end
 
+Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
+Tdiag = kron(eye(P),Tblock);
+
+%% Param selection 
 %loop in time 
 tsteps = 1e5;
-tsteps = 1e4;
+%tsteps = 1e4;
+%tsteps = 1e3; 
 %tsteps = 1e2; 
 % tsteps = 1000;
 dt = 1e-1;
 %dt = 1e-2;
+ 
 %dt = 1e-6;
-delta = 1e-3; % parameter in RFD scheme
+%delta = 1e-3; % parameter in RFD scheme
 %delta = 5e-1;
-%delta = 1e-1; %pretty good with dt = 1e-2;
+delta = 1e-3; %pretty good with dt = 1e-2;
 %delta = 5e-2;
 %delta = 1; 
 qhist = cell(tsteps,1);
@@ -86,17 +95,15 @@ qhist = cell(tsteps,1);
 %Spring model for two particles
 k = 10; 
 l = 4; % spring relaxation length
+%l = 6;
 Ufunc = @(x1,x2) k*0.5*(norm(x1-x2)-l).^2;
 Ffunc = @(x1,x2) k*(norm(x1-x2)-l)*(x1-x2)./norm(x1-x2);
 
 opt.dt = dt;
 opt.gmres_tol = 1e-5;
 
+%% Loop in time
 d = zeros(tsteps,1);
-
-
-Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
-Tdiag = kron(eye(P),Tblock);
 
 
 for i = 1:tsteps
@@ -118,18 +125,38 @@ for i = 1:tsteps
     if P == 2
         RandVel = randn(6*P,1);
       %  [U1, ~, ~] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,RandVel,0, opt);
-
-        [rinDown,routDown,] = updateNodes(rvec_in,rvec_out,P,N,M,-delta/2*RandVel);
+             
+        [rinDown,routDown,~] = updateNodes(rvec_in,rvec_out,P,N,M,-delta/2*RandVel);
         [rinUp,routUp,transVec] = updateNodes(rvec_in,rvec_out,P,N,M,delta/2*RandVel);
-        qUp = q+transVec;
-        qDown = q-transVec;
-        [U2, ~, ~] = solve_brownian_mobility(qUp,rinUp,routUp,Y,UU,LL,Kin,Tblock,RandVel,0, opt);
-        [U1, ~, ~] = solve_brownian_mobility(qDown,rinDown,routDown,Y,UU,LL,Kin,Tblock,RandVel,0, opt);
 
-        % Solve with the standard mobility formulation instead, for debug
-        % purposes. Gives the same result.
-       % [U2, ~, ~] = solve_mobility(qUp,rinUp,routUp,RandVel,opt);
-        %[U1, ~, ~] = solve_mobility(qDown,rinDown,routDown,RandVel,opt);
+        if iterate_RFD
+            qUp = q+transVec;
+            qDown = q-transVec;
+            [U2, ~, ~] = solve_brownian_mobility(qUp,rinUp,routUp,Y,UU,LL,Kin,Tblock,RandVel,0, opt);
+            [U1, ~, ~] = solve_brownian_mobility(qDown,rinDown,routDown,Y,UU,LL,Kin,Tblock,RandVel,0, opt);
+       
+            % Solve with the standard mobility formulation instead, for debug
+            % purposes. Gives the same result.
+          % [U2, ~, ~] = solve_mobility(qUp,rinUp,routUp,RandVel,opt);
+          % [U1, ~, ~] = solve_mobility(qDown,rinDown,routDown,RandVel,opt)
+        
+        else
+
+            %Build densely
+            S_up = generate_stokes_mat(rinUp,routUp);
+            [Ytot,Utot] = getPseudoFactors(S_up,1e-13,0);
+            Rup = Ktot'*Ytot*(Utot'*Btot);
+            Mup = Rup\eye(6*P);
+
+            S_down = generate_stokes_mat(rinDown,routDown);
+            [Ytot,Utot] = getPseudoFactors(S_down,1e-13,0);
+            Rdown = Ktot'*Ytot*(Utot'*Btot);
+            Mdown = Rdown\eye(6*P);
+
+            U2 = Mup*RandVel;
+            U1 = Mdown*RandVel;
+        end
+
         RFD = (U2-U1)/delta;
 
         %RFD = zeros(6*P,1);
@@ -152,7 +179,7 @@ for i = 1:tsteps
         S = generate_stokes_mat(rvec_in,rvec_out);
         if solve_dense
             %U = solve_mobility(q,rvec_in, rvec_out,Fvec,opt);
-            %[U, ~, ~] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,0, opt);
+            [UT, ~, ~] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,0, opt);
     
             %build sqrt of M densely:
             [Ytot,Utot] = getPseudoFactors(S,1e-13,0);
@@ -169,10 +196,34 @@ for i = 1:tsteps
         else
 
             %% Solve instead with blockdiag(T)*S iteratively
-            A = -4*pi/M*Tdiag*S;
-            Asym = (A+A')/2;
-            sqrtA = chol(Asym);
-            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, sqrtA);
+            A = -Tdiag*S;
+            %A = -Tdiag*S; %the weights will cancel out
+            Asym = M/(4*pi)*(A+A')/2;
+            %sqrtA = chol(Asym); %results in very large errors!
+            [Vs,Ds] = eig(Asym);
+           % Ainv = A\eye(size(A)); 
+            ds = diag(Ds); 
+            tol = 1e-8; 
+            ind = find(real(ds)>tol);
+            % diff_set = setdiff(1:length(ds),ind);
+            % sqds = sqrt(ds); 
+            % sqds(diff_set) = 0;
+            % sqrtA = Vs*diag(sqds)*Vs';
+            
+            %same thing
+            sqrtA = Vs(:,ind)*diag(sqrt(ds(ind)))*Vs(:,ind)';
+            
+            % Check that we compute the right RBM!
+            % [Ytot,Utot] = getPseudoFactors(A,1e-13,0);
+            % Ainv = Ytot*Utot';
+            % R = M/(4*pi)*Ktot'*Ainv*Ktot;
+            % R2 = -Ktot'*Ainv*Tdiag*Btot;
+            % [Ytot,Utot] = getPseudoFactors(S,1e-13,0);
+            % R3 = Ktot'*Ytot*(Utot'*Btot);
+            dW = randn(3*N*P,1); %different noise here for different N!
+            % Udense = (R3\eye(P*6))*(Fvec+Ktot'*Ainv*sqrtA*sqrt(2/opt.dt)*dW);
+
+            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, sqrtA,dW);
         end
     %end
 
@@ -181,6 +232,9 @@ for i = 1:tsteps
     
     Unew = dt*(U+RFD);
     [rvec_in,rvec_out,transVec] = updateNodes(rvec_in,rvec_out,P,N,M,Unew); %Rotation to be taken into account? 
+    % if norm(Unew,inf)>1
+    %     disp('large change')
+    % end
     q = q+transVec;
     if P == 1
         d(i) = norm(q)^2; %store squared displacement
@@ -231,13 +285,15 @@ else  %P == 2 -- Draw marginal pdf
     k = 10;
     p = @(r) 4*pi*r.^2/((2*pi/k).^(3/2)).*exp(-k*(r-l).^2/2); %for the potential spring
     p2 = @(r) r.^2.*exp(-k*(r-l).^2/sqrt(2)); %for the potential spring
-    rmax = 6;
+    rmax = 7;
     Q = integral(p,1,rmax);
     pn = @(r) p(r)/Q;
     Q2 = integral(p2,1,rmax);
     pn2 = @(r) p2(r)/Q2;
-    r = linspace(2,rmax);
-    plot(r,pn(r),'k--');
+    r = linspace(2,rmax,200);
+    plot(r,pn(r),'k--','LineWidth',2);
+    xlabel('particle-particle distance $d$','Interpreter','latex')
+    ylabel('$p(d)$','Interpreter','latex')
    % plot(r,pn2(r),'r--')
 end
 
