@@ -43,7 +43,11 @@ while (iter_err > tol) && (j<max_it)
     y = norm(z) * ( v(:,1:j)*hsqrt(:,1));
     y = real(y);
     if ~isempty(pre_cond)
-        y = pre_cond*y;
+        if isa(pre_cond,'function_handle')
+            y = pre_cond(y);
+        else
+            y = pre_cond*y;
+        end
     end
     
    

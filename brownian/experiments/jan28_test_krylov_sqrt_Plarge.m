@@ -3,7 +3,7 @@
 clear; close all;
 rng(5); 
 
-P = 10; %number of bodies
+P = 20; %number of bodies
 delta = 1; %smallest particle particle distance 
 if P == 2
     q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
@@ -79,11 +79,10 @@ for i = 1:length(tolvec)
     dsqrt_plus = sqrt(d); 
     dsqrt_plus(diff_set) = 0;
     Ci_plus = Ve*diag(dsqrt_plus);    
-    C = kron(eye(P),Ci);
-    Cplus = kron(eye(P),Ci_plus);
+    Cplus = @(x) apply_block_diag(x, Ci_plus, P);
 
     if dense
-
+        C = kron(eye(P),Ci);
         B_precond = C*B*C';
         if plot_eigs
             e_precond = eig(B_precond); 
@@ -116,6 +115,17 @@ for i = 1:length(tolvec)
     
 end
 
+function y = apply_block_diag(x, B, P)
+%APPLY_BLOCK_DIAG Apply block-diagonal operator with P identical blocks B.
+% x is (3N*P) x 1, B is (3N) x (3N).
+nb = size(B,1);
+y = zeros(size(x));
+for k = 1:P
+    idx = (k-1)*nb + (1:nb);
+    y(idx) = B * x(idx);
+end
+end
+
 lgd = legend('show','Location','best');
 lgd.Title.String = 'Eigenvalue truncation (preconditioner)';
 
@@ -123,53 +133,3 @@ axis tight
 grid on
 xlabel('Iteration number')
 ylabel('Estimated error using Lanczos')
-
-xsrc = r(:,1); 
-ysrc = r(:,2);
-zsrc = r(:,3);
-xtar = rout(:,1); 
-ytar = rout(:,2); 
-ztar = rout(:,3); 
-nx = nn(:,1);
-ny = nn(:,2); 
-nz = nn(:,3); 
-mu = 1; 
-
-Nsrc = numel(xsrc);
-Ntar = numel(xtar);
-T = zeros(3*Nsrc,3*Ntar);
-
-prefac = 6 / (8*pi*mu);
-
-for j = 1:Ntar
-    %Vector differences r = x - y_j
-    rx = xtar(j) - xsrc;
-    ry = ytar(j) - ysrc;
-    rz = ztar(j) - zsrc;
-    r2 = rx.^2 + ry.^2 + rz.^2;
-    r5 = sqrt(r2).^5;
-
-    %Dot with normal at target
-    rdotn = rx*nx(j) + ry*ny(j) + rz*nz(j);
-
-    %Compute 3x3 block per target
-    Txx = prefac * rdotn .* (rx.*rx) ./ r5;
-    Txy = prefac * rdotn .* (rx.*ry) ./ r5;
-    Txz = prefac * rdotn .* (rx.*rz) ./ r5;
-    Tyx = prefac * rdotn .* (ry.*rx) ./ r5;
-    Tyy = prefac * rdotn .* (ry.*ry) ./ r5;
-    Tyz = prefac * rdotn .* (ry.*rz) ./ r5;
-    Tzx = prefac * rdotn .* (rz.*rx) ./ r5;
-    Tzy = prefac * rdotn .* (rz.*ry) ./ r5;
-    Tzz = prefac * rdotn .* (rz.*rz) ./ r5;
-
-    %Assemble into block structure
-    T(:, 3*j-2:3*j) = reshape( ...
-    [Txx; Txy; Txz;  ...
-     Tyx; Tyy; Tyz;  ...
-     Tzx; Tzy; Tzz], ...
-    3, 3*Nsrc).';
-end
-
-
-end
