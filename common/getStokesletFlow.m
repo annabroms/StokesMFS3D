@@ -1,7 +1,7 @@
-function res = getFlow(tau_stokes, rin, rout, vars)
-%GETFLOW Evaluate Stokes flow velocity from Stokeslet sources 
+function res = getStokesletFlow(tau_stokes, rin, rout, vars)
+%GETSTOKESLETFLOW Evaluate Stokes flow velocity from Stokeslet sources.
 %
-%   res = GETFLOW(tau_stokes, rin, rout, vars)
+%   res = GETSTOKESLETFLOW(tau_stokes, rin, rout, vars)
 %
 %   Computes the fluid velocity induced by a collection of Stokeslets located
 %   at the source points `rin`, with strengths `tau_stokes`, evaluated at the
@@ -24,16 +24,36 @@ function res = getFlow(tau_stokes, rin, rout, vars)
 %   NOTES:
 %       - If vars.fmm is true, the function uses the FMM3D interface `stfmm3d`
 %         (requires FMM3D to be installed and compiled).
-%       - Otherwise, it falls back to direct evaluation via a mex interface to SE0P_Stokeslet_direct_full_ext_mex.
+%       - Otherwise, it falls back to direct evaluation via a mex interface to
+%         SE0P_Stokeslet_direct_full_ext_mex (the fast direct branch).
 %       - Modify this function for solving MFS with other fast summation
 %         technique or implementation of direction summation. 
 %
+%   See also: getTractionFast, getStressletFlow
+% 
 %   DEPENDENCIES:
 %       - Accelerated evaluation: FMM3D (https://github.com/flatironinstitute/fmm3d)
 %       - Direct evaluation: SE0P_Stokeslet_direct_full_ext_mex
 %       (https://github.com/annabroms/Stokes_Direct -- precompiled binary exists)
 %
-% Anna Broms June 12, 2025
+% Anna Broms June 12, 2025, updated Feb 3 2026
+
+if nargin < 1
+    self_test;
+    return;
+end
+
+% Normalize common transposed inputs for mex compatibility
+if size(rin,2) ~= 3 && size(rin,1) == 3
+    rin = rin.';
+end
+if size(rout,2) ~= 3 && size(rout,1) == 3
+    rout = rout.';
+end
+if ~isvector(tau_stokes) && size(tau_stokes,2) ~= 3 && size(tau_stokes,1) == 3
+    tau_stokes = tau_stokes.';
+end
+
 
 if vars.fmm 
     % -------- Use FMM3D for fast evaluation --------
@@ -68,6 +88,32 @@ else
     res = 1/(8*pi) * U(:); % Apply Stokeslet prefactor
 end
 
+function self_test()
+
+if exist('stfmm3d','file') ~= 2
+    fprintf('getStokesletFlow self-test skipped: stfmm3d not found.\n');
+    return;
+end
+
+rng(1);
+Nsrc = 40;
+Ntar = 30;
+
+rin = rand(Nsrc,3);
+rout = rand(Ntar,3);
+tau = rand(3*Nsrc,1);
+
+vars.fmm = 0;
+res_direct = getStokesletFlow(tau, rin, rout, vars);
+
+vars.fmm = 1;
+vars.eps = 1e-10;
+res_fmm = getStokesletFlow(tau, rin, rout, vars);
+
+rel_err = norm(res_fmm - res_direct) / norm(res_direct);
+fprintf('getStokesletFlow self-test: rel err (fmm vs direct) = %.3e\n', rel_err);
+
+end
 
 
 end

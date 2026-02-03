@@ -30,7 +30,7 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %
 %   DEPENDENCIES:
 %       init_MFS, getDesignGrid, getVelocityData, matvecStokesMFS,
-%       oneBodyPrecondRes, helsing_gmres, getKmat, getFlow
+%       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow
 %
 %   See also: LARGE_ELLIPSOID_EX, SOLVE_MOBILITY
 %
@@ -235,7 +235,7 @@ for k = 1:P
 end
 
 % Evaluate flow from solution to resistance problem
-ubdry = getFlow(lambda_gmres, rvec_in, rcheck, opt);
+ubdry = getStokesletFlow(lambda_gmres, rvec_in, rcheck, opt);
 
 % Compute relative residual
 uerr_vec = vecnorm(reshape(ucheck - ubdry, 3, []), 2, 1) ./ ...

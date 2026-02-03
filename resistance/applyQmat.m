@@ -28,14 +28,14 @@ function lambda_fine = applyQmat(lambda, rvec_in, rvec_out, Rinv, Zi,Yi,R, opt)
 %   NOTES:
 %     - Unlike APPLYPMAT, this function applies the projection directly on 
 %       (i.e., it modifies test functions or right-hand side vectors).
-%     - The flow is computed via getFlow using proxy points and Stokes kernel.
+%     - The flow is computed via getStokesletFlow using proxy points and Stokes kernel.
 %     - Image systems are not included in this implementation.
 %
-%   See also: applyPmat, getFlow
+%   See also: applyPmat, getStokesletFlow
 %
 % Anna Broms, Oct 14, 2025
 
-proj_vel = getFlow(lambda, rvec_in, rvec_out, opt); 
+proj_vel = getStokesletFlow(lambda, rvec_in, rvec_out, opt); 
 lambda_proj = getCoarseSource(proj_vel,Rinv,Zi,Yi,R,opt);
 
 lambda_fine = lambda-lambda_proj;

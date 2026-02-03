@@ -30,7 +30,7 @@ function res = applyPmat(vel,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt)
 %     - The matrices Z and Y are sorted as [x y z x y z ... ]
 %     - Currently implemented without image system contributions.
 %
-%   See also: applyQmat, getFlow
+%   See also: applyQmat, getStokesletFlow
 %
 % Anna Broms Oct 14, 2025
 
@@ -38,7 +38,7 @@ lambda = getCoarseSource(vel,Rinv,Zi,Yi,R,opt);
 
 %compute velocities using these source strengths
 
-proj_vel = getFlow(lambda, rvec_in, rvec_out, opt); 
+proj_vel = getStokesletFlow(lambda, rvec_in, rvec_out, opt); 
 
 res = vel-proj_vel;
 

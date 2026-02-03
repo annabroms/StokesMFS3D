@@ -93,7 +93,7 @@ for k = 1:P
 end
 
 %% Get flow field due to completion source.
-uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt); 
+uvec = getStokesletFlow(lambda_vec,rvec_in,rvec_out,opt); 
 uvec = -uvec;
 
 
@@ -170,7 +170,7 @@ for i =1:P
 end
 
 %get flow and compare RHS and LHS of representation
-ubdry = getFlow(densityK,rvec_in,rcheck,opt);
+ubdry = getStokesletFlow(densityK,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);
 

@@ -42,7 +42,7 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 %       easy to modify). 
 %
 %   DEPENDENCIES:
-%       - getFlow, rotate_vector, 
+%       - getStokesletFlow, rotate_vector, 
 %
 %  Anna Broms, June 12, 2025
 
@@ -110,7 +110,7 @@ end
 
 %% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
-res = getFlow(lambda_stokes,rin,rout,vars);
+res = getStokesletFlow(lambda_stokes,rin,rout,vars);
 
 %% Adjust to obtain identity blocks on diagonal of system matrix
 res = res+mu; 
@@ -122,7 +122,7 @@ for i = 1:P
     rin_i = rin(N*(i-1)+1:N*i,:); %sources on body i    
     rows_i = (i-1)*M+1:i*M;
     targ = rout(rows_i,:);  %collocation points on body i
-    u_self = getFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
+    u_self = getStokesletFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
     res((i-1)*3*M+1:i*3*M) = res((i-1)*3*M+1:i*3*M)-u_self;
 
 end

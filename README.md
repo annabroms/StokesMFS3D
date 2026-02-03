@@ -24,7 +24,7 @@ To run simulations, ensure the following dependencies are available:
   Used for direct evaluation of fundamental solutions.  
   Only `SE0P_Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` repository.
 
-To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getFlow.m.
+To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m.
 
 - **Spherical Design Nodes**  
   Used to construct the source/target geometry. See `geometry/README.md` for details.
