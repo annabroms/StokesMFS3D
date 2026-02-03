@@ -1,9 +1,13 @@
-function [y,iter_errv, exact_errv] = KrylovSqrtMsing(M,z,tol,yexact)
+function [y,iter_errv, iters, exact_errv] = KrylovSqrtMsing(M,z,tol,max_it,pre_cond,yexact)
 %Borrowed from FBIM
+
+if nargin < 5
+    pre_cond = [];
+end
 
 if isa(M,'function_handle')
    afun = M; 
-else
+else 
    afun = @(x) M*x;
 end
 
@@ -15,7 +19,7 @@ y = v;
 %yexact = real(yexact);
 
 j=1;
-while iter_err > tol
+while (iter_err > tol) && (j<max_it)
     
     w = afun(v(:,j));
     
@@ -38,12 +42,16 @@ while iter_err > tol
     yold = y;
     y = norm(z) * ( v(:,1:j)*hsqrt(:,1));
     y = real(y);
+    if ~isempty(pre_cond)
+        y = pre_cond*y;
+    end
     
+   
     iter_err = norm(y-yold)/norm(yold);
     
     iter_errv(j) = iter_err;
     
-    if nargin == 4
+    if nargin == 6
         exact_errv(j) = norm(y-yexact)/norm(yexact);
     end
     
@@ -51,8 +59,10 @@ while iter_err > tol
 %    [j,iter_err]    
 end
 
-if nargin<4
+if nargin<6
     exact_errv = [];
 end
+
+iters = j; 
 
 end
