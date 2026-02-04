@@ -97,7 +97,7 @@ for k = 1:P
 end
 end
 % Visualize: median iterations to reach target + uncertainty (IQR)
-med_iters = median(iter_req, 3);
+med_iters = mean(iter_req, 3);
 q25 = prctile(iter_req, 25, 3);
 q75 = prctile(iter_req, 75, 3);
 iqr_iters = q75 - q25;
@@ -147,7 +147,7 @@ xlabel('\delta')
 ylabel('P')
 
 cb = colorbar;
-cb.Label.String = 'Median iterations';
+cb.Label.String = 'Mean iterations';
 colormap(parula)
 
 title(sprintf(['Krylov iterations to reach error %.1e (fixed eigval trunc = %.1e)\n' ...

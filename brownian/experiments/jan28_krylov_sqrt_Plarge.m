@@ -3,8 +3,8 @@
 clear; close all;
 rng(5); 
 
-P = 20; %number of bodies
-delta = 1; %smallest particle particle distance 
+P = 500; %number of bodies
+delta = 0.1; %smallest particle particle distance 
 if P == 2
     q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 elseif P == 1
@@ -16,7 +16,7 @@ end
 
 
   
-fmm = 0; %only activate if many particles (say, more than 40)
+fmm = 1; %only activate if many particles (say, more than 40)
 
 %Test first with very low resolution
 Rp = 0.30;
@@ -48,7 +48,7 @@ end
 dW2 = rand(3*N*P,1);
 
 %% Block block-diagonal preconditioner 
-Ti = stokes_DLP(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:));
+Ti = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:));
 Si = generate_stokes_mat(rvec_in(1:N,:), rvec_out(1:M,:));
 Ai = Ti*Si;
 Bi = (Ai+Ai')/2;
@@ -64,6 +64,7 @@ maxit = 500;
 
 vars.fmm = fmm; 
 vars.eps = 1e-10; %for use in FMM 
+tolvec = 1e-12;
 
 % Loop over different truncation levels of the eigvals to check the effect
 for i = 1:length(tolvec)

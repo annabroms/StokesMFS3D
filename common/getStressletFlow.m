@@ -56,10 +56,8 @@ if vars.fmm
     ifppreg = 0;      % no eval at sources
     ifppregtarg = 1;  % just vel out
     
-    
     targ = rvec_out';
     
-    rng(0)
     srcinfo.sources = rvec_in';
     srcinfo.stoklet = zeros(3,Ns); 
     
@@ -68,7 +66,7 @@ if vars.fmm
     
     U = stfmm3d(vars.eps,srcinfo,ifppreg,targ,ifppregtarg);
     u = U.pottarg;
-    u = u(:); 
+    u = -u(:); %there is a sign difference!
 else
     targ = rvec_out; 
     srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x N
@@ -76,7 +74,7 @@ else
     % Evaluate stresslet flow at targets via direct sum
     U = SE0P_Stresslet_direct_full_ext_mex(rvec_in, srcinfo.strslet', nn, struct('eval_ext_x', targ));
     
-    U = -U';              % Transpose to match output stacking
+    U = U';              % Transpose to match output stacking
     u = 1/(8*pi) * U(:); % Apply Stokeslet prefactor
 end
 
