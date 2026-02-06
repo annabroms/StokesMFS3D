@@ -1,4 +1,5 @@
-%test sqrt of traction computation
+%test sqrt of TG with preconditioning for 2 bodies. This script in addition displays
+%convergence with the RPY tensor and without preconditioning.
 
 clear; close all;
 
@@ -32,18 +33,12 @@ M = size(rvec_out,1)/P;
 N = size(rvec_in,1)/P; 
 n = repmat(rvec_out(1:M,:),P,1);
 
-if P == 1
-    T = getTractionMat(rvec_in,rvec_out,n); 
-else
-    Tblock = getTractionMat(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:));
-    T = kron(eye(P),Tblock);
-end
-T = getTractionMat(rvec_in,rvec_out,n); 
-S = generate_stokes_mat(rvec_in, rvec_out);
+Tt = getTractionMat(rvec_in,rvec_out,n); 
+G = stokes_SLP_mat(rvec_in, rvec_out);
 
-A  = T'*S;
+A  = Tt'*G;
 
-
+%% Check convergence with unpreconditioned Lanczos
 %Do eigval decomp
 B = (A+A')/2;
 [V,D] = eig(B);
@@ -65,12 +60,12 @@ dW1 = rand(size(S,1),1);
 dW2 = rand(size(A,1),1);
 maxit = 500; 
 tol = 1e-8; 
-[y,iter_errv1] = KrylovSqrtMsing(S,dW1,tol,maxit);
+[~,iter_errv1] = KrylovSqrtMsing(S,dW1,tol,maxit);
 [y,iter_errv2] = KrylovSqrtMsing(A,dW2,tol,maxit);
-[y,iter_errv3] = KrylovSqrtMsing(A+A',dW2,tol,maxit);
-[y,iter_errv4] = KrylovSqrtMsing(A3,dW2,tol,maxit);
+[~,iter_errv3] = KrylovSqrtMsing(A+A',dW2,tol,maxit);
+[~,iter_errv4] = KrylovSqrtMsing(A3,dW2,tol,maxit);
 y2 = krylov_sqrt(A,dW2,20);
-%norm(y-y2,inf)/norm(y,inf)
+norm(y-y2,inf)/norm(y,inf)
 
 %%
 figure()
@@ -82,12 +77,12 @@ semilogy(iter_errv4,'s--');
 xlabel('Iteration number')
 ylabel('Estimated error using Lanczos')
 axis tight
-legend('RPY tensor','TS','Symmetrized TS')
+legend('RPY tensor','TtG','Symmetrized TtG')
 
 %% Block diagonal preconditioner
-T = getTractionMat(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)); 
-S = generate_stokes_mat(rvec_in(1:N,:), rvec_out(1:M,:));
-Ai = T'*S;
+Tt = getTractionMat(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)); 
+S = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+Ai = Tt'*S;
 Bi = (Ai+Ai')/2;
 %Bi = Ai; 
 [Ve,De] = eig(Bi);
@@ -122,15 +117,17 @@ for i = 1:length(tolvec)
     e_precond = eig(B_precond); 
     e = eig(B); 
 
+    %% Display eigvals of preconditioned matrix
     %Eigenvalues are clustered at 1! 
     figure(2)
     plot(real(e_precond),imag(e_precond),'+')
+    title('Eigvals of onebody preconditioned matrix')
     
     
     % semilogy(sort(e_precond));
     % hold on
     % semilogy(sort(e))
-    
+    %% Run lanczos with this truncation level in the preconditioner
     [y,iter_errv5] = KrylovSqrtMsing(B_precond,dW2,tol,maxit,Cplus);
     
     figure(10)
@@ -152,7 +149,6 @@ axis tight
 grid on
 xlabel('Iteration number')
 ylabel('Estimated error using Lanczos')
-
 
 
 

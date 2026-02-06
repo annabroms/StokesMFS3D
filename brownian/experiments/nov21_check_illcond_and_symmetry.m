@@ -1,11 +1,13 @@
 clear; 
 close all;
 
-%Test of the symmetry error in the matrix A = TS. We also check the
-%eigenvalues and singular values
+%Test of the symmetry error in the matrix TG (visualising its eigenvalues). We also check the
+%eigenvalues and singular values of the symmetric part of TG and the
+%corresponding singular vectors. Conclusion: TG, G and sym(TG) all have a
+%joint null-space, namely in the normal direction of the proxy surface. 
 
 P=2;
-delta = 10; 
+delta = 0.2; 
 if P==1
     q = [0 0 0];
 else
@@ -37,47 +39,91 @@ for a = 2 %; %[1 1.2 1.5 2 3] %Determines oversampling factor for the collocatio
     N = size(rvec_in,1)/P;
     MM = size(rvec_out,1)/P; 
     
-    n = repmat(rvec_out(1:MM,:)-q(1,:),P,1);
-    %remember T is a block diagonal matrix
+    n = rvec_out - kron(q,ones(MM,1));
+    
+    % Attempt at removing the null space of Tt (per-body correction)
     if P==1
-        T = getTraction(rvec_in,rvec_out,n); 
-        Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:));
-        T = T+Nmat;
+        Tt = getTractionMat(rvec_in,rvec_out,n); 
+        Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:))';
+        %Tt = Tt+Nmat;
     else
-        Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:MM,:),rvec_out(1:MM,:)-q(1,:));
-        %Nmat = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:));
-        %Tblock = Tblock+Nmat; 
-        T = kron(eye(P),Tblock);
+        Tt = getTractionMat(rvec_in,rvec_out,n); 
+        Nmat_block = normal_outer_block(rvec_in(1:N,:), rvec_out(1:MM,:))';
+        %Tt = Tt + kron(eye(P), Nmat_block);
     end
-    %T = getTraction(rvec_in,rvec_out,n);
+    %Tt = getTractionMat(rvec_in,rvec_out,n);
 
-    S = generate_stokes_mat(rvec_in, rvec_out);
+    G = stokes_SLP_mat(rvec_in, rvec_out);
 
-    A = -4*pi/MM*T*S;
+    A = 4*pi/MM*Tt'*G; 
 
-    [Y,U]  = getPseudoFactors(S,tol,4);
+    %% Visualise all singvals
+    [Y,U]  = getPseudoFactors(G,tol,4);
     [YA,UA]  = getPseudoFactors(A,tol,3);
 
+    %% Visualise all eigvals
     [V,D] = eig(A); 
     figure(1)
     plot(real(diag(D)),imag(diag(D)),'+-');
     hold on
 
-    [V,D] = eig((A+A')/2); 
-    dsym = diag(D);
+    [Vsym,Dsym] = eig((A+A')/2); 
+    dsym = diag(Dsym);
     figure(2)
     semilogy(dsym,'+-');
     hold on
 
+    %% Visualize smallest eigen/singular vectors
+    n_modes = 1;
+    if P == 2
+        n_modes = 2;
+    end
+
+    [~,orda] = sort(abs(diag(D)),'ascend');
+    va1 = V(:,orda(1));
+    va2 = [];
+    if n_modes == 2
+        va2 = V(:,orda(2));
+    end
+    plot_quiver_field_pair(rvec_in, va1, va2, 'TG eigvecs (blue=min eig, red=2nd)');
+
+    [~,ordas] = sort(abs(diag(Dsym)),'ascend');
+    vas1 = Vsym(:,ordas(1));
+    vas2 = [];
+    if n_modes == 2
+        vas2 = Vsym(:,ordas(2));
+    end
+    plot_quiver_field_pair(rvec_in, vas1, vas2, 'sym(TG) eigvecs (blue=min eig, red=2nd)');
+
+    [Ug,Sg,Vg] = svd(G,'econ');
+    vmin_g1 = Vg(:,end);
+    vmin_g2 = [];
+    if n_modes == 2
+        vmin_g2 = Vg(:,end-1);
+    end
+    plot_quiver_field_pair(rvec_in, vmin_g1, vmin_g2, 'G right singvecs (blue=min sing, red=2nd)');
+
+    [Uc,Sc,Vc] = svd(A,'econ');
+    vmin_a1 = Vc(:,end);
+    vmin_a2 = [];
+    if n_modes == 2
+        vmin_a2 = Vc(:,end-1);
+    end
+    plot_quiver_field_pair(rvec_in, vmin_a1, vmin_a2, 'TG right singvecs (blue=min sing, red=2nd)');
+    
+
 end
 
 %%
+figure(2)
 xlabel('j','Interpreter','latex')
 ylabel('$\lambda_j$','Interpreter','latex')
+title('Eigvals of sym(TG)')
 
 figure(1)
 xlabel('Re($\lambda$)','Interpreter','latex')
 ylabel('Im($\lambda$)','Interpreter','latex')
+title('Eigvals of TG')
 
 visualise = 1; 
 tol = 1e-13;
@@ -85,3 +131,33 @@ tol = 1e-13;
 legend('a = 1', 'a = 1.2','a = 1.5', 'a = 2', 'a = 3')
 set(legend,'interpreter','latex')
 
+function plot_quiver_field_pair(rvec, vec1, vec2, plot_title)
+    if isempty(rvec) || isempty(vec1)
+        return;
+    end
+    v1 = real(vec1(:));
+    n = size(rvec,1);
+    if numel(v1) ~= 3*n
+        return;
+    end
+    v1 = reshape(v1,3,[])';
+    figure();
+    quiver3(rvec(:,1), rvec(:,2), rvec(:,3), v1(:,1), v1(:,2), v1(:,3), 'AutoScale','on','Color','b');
+    hold on
+    if ~isempty(vec2)
+        v2 = real(vec2(:));
+        if numel(v2) == 3*n
+            v2 = reshape(v2,3,[])';
+            quiver3(rvec(:,1), rvec(:,2), rvec(:,3), v2(:,1), v2(:,2), v2(:,3), 'AutoScale','on','Color','r');
+        end
+    end
+    axis equal
+    grid on
+    title(plot_title)
+end
+
+fprintf(['Fig 1 and 2 display the eigvals of TG and sym(TG),\n Fig 4 and 3 the singvals of the same matrices\n ...' ...
+    'There is clearly a nontrivial null space... now to be visualised'])
+
+
+alignfigs; 

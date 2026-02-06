@@ -1,4 +1,5 @@
-%test sqrt of traction computation
+%test sqrt of TG. It's the same thing as nov19_test_krylov_sqrt_P2.m but
+%with some speedups that allows for more bodies. 
 
 clear; close all;
 rng(5); 

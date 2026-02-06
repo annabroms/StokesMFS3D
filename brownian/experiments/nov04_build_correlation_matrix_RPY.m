@@ -1,10 +1,11 @@
 clear; close all; 
 %Builds correlation matrix for <UU'> when the noise is given by the
-% action of chol(S_RPY). Compares either against the known mobility matrix,
-% when this is known for a single body, or against the resulting mobility
-% matrix obtained with a dense MFS solve. Conclusion: the error has a
-% strong dependence on the regularisation parameter in the RPY tensor and
-% two error contributions must be balanced: regularisation and discretisation. 
+% action of chol(S_RPY) and the rest of the mobility problem is solved with
+% MFS. Compares either against the known mobility matrix, when this is
+% known for a single body, or against the resulting mobility matrix
+% obtained with a dense MFS solve. Conclusion: the error has a strong
+% dependence on the regularisation parameter in the RPY tensor and two
+% error contributions must be balanced: regularisation and discretisation.
 % Regardless, the error for the best case scenario is large!
 
 % set particle coordinates
@@ -35,7 +36,7 @@ MM = size(rvec_out,1)/P;
 B = getKmat(rvec_out,q);
 K = getKmat(rvec_in,q);
 
-G = generate_stokes_mat(rvec_in, rvec_out);
+G = stokes_SLP_mat(rvec_in, rvec_out);
 tol = 1e-13; 
 visualise = 0; 
 [Y,U]  = getPseudoFactors(G,tol,visualise);
@@ -49,7 +50,9 @@ avec = logspace(-2,0);
 for i = 1:length(avec)
     i
     S_RPY = generate_RPY_matrix(rvec_out,avec(i));
-    S = generate_stokes_mat(rvec_out, rvec_out);
+
+    % Compare regularized version against the non-regularized version
+    % S = stokes_SLP_mat(rvec_out, rvec_out);
 
     % figure()
     % imagesc(log10(abs(S-S_RPY)))
@@ -57,7 +60,8 @@ for i = 1:length(avec)
     
     KGplus = K'*Y*U';
 
-    %Build correlation for the rigid body motion vectors.
+    %Build correlation for the rigid body motion vectors, assuming the
+    %rest of the problem is solved with MFS.
     M_corr = M*KGplus*S_RPY*KGplus'*M';
 
     err(i) = norm(M-M_corr)/norm(M); 
