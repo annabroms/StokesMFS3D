@@ -1,4 +1,4 @@
-function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,vars, resistance_flag,R,L)
+function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,nn, vars, resistance_flag,R,L)
 %MATVECSTOKESMFS Matrix-vector product for basic Stokes MFS (without image enhancement) 
 %
 %   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, R, resistance_flag,R,L)
@@ -42,7 +42,7 @@ function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,vars, resi
 %       easy to modify). 
 %
 %   DEPENDENCIES:
-%       - getFlow, rotate_vector, 
+%       - getStokesletFlow, rotate_vector, 
 %
 %  Anna Broms, June 12, 2025
 
@@ -109,17 +109,25 @@ end
 
 %% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
-res_stokes = getFlow(lambda_stokes,rin,rout,vars);
+res_stokes = getStokesletFlow(lambda_stokes,rin,rout,vars);
 
-%just for now
-%T = getTraction(rin,rout,nn);
-%res = -T*res;
-
-res = zeros(3*N*P,1); 
-
-for k = 1:P
-    res(3*(k-1)*N+1:3*k*N) = -Tblock*res_stokes(3*(k-1)*M+1:k*3*M);
+if vars.fmm
+    u = getStressletFlow(rin,rout,nn,reshape(res_stokes,3,[])',vars.M*P);
+    res = -u(:);
+else
+    %just for now
+    T = getTraction(rin,rout,nn);
+    res = -T*res_stokes;
 end
+
+%norm(u-res) small
+
+
+% block-diagonal T
+% res = zeros(3*N*P,1); 
+% for k = 1:P
+%     res(3*(k-1)*N+1:3*k*N) = -Tblock*res_stokes(3*(k-1)*M+1:k*3*M);
+% end
     
 
 %% Adjust to obtain identity blocks on diagonal of system matrix
@@ -132,7 +140,7 @@ for i = 1:P
     rin_i = rin(N*(i-1)+1:N*i,:); %sources on body i    
     rows_i = (i-1)*M+1:i*M;
     targ = rout(rows_i,:);  %collocation points on body i
-    u_self = getFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
+    u_self = getStokesletFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
    
     
     u_self = -Tblock*u_self; 

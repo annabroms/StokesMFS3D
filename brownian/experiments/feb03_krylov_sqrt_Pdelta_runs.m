@@ -54,7 +54,7 @@ for ip = 1:nP
 
             % Block-diagonal preconditioner
             Ti = stokes_DLP(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:));
-            Si = generate_stokes_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+            Si = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
             Ai = Ti*Si;
             Bi = (Ai+Ai')/2;
             [Ve,De] = eig(Bi);

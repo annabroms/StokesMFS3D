@@ -32,14 +32,14 @@ function [Y, U, Si] = oneBodyPrecondRes(rin, rout)
 %         be visualized for diagnostics with the flag visualise = 1. 
 %
 %   DEPENDENCIES:
-%       - generate_stokes_mat.m, getPseudoFactors.m
+%       - stokes_SLP_mat.m, getPseudoFactors.m
 %
 %  Anna Broms, June 12, 2025
 
 tol = 1e-15;
 visualise = 0; 
 
-S = generate_stokes_mat(rin,rout);
+S = stokes_SLP_mat(rin,rout);
 
 [Y, U, Si] = getPseudoFactors(S, tol, visualise);
 U = U'; 

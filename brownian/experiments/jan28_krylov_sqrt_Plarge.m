@@ -3,8 +3,8 @@
 clear; close all;
 rng(5); 
 
-P = 500; %number of bodies
-delta = 0.1; %smallest particle particle distance 
+P = 80; %number of bodies
+delta = 1; %smallest particle particle distance 
 if P == 2
     q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 elseif P == 1
@@ -16,11 +16,13 @@ end
 
 
   
-fmm = 1; %only activate if many particles (say, more than 40)
-
+fmm = 0; %only activate if many particles (say, more than 40). However currently slow... 
+fast = 1; 
 %Test first with very low resolution
 Rp = 0.30;
-N = 100; 
+N = 100;
+% Rp = 0.68;
+% N = 700; 
 % Rp = 0.15;
 % N = 50; 
 a = 1.2; 
@@ -40,7 +42,7 @@ n_out = repmat(rvec_out(1:M,:),P,1);
 
 if dense
     T = stokes_DLP(rvec_out,rvec_in,n_out);
-    S = generate_stokes_mat(rvec_in, rvec_out);
+    S = stokes_SLP_mat(rvec_in, rvec_out);
     A  = T*S;
     B = (A+A')/2;
 end
@@ -49,7 +51,7 @@ dW2 = rand(3*N*P,1);
 
 %% Block block-diagonal preconditioner 
 Ti = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:));
-Si = generate_stokes_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+Si = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
 Ai = Ti*Si;
 Bi = (Ai+Ai')/2;
 [Ve,De] = eig(Bi);
@@ -64,7 +66,7 @@ maxit = 500;
 
 vars.fmm = fmm; 
 vars.eps = 1e-10; %for use in FMM 
-tolvec = 1e-12;
+tolvec = 1e-16;
 
 % Loop over different truncation levels of the eigvals to check the effect
 for i = 1:length(tolvec)
@@ -80,7 +82,7 @@ for i = 1:length(tolvec)
     dsqrt_plus = sqrt(d); 
     dsqrt_plus(diff_set) = 0;
     Ci_plus = Ve*diag(dsqrt_plus);    
-    Cplus = @(x) apply_block_diag(x, Ci_plus, P);
+    Cplus = @(x) apply_block_diag(x, Ci_plus, P, Ve, diag(dsqrt_plus));
 
     if dense
         C = kron(eye(P),Ci);
@@ -99,8 +101,11 @@ for i = 1:length(tolvec)
     else
         CBC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,Ci,vars);
     end
-    
-    [y,iter_errv5] = KrylovSqrtMsing(CBC,dW2,tol,maxit,Cplus);
+    if fast
+        [y,iter_errv5] = KrylovSqrtMsing_fast(CBC,dW2,tol,maxit,Cplus);
+    else
+        [y,iter_errv5] = KrylovSqrtMsing(CBC,dW2,tol,maxit,Cplus);
+    end
     
     figure(10)
     semilogy(iter_errv5,'Marker',m{mod(i,4)+1},'Color',c{mod(i,5)+1}, ...
@@ -116,14 +121,15 @@ for i = 1:length(tolvec)
     
 end
 
-function y = apply_block_diag(x, B, P)
+function y = apply_block_diag(x, B, P,V, D)
 %APPLY_BLOCK_DIAG Apply block-diagonal operator with P identical blocks B.
 % x is (3N*P) x 1, B is (3N) x (3N).
 nb = size(B,1);
 y = zeros(size(x));
 for k = 1:P
     idx = (k-1)*nb + (1:nb);
-    y(idx) = B * x(idx);
+    %y(idx) = B * x(idx);
+    y(idx) = V*(D * x(idx)); % I don't know if this makes a difference...
 end
 end
 

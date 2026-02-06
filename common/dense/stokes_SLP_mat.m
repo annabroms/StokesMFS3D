@@ -1,4 +1,4 @@
-function G = generate_stokes_mat(rin, rout)
+function G = stokes_SLP_mat(rin, rout)
 %GENERATE_STOKES_MAT Builds dense Stokeslet target-from-source matrix for 3D Stokes flow.
 %
 %   G = GENERATE_STOKES_MAT(rin, rout)
@@ -26,7 +26,7 @@ function G = generate_stokes_mat(rin, rout)
 %   EXAMPLE USAGE:
 %       rin = rand(10,3);
 %       rout = rand(12,3);
-%       S = generate_stokes_mat(rin, rout);
+%       S = stokes_SLP_mat(rin, rout);
 %
 %   Anna Broms June, 12, 2025
 

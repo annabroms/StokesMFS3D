@@ -15,7 +15,7 @@ function res = getPrecondTG(x,P,rvec_in,rvec_out,nn,Ci,vars)
 % res      - preconditioned vector (same layout as x)
 
 %dense implementation that should generate the same result: 
-% S = generate_stokes_mat(rvec_in,rvec_out); 
+% S = stokes_SLP_mat(rvec_in,rvec_out); 
 % A  = T*S;
 % B = (A+A')/2;
 % C = kron(eye(P),Ci);

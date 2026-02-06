@@ -25,7 +25,7 @@ function [Y, UU, LL, Kin, Kout] = oneBodyPrecondMob(rin, rout, q)
 %       Kout  - Mapping from RBM velocity to velocity on boundary.
 %
 %   DEPENDENCIES:
-%       - generate_stokes_mat, getKmat, getPseudoFactors
+%       - stokes_SLP_mat, getKmat, getPseudoFactors
 %
 % Anna Broms, June 12, 2025
 
@@ -37,7 +37,7 @@ elseif nargin < 3
 end
 
 % Build MFS and rigid-body matrices
-S    = generate_stokes_mat(rin, rout);
+S    = stokes_SLP_mat(rin, rout);
 Kin  = getKmat(rin, q);
 Kout = getKmat(rout, q);
 
