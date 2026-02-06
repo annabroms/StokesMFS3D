@@ -4,6 +4,8 @@
 
 spherical_designs/
 data/
+brownian/archive/
+brownian/visuals/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux

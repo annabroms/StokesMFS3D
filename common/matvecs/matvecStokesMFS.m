@@ -10,8 +10,8 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 %
 %   INPUTS:
 %       mu    - 3*M*P x 1 vector of boundary data at collocation points on all particles.
-%       rin    - 3*N*P x 1 matrix of all source (proxy) point positions.
-%       rout   - 3*M*P x 1 matrix of all target (collocation) point positions.
+%       rin    - N*P x 3 matrix of all source (proxy) point positions.
+%       rout   - M*P x 3 matrix of all target (collocation) point positions.
 %       q      - P x 3 array of particle centers.
 %       Uii    - Cell array {U} containing left preconditioner matrix from
 %               one-body SVD for body i in cell i

@@ -1,21 +1,25 @@
 function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,nn, vars, resistance_flag,R,L)
-%MATVECSTOKESMFS Matrix-vector product for basic Stokes MFS (without image enhancement) 
+%MATVECSTOKESMFS_DLP Matrix-vector product for basic but non-standard
+%Stokes MFS. This is without image enhancement, but using a combined
+%ansatz, TG, with T a DLP (stresslet) mapping and G are the standard
+%stokeslets. 
 %
 %   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, vars, R, resistance_flag,R,L)
 %
 %   Computes the matrix-vector product A*mu for the linear system arising
-%   in a 1-body precomputed Stokes problem solved via the Method of Fundamental Solutions (MFS).
-%   Used as a callback in GMRES, both for the resistance and mobility
-%   problems
+%   in a 1-body precomputed Stokes problem solved via the Method of Fundamental Solutions 
+%   (MFS) with the TG ansatz (composed DLP and SLP).
+%   Used as a callback in GMRES, both for the resistance and mobility problems
 %
 %   INPUTS:
 %       mu    - 3*M*P x 1 vector of boundary data at collocation points on all particles.
-%       rin    - 3*N*P x 1 matrix of all source (proxy) point positions.
-%       rout   - 3*M*P x 1 matrix of all target (collocation) point positions.
+%       rin    - N*P x 3 matrix of all source (proxy) point positions.
+%       rout   - M*P x 3 matrix of all target (collocation) point positions.
 %       q      - P x 3 array of particle centers.
 %       Uii    - Cell array {U} containing left preconditioner matrix from
 %               one-body SVD for body i in cell i
 %       Yii    - Cell array {Y} containing right preconditioner matrix from one-body SVD.
+%       Tblock - stokes_DLP_mat (stresslet matrix mapping target points to sources) for a single body
 %       vars   - Struct with solver settings and flags:
 %                - vars.fmm: if true, use FMM3D to evaluate flow.
 %                - vars.profile: if true, calls memorygraph profiling tool.
@@ -42,9 +46,9 @@ function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, Tblock,nn, vars, 
 %       easy to modify). 
 %
 %   DEPENDENCIES:
-%       - getStokesletFlow, rotate_vector, 
+%       - getStokesletFlow, getStressletFlow, rotate_vector, 
 %
-%  Anna Broms, June 12, 2025
+%  Anna Broms, November 12, 2025
 
 P = size(q,1); %number of particles
 M = vars.M; 
@@ -111,24 +115,8 @@ end
  %points
 res_stokes = getStokesletFlow(lambda_stokes,rin,rout,vars);
 
-if vars.fmm
-    u = getStressletFlow(rin,rout,nn,reshape(res_stokes,3,[])',vars.M*P);
-    res = -u(:);
-else
-    %just for now
-    T = getTraction(rin,rout,nn);
-    res = -T*res_stokes;
-end
-
-%norm(u-res) small
-
-
-% block-diagonal T
-% res = zeros(3*N*P,1); 
-% for k = 1:P
-%     res(3*(k-1)*N+1:3*k*N) = -Tblock*res_stokes(3*(k-1)*M+1:k*3*M);
-% end
-    
+% apply the matrix T from the left, i.e. evaluate a stresslet flow
+res = getStressletFlow(rout,rin,nn,res_stokes,vars.M*P,vars);
 
 %% Adjust to obtain identity blocks on diagonal of system matrix
 res = res+mu; 
@@ -141,9 +129,10 @@ for i = 1:P
     rows_i = (i-1)*M+1:i*M;
     targ = rout(rows_i,:);  %collocation points on body i
     u_self = getStokesletFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
-   
+    %u_self2 = getStressletFlow(targ,rin_i,nn(rows_i,:),u_self,M,vars);
+    %%same thing as below. I should test what is faster
     
-    u_self = -Tblock*u_self; 
+    u_self = Tblock*u_self; 
     res((i-1)*3*N+1:i*3*N) = res((i-1)*3*N+1:i*3*N)-u_self;
 
 end

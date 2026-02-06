@@ -1,5 +1,11 @@
 function [U, iters, lambda_norm, uerr] = solve_mobility_with_DLP(q,rvec_in,rvec_out,Fvec, opt,R,E0)
-%SOLVE_MOBILITY Solve a Stokes mobility problem for a configuration of ellipsoidal particles using MFS.
+%SOLVE_MOBILITY_WITH_DLP Solve a Stokes mobility problem for a
+%configuration of ellipsoidal particles using "non-standard" MFS where the
+%ansatz is a u = TG \lambda, with G a Stokeslet (SLP) mapping from proxy surface to true surface
+%and T a Stresslet (DLP) mapping from true surface back to proxy surface.
+%Everyhting is analogous to the standard solve_mobility function. This is
+%written in preparation for simulations of Brownian motion, where it is
+%beneficial to work with a symmetric saddle point system. 
 %
 %   [U, iters, lambda_norm, uerr] = SOLVE_MOBILITY_WITH_DLP(q, rvec_in, rvec_out, Fvec, opt, R, E0)
 %
@@ -8,8 +14,8 @@ function [U, iters, lambda_norm, uerr] = solve_mobility_with_DLP(q,rvec_in,rvec_
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions.
-%       rvec_in   - 3NP × 1 vector of collocation points on particle surfaces (stacked).
-%       rvec_out  - 3MP × 1 vector of proxy source points (stacked).
+%       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
+%       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
 %       Fvec      - 6P × 1 vector of applied forces and torques, format: [F1; T1; F2; T2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P x 1 cell array of rotation matrices for the P
@@ -23,16 +29,17 @@ function [U, iters, lambda_norm, uerr] = solve_mobility_with_DLP(q,rvec_in,rvec_
 %       uerr        - Maximum relative residual of the velocity field on the surface.
 %
 %   METHOD OVERVIEW:
-%       - Builds MFS representation from collocation and proxy surfaces.
+%       - Builds MFS representation from proxy and collocation surfaces.
 %       - Uses a "completion source" to represent force and torque.
+%       - Solves for a source density in the TG representation.
 %       - Computes rigid body motion from the computed source density.
-%       - Determines the surface residuals in new points.
+%       - Determines the surface residuals at check points.
 %
 %   DEPENDENCIES:
-%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS, 
-%       oneBodyPrecondMob, helsing_gmres, getKmat
+%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS_DLP, 
+%       oneBodyPrecondMob_DLP, helsing_gmres, getKmat
 %
-%   See also: SOLVE_RESISTANCE_WITH_DLP
+%   See also: SOLVE_RESISTANCE_WITH_DLP, SOLVE_MOBILITY
 %
 %   Anna Broms, Nov 28, 2025
 
@@ -71,6 +78,9 @@ end
 Yii{1} = Y;
 UUii{1} = UU; 
 
+%get normal vectors:
+nn = repmat(rvec_out(1:M,:)-q(1,:),P,1); 
+
 %% Assemble completion source, given force and torque
 
 lambda_vec = []; 
@@ -93,20 +103,24 @@ for k = 1:P
     
 end
 
-%% Get flow field due to completion source.
-uvec = getFlow(lambda_vec,rvec_in,rvec_out,opt); 
-%uvec = -uvec;
-% Now, apply the block-diagonal T here:
-Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
+%% Get flow field due to completion source: TG*lambda_0
+uvec = getStokesletFlow(lambda_vec,rvec_in,rvec_out,opt); 
 
-uvec_T = zeros(3*N*P,1);
-for k = 1:P
-    uvec_T((k-1)*3*N+1:k*3*N) = Tblock*uvec((k-1)*3*M+1:k*3*M);
-end
+% Apply T to the velocity induced on the collocation surface.
+uvec_T = -getStressletFlow(rvec_out,rvec_in,nn,uvec,M*P,opt);
+
+Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)); % precomputed, to later deal with self interaction
+
+% tested block diagonal T in the past. Does this give the same thing?
+% 
+% uvec_T2 = zeros(3*N*P,1);
+% for k = 1:P
+%     uvec_T2((k-1)*3*N+1:k*3*N) = Tblock*uvec((k-1)*3*M+1:k*3*M);
+% end
 
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,1);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,nn,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,1);
 
 
 %% Map back to the sought density in source points, determine rigid body velocities 
@@ -175,7 +189,7 @@ for i =1:P
 end
 
 %get flow and compare RHS and LHS of representation
-ubdry = getFlow(densityK,rvec_in,rcheck,opt);
+ubdry = getStokesletFlow(densityK,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);
 
@@ -207,9 +221,9 @@ Rp = 0.30;
 N = 100; 
 a = 1.2; 
 
-Rp = 0.15; %Proxy sphere radius -- very coarse resolution
-N = 50;  % Number of proxy sources
-a = 2; 
+% Rp = 0.15; %Proxy sphere radius -- very coarse resolution
+% N = 50;  % Number of proxy sources
+% a = 2; 
 %a = 2; %or play with SVD truncation level
 
 % Rp = 0.68; %proxy radius
@@ -219,12 +233,21 @@ a = 2;
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
 %[rvec_in,rvec_out,opt] = init_spheres(q);
 opt.fmm = fmm;
-opt.lr = 0;
-opt.gmres_tol = 1e-5; %does this matter for the accuracy? 
-[Uvec,it_res,lambda_norm_res,err_res] = solve_mobility_with_DLP(q,rvec_in,rvec_out,Fref, opt);
+opt.lr = 0; % no long range precond for the standard method, to make it more comparable to the DLP version.
+opt.gmres_tol = 1e-12; %does this matter for the accuracy? 
+[Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP(q,rvec_in,rvec_out,Fref, opt);
 opt.gmres_tol = 1e-10; 
-[Uvec2,it_res2,lambda_norm_res2,err_res2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt); 
+[Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt); 
 
 norm(Uvec-Uvec2,inf)/norm(Uvec2,inf)
+
+rel_err = norm(Uvec-Uvec2,inf)/norm(Uvec2,inf);
+
+fprintf('\nTest summary (solve_mobility_with_DLP)\n');
+fprintf('  P = %d, delta = %.3g, N = %d, M = %d\n', P, delta, size(rvec_in,1)/P, size(rvec_out,1)/P);
+fprintf('  Rp = %.3g, a = %.3g, gmres_tol = %.1e\n', Rp, a, opt.gmres_tol);
+fprintf('  DLP/SLP combo: iters = %d, lambda_norm = %.3e, uerr = %.3e\n', it_mob, lambda_norm_mob, err_mob);
+fprintf('  Standard solve: iters = %d, lambda_norm = %.3e, uerr = %.3e\n', it_mob2, lambda_norm_mob2, err_mob2);
+fprintf('  Relative rigid-body motion error vs standard = %.3e\n', rel_err);
 
 end

@@ -1,6 +1,6 @@
 function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec_in, rvec_out, U, opt, R, E0)
 %SOLVE_RESISTANCE_WITH_DLP Solve a Stokes resistance problem using an alternative
-%formulation, with DS\lambda = KU
+%formulation, with T*G*lambda = K*U
 %
 %   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE_WITH_DLP(q, rvec_in, rvec_out, U, opt, R, E0)
 %
@@ -9,8 +9,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions, x,y,z
-%       rvec_in   - 3NP × 1 vector of proxy source points (stacked).
-%       rvec_out  - 3MP × 1 vector of collocation points on particle surfaces (stacked).
+%       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
+%       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
 %       U         - 6P × 1 vector of prescribed rigid body velocities: [u1; omega1; u2; omega2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P × 1 cell array of rotation matrices for the P particles.
@@ -30,10 +30,11 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 %       - Validates accuracy by evaluating velocity residuals in new check points.
 %
 %   DEPENDENCIES:
-%       init_MFS, getDesignGrid, getVelocityData, matvecStokesMFS,
-%       oneBodyPrecondRes, helsing_gmres, getKmat, getFlow
+%       init_MFS, getDesignGrid, matvecStokesMFS,
+%       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow,
+%       getStressletFlow
 %
-%   See also: SOLVE_RESISTANCE
+%   See also: SOLVE_RESISTANCE, SOLVE_MOBILITY_WITH_DLP
 %
 %   Anna Broms, Nov 19, 2025
 
@@ -57,6 +58,9 @@ opt.N = N;
 opt.M = M; 
 opt.P = P; 
 
+if ~opt.ellipsoid
+    nvec = repmat(rvec_out(1:M,:),P,1);
+end
 
 %% Visualize geometry
 % Optional block for displaying the particle configuration 
@@ -78,25 +82,25 @@ if opt.plot
 end
 
 
-%% Assign RHS in resistance problem    
+%% Assign RHS in resistance problem
+% Builds the boundary data using the DLP block for a reference body.
 Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
 
 %For comparison with Kin
 Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
-Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1));
+Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:));
 %For each particle, get data at surface, given rigid body motion
 for k = 1:P
     if opt.ellipsoid
         Kin = getKmat(rvec_in(1:N,:),[0,0,0]); %If spheres, this will be the same matrix for every one.
     end
     %u_bndry((k-1)*3*N+1:3*k*N) = M/4/pi*Kin*U((k-1)*6+1:k*6);
-
-    %should give the exact same thing, but turns out to give slightly
-    %smaller residual.
-    u_bndry((k-1)*3*N+1:3*k*N) = -Tblock*Kout*U((k-1)*6+1:k*6);
-
-
+    % This uses the stresslet block to map rigid motion to boundary data.
+    u_bndry((k-1)*3*N+1:3*k*N) = Tblock*Kout*U((k-1)*6+1:k*6);
+    %u_bndry2((k-1)*3*M+1:3*k*M) = Kout*U((k-1)*6+1:k*6);
 end
+%u_bndry_ref = getStressletFlow(rvec_out,rvec_in,nvec,u_bndry2,M*P,opt);
+%%This is the same!
 
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
@@ -104,7 +108,7 @@ if opt.ellipsoid
     [Yk,UUk,Si] = oneBodyPrecondResDLP((R{1}'*rvec_in(1:N,:)')',...
     (R{1}'*rvec_out(1:M,:)')');
 else
-    nvec = repmat(rvec_out(1:M,:),P,1);
+    
     [Yk,UUk,Si] = oneBodyPrecondResDLP(rvec_in(1:N,:),rvec_out(1:M,:),nvec);
 end
 
@@ -128,7 +132,7 @@ if debug
         k
         x(:) = 0; 
         x(k) = 1; 
-        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,opt,1,R);
+        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R);
         CC(:,k) = uu;
     end
     toc
@@ -144,33 +148,14 @@ if debug
     plot(real(D),imag(D),'ro')
 end
 
-%% Prepare long-range preconditioning with deflation
 
 u_bndry = u_bndry';
-if opt.lr
-    error('not yet implemented with DLP extension')
-    if opt.lr > 2 %use svd for single body
-        [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt,Yk*diag(Si),UUk');
-    else
-        [Rinv,Zi,Yi,db] = get_long_range_precond(q,rvec_in,rvec_out,R,opt);
-    end
-    opt.db = db; 
-    tau_coarse = getCoarseSource(u_bndry,Rinv,Zi,Yi,R,opt);
-    disp('Done coarse projection')
-else
-    disp('No deflation')
-end
-
 
 %% Solve problem
 verbose = 1; 
-if opt.lr
-    %not yet implemented
-    Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt); 
-    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,Zi,Yi),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);
-else
-    [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
-end
+
+[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
+
 
 if opt.profile
     memorygraph('label','done matvec resistance, remap and determine force')
@@ -254,7 +239,7 @@ for k = 1:P
 end
 
 % Evaluate flow from solution to resistance problem
-ubdry = getFlow(lambda_gmres, rvec_in, rcheck, opt);
+ubdry = getStokesletFlow(lambda_gmres, rvec_in, rcheck, opt);
 
 % Compute relative residual
 uerr_vec = vecnorm(reshape(ucheck - ubdry, 3, []), 2, 1) ./ ...
@@ -268,13 +253,13 @@ end
 function test_solve
 rng(5); %reproducable
 
-P = 10; %number of bodies
+P = 2; %number of bodies
 delta = 7; %smallest particle particle distance 
 q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
 
 %random configurations
-[q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
+%[q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
   
 fmm = 0; %only activate if many particles (say, more than 40)
 
@@ -286,8 +271,8 @@ Uref = rand(6*P,1);
 Rp = 0.30;
 N = 100; 
 
-Rp = 0.15; %Proxy sphere radius -- very coarse resolution
-N = 50;  % Number of proxy sources
+% Rp = 0.15; %Proxy sphere radius -- very coarse resolution
+% N = 50;  % Number of proxy sources
 a = 2; 
 %a = 2; %or play with SVD truncation level
 
@@ -300,12 +285,18 @@ a = 2;
 opt.fmm = fmm;
 opt.gmres_tol = 1e-3;
 opt.lr = 0;
-%opt.gmres_tol = 1e-10; %does this matter for the accuracy? 
+opt.gmres_tol = 1e-10; %does this matter for the accuracy? 
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance_with_DLP(q,rvec_in,rvec_out,Uref, opt);
 opt.gmres_tol = 1e-10; 
 [Fvec2,it_res2,lambda_norm_res2,err_res2] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 
-norm(Fvec-Fvec2,inf)/norm(Fvec2,inf)
+rel_err = norm(Fvec-Fvec2,inf)/norm(Fvec2,inf);
+
+fprintf('\nTest summary (solve_resistance_with_DLP)\n');
+fprintf('  P = %d, delta = %.3g, N = %d, M = %d\n', P, delta, size(rvec_in,1)/P, size(rvec_out,1)/P);
+fprintf('  Rp = %.3g, a = %.3g, gmres_tol = %.1e\n', Rp, a, opt.gmres_tol);
+fprintf('  DLP/SLP combo: iters = %d, lambda_norm = %.3e, err_res = %.3e\n', it_res, lambda_norm_res, err_res);
+fprintf('  Standard solve: iters = %d, lambda_norm = %.3e, err_res = %.3e\n', it_res2, lambda_norm_res2, err_res2);
+fprintf('  Relative force error vs standard = %.3e\n', rel_err);
 
 end
-

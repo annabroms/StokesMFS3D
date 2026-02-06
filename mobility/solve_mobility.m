@@ -8,8 +8,8 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions.
-%       rvec_in   - 3NP × 1 vector of collocation points on particle surfaces (stacked).
-%       rvec_out  - 3MP × 1 vector of proxy source points (stacked).
+%       rvec_in   - NP × 3 vector of collocation points on particle surfaces (stacked).
+%       rvec_out  - MP × 3 vector of proxy source points (stacked).
 %       Fvec      - 6P × 1 vector of applied forces and torques, format: [F1; T1; F2; T2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P x 1 cell array of rotation matrices for the P

@@ -8,8 +8,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions, x,y,z
-%       rvec_in   - 3NP × 1 vector of proxy source points (stacked).
-%       rvec_out  - 3MP × 1 vector of collocation points on particle surfaces (stacked).
+%       rvec_in   - NP × 3 vector of proxy source points (stacked).
+%       rvec_out  - MP × 3 vector of collocation points on particle surfaces (stacked).
 %       U         - 6P × 1 vector of prescribed rigid body velocities: [u1; omega1; u2; omega2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P × 1 cell array of rotation matrices for the P particles.

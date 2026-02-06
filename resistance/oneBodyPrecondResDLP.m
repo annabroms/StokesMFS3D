@@ -35,17 +35,17 @@ function [Y, U, Si] = oneBodyPrecondResDLP(rin, rout,n)
 %         be visualized for diagnostics with the flag visualise = 1. 
 %
 %   DEPENDENCIES:
-%       - generate_stokes_mat.m, getTraction.m getPseudoFactors.m
+%       - stokes_SLP_mat.m, stokes_DLP_mat.m getPseudoFactors.m
 %
 %  Anna Broms, Nov 28, 2025
 
 tol = 1e-10; %will be resolution dependent
 visualise = 0; 
 
-S = generate_stokes_mat(rin,rout);
-T = getTraction(rin,rout,n);
+S = stokes_SLP_mat(rin,rout);
+T = stokes_DLP_mat(rout,rin,n); 
 
-[Y, U, Si] = getPseudoFactors(-T*S, tol, visualise);
+[Y, U, Si] = getPseudoFactors(T*S, tol, visualise);
 U = U'; 
 
 end

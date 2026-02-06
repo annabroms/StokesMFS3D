@@ -1,7 +1,7 @@
 function [Y, UU, LL, Kin, Kout] = oneBodyPrecondMobDLP(rin, rout, q)
 %oneBodyPrecondMobDLP Determines pseudoinverse factors for the single body MFS
-% Stokes mobility system matrix constructed as blkdiag(T)*S, with T a
-% double layer matrix and S a target-from-source matrix of Stokeslets
+% Stokes mobility system matrix constructed as T*S, with T a
+% double layer (stresslet) matrix and S a target-from-source matrix of Stokeslets
 %
 %   [Y, UU, LL, Kin] = oneBodyPrecondMobDLP(rin, rout, q)
 %  
@@ -25,7 +25,7 @@ function [Y, UU, LL, Kin, Kout] = oneBodyPrecondMobDLP(rin, rout, q)
 %       Kin   - Mapping from source strength to net force and torque.
 %
 %   DEPENDENCIES:
-%       - generate_stokes_mat, getKmat,
+%       - stokes_SLP_mat, getKmat,
 %       getPseudoFactors,oneBodyPrecondResDLP
 %
 % Anna Broms, Nov 28, 2025
@@ -38,7 +38,7 @@ elseif nargin < 3
 end
 
 % Build MFS and rigid-body matrices
-S    = generate_stokes_mat(rin, rout);
+S    = stokes_SLP_mat(rin, rout);
 Kin  = getKmat(rin, q);
 Kout  = getKmat(rout, q);
 
@@ -47,8 +47,8 @@ LL = Kin * ((Kin' * Kin) \ Kin');
 
 % Build one-body operator that does not contribute to force/torque. The
 % last term takes care of velocity constraint.
-T = getTraction(rin,rout,rout-q(1,:));
-A = -T*S * (eye(size(LL)) - LL) + -T*Kout*Kin';
+T = stokes_DLP_mat(rout,rin,rout-q(1,:));
+A = T*S * (eye(size(LL)) - LL) + T*Kout*Kin';
 
 % Compute pseudoinverse factors 
 tol = 1e-15;
