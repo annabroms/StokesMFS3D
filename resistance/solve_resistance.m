@@ -8,8 +8,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions, x,y,z
-%       rvec_in   - NP × 3 vector of proxy source points (stacked).
-%       rvec_out  - MP × 3 vector of collocation points on particle surfaces (stacked).
+%       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
+%       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
 %       U         - 6P × 1 vector of prescribed rigid body velocities: [u1; omega1; u2; omega2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P × 1 cell array of rotation matrices for the P particles.
@@ -34,7 +34,14 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %
 %   See also: LARGE_ELLIPSOID_EX, SOLVE_MOBILITY
 %
+%   NOTES:
+%       - If opt.plot is true, a surface visualization is produced.
+%       - Traction visualization is computed only when opt.plot is true.
+%
 %   Anna Broms, June 13, 2025
+
+if nargin==0, test_solve; 
+    return; end
 
 
 P = size(q,1); %number of spheres
@@ -72,6 +79,7 @@ if opt.plot
         axis equal
     end
     camlight
+    title('Particle configuration')
 end
 
 
@@ -143,7 +151,7 @@ if opt.lr
     tau_coarse = getCoarseSource(u_bndry,Rinv,Zi,Yi,R,opt);
     disp('Done coarse projection')
 else
-    disp('No deflation')
+    disp('No deflation preconditioning')
 end
 
 
@@ -235,13 +243,63 @@ for k = 1:P
 end
 
 % Evaluate flow from solution to resistance problem
-ubdry = getStokesletFlow(lambda_gmres, rvec_in, rcheck, opt);
+ubdry_check = getStokesletFlow(lambda_gmres, rvec_in, rcheck, opt);
 
 % Compute relative residual
-uerr_vec = vecnorm(reshape(ucheck - ubdry, 3, []), 2, 1) ./ ...
+uerr_vec = vecnorm(reshape(ucheck - ubdry_check, 3, []), 2, 1) ./ ...
            max(vecnorm(reshape(ucheck, 3, []), 2, 1));
 err_res = max(uerr_vec);
 
+%% Optional visualization: color by surface velocity and traction magnitudes
+if opt.plot
+    ubdry_surf = getStokesletFlow(lambda_gmres, rvec_in, rvec_out, opt);
+    umag = vecnorm(reshape(ubdry_surf,3,[]),2,1).';
+    nvec = rvec_out - kron(q, ones(M,1));
+    nvec = nvec ./ vecnorm(nvec,2,2);
+    traction = getTractionFast(lambda_gmres, rvec_in, rvec_out, nvec, opt);
+    tmag = vecnorm(reshape(traction,3,[]),2,1).';
 
+    plot_surface_scalar(rvec_out, M, P, umag, ...
+        'Resistance: surface velocity magnitude', 'parula');
+    plot_surface_scalar(rvec_out, M, P, tmag, ...
+        'Resistance: traction magnitude on surface', 'hot');
+end
+
+
+
+end
+
+function test_solve
+% Self-test: mobility -> resistance -> compare forces/torques.
+rng(5); %reproducable
+close all; 
+
+P = 8; %number of bodies
+delta = 2; %smallest particle particle distance
+[q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
+
+fmm = 0; %only activate if many particles (say, more than 40)
+
+Fref = rand(6*P,1);
+
+[rvec_in,rvec_out,opt] = init_spheres(q);
+opt.fmm = fmm;
+opt.lr = 0;
+opt.gmres_tol = 1e-10;
+opt.plot = 1; 
+
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fref, opt);
+[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,U, opt);
+
+rel_err = norm(Fvec-Fref,inf)/norm(Fref,inf);
+
+fprintf('\nSelf-test summary (solve_resistance)\n');
+fprintf('  P = %d, delta = %.3g, N = %d, M = %d\n', P, delta, size(rvec_in,1)/P, size(rvec_out,1)/P);
+fprintf('  gmres_tol = %.1e\n', opt.gmres_tol);
+fprintf('  Mobility:   iters = %d, lambda_norm = %.3e, rel surf residual = %.3e\n', it_mob, lambda_norm_mob, err_mob);
+fprintf('  Resistance: iters = %d, lambda_norm = %.3e, rel surf residual = %.3e\n', it_res, lambda_norm_res, err_res);
+fprintf('  Relative force/torque error = %.3e\n', rel_err);
+
+alignfigs;
 
 end

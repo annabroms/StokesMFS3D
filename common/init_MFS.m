@@ -9,7 +9,7 @@ else
     opt.des_n = des_n;
 end
 opt.tol = 1e-14; %default tolerance for the truncated SVD
-opt.plot = 0; % debug parameter
+opt.plot = 0; % debug / visualisation parameter
 
 opt.maxit = 400;  %max number of GMRES iterations
 opt.gmres_tol = 1e-7; %GMRES tol

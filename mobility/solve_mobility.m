@@ -8,8 +8,8 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %
 %   INPUTS:
 %       q         - P × 3 matrix of particle center positions.
-%       rvec_in   - NP × 3 vector of collocation points on particle surfaces (stacked).
-%       rvec_out  - MP × 3 vector of proxy source points (stacked).
+%       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
+%       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
 %       Fvec      - 6P × 1 vector of applied forces and torques, format: [F1; T1; F2; T2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P x 1 cell array of rotation matrices for the P
@@ -23,7 +23,7 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %       uerr        - Maximum relative residual of the velocity field on the surface.
 %
 %   METHOD OVERVIEW:
-%       - Builds MFS representation from collocation and proxy surfaces.
+%       - Builds MFS representation from proxy and collocation surfaces.
 %       - Uses a "completion source" to represent force and torque.
 %       - Computes rigid body motion from the computed source density.
 %       - Determines the surface residuals in new points.
@@ -34,7 +34,14 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %
 %   See also: SOLVE_RESISTANCE
 %
+%   NOTES:
+%       - If opt.plot is true, a surface visualization is produced.
+%       - Surface velocity visualization is computed only when opt.plot is true.
+%
 %   Anna Broms, June 13, 2025
+
+if nargin==0, test_solve; 
+    return; end
 
 
 if nargin < 6
@@ -170,13 +177,60 @@ for i =1:P
 end
 
 %get flow and compare RHS and LHS of representation
-ubdry = getStokesletFlow(densityK,rvec_in,rcheck,opt);
-uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
+ubdry_check = getStokesletFlow(densityK,rvec_in,rcheck,opt);
+uerr_vec = vecnorm(reshape(ucheck-ubdry_check,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);
 
+%% Optional visualization: color by surface velocity and traction magnitudes
+if opt.plot
+    ubdry_surf = getStokesletFlow(densityK, rvec_in, rvec_out, opt);
+    umag = vecnorm(reshape(ubdry_surf,3,[]),2,1).';
+    nvec = rvec_out - kron(q, ones(M,1));
+    nvec = nvec ./ vecnorm(nvec,2,2);
+    traction = getTractionFast(densityK, rvec_in, rvec_out, nvec, opt);
+    tmag = vecnorm(reshape(traction,3,[]),2,1).';
+
+    plot_surface_scalar(rvec_out, M, P, umag, ...
+        'Mobility: surface velocity magnitude', 'parula');
+    plot_surface_scalar(rvec_out, M, P, tmag, ...
+        'Mobility: traction magnitude on surface', 'hot');
+end
 
 
 
-   
+end
+
+function test_solve
+% Self-test: resistance -> mobility -> compare rigid-body motion.
+rng(5); %reproducable
+close all
+
+P = 8; %number of bodies
+delta = 1; %smallest particle particle distance
+[q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
+
+fmm = 0; %only activate if many particles (say, more than 40)
+
+Uref = rand(6*P,1);
+
+[rvec_in,rvec_out,opt] = init_spheres(q);
+opt.fmm = fmm;
+opt.lr = 0;
+opt.gmres_tol = 1e-10;
+opt.plot = 1; 
+
+[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt);
+
+rel_err = norm(U-Uref,inf)/norm(Uref,inf);
+
+fprintf('\nSelf-test summary (solve_mobility)\n');
+fprintf('  P = %d, delta = %.3g, N = %d, M = %d\n', P, delta, size(rvec_in,1)/P, size(rvec_out,1)/P);
+fprintf('  gmres_tol = %.1e\n', opt.gmres_tol);
+fprintf('  Resistance: iters = %d, lambda_norm = %.3e, rel surf residual = %.3e\n', it_res, lambda_norm_res, err_res);
+fprintf('  Mobility:   iters = %d, lambda_norm = %.3e, rel surf residual = %.3e\n', it_mob, lambda_norm_mob, err_mob);
+fprintf('  Relative rigid-body motion error = %.3e\n', rel_err);
+
+alignfigs; 
 
 end

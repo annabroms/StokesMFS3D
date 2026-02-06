@@ -1,7 +1,7 @@
 
 # StokesMFS3D
 
-**StokesMFS3D** provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving the **Stokes resistance** and **mobility problems** for spherical or ellipsoidal rigid bodies.
+StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving the **Stokes resistance** and **mobility problems** for spherical or ellipsoidal rigid bodies.
 
 This code demonstrates the basic algorithm using source points on proxy surfaces only. 
 
@@ -22,7 +22,7 @@ To run simulations, ensure the following dependencies are available:
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for direct evaluation of fundamental solutions.  
-  Only `SE0P_Stokeslet_direct.c` needs to be compiled. A precompiled binary is included in the `Stokes_Direct` repository.
+  Only `SE0P_Stokeslet_direct.c` needs to be compiled in the standard setting. A precompiled binary is included in the `Stokes_Direct` repository.
 
 To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m.
 
@@ -37,6 +37,7 @@ In the experiments folder:
 - Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
 - Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.
 
+Several functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
 ## Publications
 
 This work is based on the following research papers:
