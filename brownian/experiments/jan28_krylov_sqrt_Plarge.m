@@ -4,8 +4,8 @@
 clear; close all;
 rng(5); 
 
-P = 80; %number of bodies
-delta = 1; %smallest particle particle distance 
+P = 8; %number of bodies
+delta = 10; %smallest particle particle distance 
 if P == 2
     q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 elseif P == 1
@@ -100,10 +100,10 @@ for i = 1:length(tolvec)
         CBC = @(x) B_precond*x;
 
     else
-        CBC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,Ci,vars);
+        BC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,Ci,vars);
     end
     if fast
-        [y,iter_errv5] = KrylovSqrtMsing_fast(CBC,dW2,tol,maxit,Cplus);
+        [y,iter_errv5] = KrylovSqrtMsing_fast(BC,dW2,tol,maxit,Cplus);
     else
         [y,iter_errv5] = KrylovSqrtMsing(CBC,dW2,tol,maxit,Cplus);
     end
@@ -120,18 +120,6 @@ for i = 1:length(tolvec)
     % semilogy(iter_errv6,'Marker',m{mod(i,4)+1},'Color',c{mod(i,5)+1},'DisplayName',num2str(tolvec(i)));
     % hold on
     
-end
-
-function y = apply_block_diag(x, B, P,V, D)
-%APPLY_BLOCK_DIAG Apply block-diagonal operator with P identical blocks B.
-% x is (3N*P) x 1, B is (3N) x (3N).
-nb = size(B,1);
-y = zeros(size(x));
-for k = 1:P
-    idx = (k-1)*nb + (1:nb);
-    %y(idx) = B * x(idx);
-    y(idx) = V*(D * x(idx)); % I don't know if this makes a difference...
-end
 end
 
 lgd = legend('show','Location','best');

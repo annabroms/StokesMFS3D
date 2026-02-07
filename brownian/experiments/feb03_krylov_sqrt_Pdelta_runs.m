@@ -86,16 +86,6 @@ for ip = 1:nP
     end
 end
 
-function y = apply_block_diag(x, B, P)
-%APPLY_BLOCK_DIAG Apply block-diagonal operator with P identical blocks B.
-% x is (3N*P) x 1, B is (3N) x (3N).
-N = size(B,1);
-y = zeros(size(x));
-for k = 1:P
-    idx = (k-1)*N + (1:N);
-    y(idx) = B * x(idx);
-end
-end
 % Visualize: median iterations to reach target + uncertainty (IQR)
 med_iters = mean(iter_req, 3);
 q25 = prctile(iter_req, 25, 3);

@@ -68,4 +68,6 @@ for k = 1:P
     res((k-1)*3*N+1:k*3*N) = Ci*uAll((k-1)*3*N+1:k*3*N);
 end
 
+res = M/(4*pi)*res;
+
 end
