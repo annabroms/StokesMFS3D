@@ -32,7 +32,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 %   DEPENDENCIES:
 %       init_MFS, getDesignGrid, matvecStokesMFS,
 %       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow,
-%       getStressletFlow
+%       getStressletFlow, rotate_vector, ellipsoid_param, setupsurfquad,
+%       getTractionFast
 %
 %   See also: SOLVE_RESISTANCE, SOLVE_MOBILITY_WITH_DLP
 %

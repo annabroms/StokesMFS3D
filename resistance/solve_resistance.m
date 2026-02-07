@@ -30,7 +30,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %
 %   DEPENDENCIES:
 %       init_MFS, getDesignGrid, getVelocityData, matvecStokesMFS,
-%       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow
+%       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow,
+%       ellipsoid_param, setupsurfquad, getTractionFast
 %
 %   See also: LARGE_ELLIPSOID_EX, SOLVE_MOBILITY
 %

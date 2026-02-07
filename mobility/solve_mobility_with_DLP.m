@@ -36,8 +36,10 @@ function [U, iters, lambda_norm, uerr] = solve_mobility_with_DLP(q,rvec_in,rvec_
 %       - Determines the surface residuals at check points.
 %
 %   DEPENDENCIES:
-%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS_DLP, 
-%       oneBodyPrecondMob_DLP, helsing_gmres, getKmat
+%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS_DLP,
+%       oneBodyPrecondMob_DLP, helsing_gmres, getKmat, getStokesletFlow,
+%       getStressletFlow, stokes_DLP_mat, rotate_vector, ellipsoid_param,
+%       setupsurfquad
 %
 %   See also: SOLVE_RESISTANCE_WITH_DLP, SOLVE_MOBILITY
 %

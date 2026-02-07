@@ -21,6 +21,10 @@ function [RFD, U1, U2] = compute_RFD(q,rvec_in,rvec_out,RandVel,opt,precond)
 %   Outputs:
 %     RFD - 6P x 1 finite difference drift term
 %     U1, U2 - rigid body velocities for down/up configurations
+%
+%   DEPENDENCIES:
+%     updateNodes, solve_brownian_mobility, oneBodyPrecondMobDLP,
+%     stokes_SLP_mat, getPseudoFactors
 
 if nargin < 5
     precond = [];
@@ -66,10 +70,10 @@ if iterate_RFD
     end
     [U2, ~, ~] = solve_brownian_mobility(qUp,rinUp,routUp, ...
         precond.Y,precond.UU,precond.LL,precond.Kin,precond.Tblock, ...
-        RandVel,0,opt);
+        RandVel,opt,[]);
     [U1, ~, ~] = solve_brownian_mobility(qDown,rinDown,routDown, ...
         precond.Y,precond.UU,precond.LL,precond.Kin,precond.Tblock, ...
-        RandVel,0,opt);
+        RandVel,opt,[]);
 else
     if isempty(precond) || ~isfield(precond,'Ktot') || ~isfield(precond,'Btot')
         % Compute Ktot/Btot if not provided

@@ -29,8 +29,9 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %       - Determines the surface residuals in new points.
 %
 %   DEPENDENCIES:
-%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS, 
-%       oneBodyPrecondMob, helsing_gmres, getKmat
+%       init_MFS, getDesignGrid, getCompletionSource, matvecStokesMFS,
+%       oneBodyPrecondMob, helsing_gmres, getKmat, getStokesletFlow,
+%       rotate_vector, ellipsoid_param, setupsurfquad, getTractionFast
 %
 %   See also: SOLVE_RESISTANCE
 %

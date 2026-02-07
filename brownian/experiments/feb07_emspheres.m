@@ -189,14 +189,14 @@ for i = 1:tsteps
             %build sqrt of M densely:
             [Ytot,Utot] = getPseudoFactors(G,1e-13,0);
             Rtot = Ktot'*Ytot*(Utot'*Btot);
-            Mtot = Rtot\eye(6*PP);
+            Mtot = Rtot\eye(6*P);
             U = Mtot*Fvec;
             try 
                 R = chol(Mtot);
             catch
                 disp('Not pos def')
             end
-            W = sqrt(2/dt)*randn(6*PP,1);
+            W = sqrt(2/dt)*randn(6*P,1);
             U = U+R'*W;
         else
 
@@ -235,15 +235,13 @@ for i = 1:tsteps
             % Udense = (R3\eye(P*6))*(Fvec+Ktot'*Ainv*sqrtA*sqrt(2/opt.dt)*dW);
             %noise = sqrtA*dW;
 
-            %% Terrible convergence for Lanczos without precond
-            %[noise,~,iters] = KrylovSqrtMsing((A+A')/2,dW,tol_krylov);
-            %% Set up Lanczos with preconditioning (implemented in slow way)
+            %% Set up Lanczos with preconditioning (necessary for convergence!)
             B_precond = PP*C*PP';     
             [noise,iter_errv5,iters] = KrylovSqrtMsing(B_precond,dW,tol_lanczos,maxit,PPplus);
             iter_hist(i) = iters;
     %% Solve mobility problem
-           % [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, sqrtA,dW);
-            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, [],noise);
+           % [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,opt, noise);
+            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,opt, noise);
         end
     %end
 
