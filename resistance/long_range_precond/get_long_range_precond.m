@@ -1,4 +1,4 @@
-function [Rinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt,V,U)
+function [Sinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt,V,U)
 %GET_LONG_RANGE_PRECOND  Construct coarse-space projection matrices for long-range preconditioning.
 %
 %   [Rinv, Zi,Yi,db] = GET_LONG_RANGE_PRECOND(q, rin, rout, opt)
@@ -7,8 +7,8 @@ function [Rinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt,V,U)
 %   the coarse-to-fine mappings AN and AM, and the inverse coarse interaction matrix Rinv.
 %   These are used to define the projectors:
 %
-%       P = I - G * Z * Rinv * Y'     (left-side projection, see applyPmat)
-%       Q = I - Z * Rinv * Y' * G     (right-side projection, see applyQmat)
+%       P = I - G * Z * Sinv * Y'     (left-side projection, see applyPmat)
+%       Q = I - Z * Sinv * Y' * G     (right-side projection, see applyQmat)
 %
 %   The choice of coarse basis (e.g. translation-only vs. rigid-body modes) 
 %   is set via the option opt.lr.
@@ -22,7 +22,7 @@ function [Rinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt,V,U)
 %                        2 = full rigid-body modes (6 per body),
 %                  • N: number of proxy points per body,
 %                  • M: number of collocation points per body,
-%                  • other kernel options (such as fmm flat passed to getFlow).
+%                  • other kernel options (such as fmm flat passed to getStokesletFlow).
 %
 %   OUTPUTS:
 %     Rinv     - (3Pk×3Pk) inverse of coarse interaction matrix R = AM'*U,
@@ -34,10 +34,10 @@ function [Rinv,Zi,Yi,db] = get_long_range_precond(q,rin,rout,RR,opt,V,U)
 %   NOTES:
 %     - The function assumes block structure per body and constructs
 %       block-diagonal matrices Z and Y accordingly.
-%     - Coarse-flow matrix U is built using calls to getFlow with basis sources.
+%     - Coarse-flow matrix U is built using calls to getStokesletFlow with basis sources.
 %     - Currently uses dense matrix assembly; consider FMM for acceleration.
 %
-%   See also: applyPmat, applyQmat, getFlow, getKmat
+%   See also: applyPmat, applyQmat, getStokesletFlow, getKmat
 %
 % Anna Broms, Oct 14, 2025
 
@@ -85,7 +85,7 @@ for k = 1:P
                 % specific particle
 
                 %debug mode: 
-                %Gk = generate_stokes_mat(rin((k-1)*N+1:k*N,:),rout((k-1)*M+1:k*M,:));
+                %Gk = stokes_SLP_mat(rin((k-1)*N+1:k*N,:),rout((k-1)*M+1:k*M,:));
                 %do svd
                 %[Uk,Sk,Vk] = svd(Gk); 
                 %block_k = Vk(:,1:db); %same thing as block
@@ -98,7 +98,7 @@ for k = 1:P
         end
    
     for i = 1:db
-        u(:,(k-1)*db+i) = getFlow(block(:,i),rin(N*(k-1)+1:k*N,:),rout,opt);
+        u(:,(k-1)*db+i) = getStokesletFlow(block(:,i),rin(N*(k-1)+1:k*N,:),rout,opt);
     end
 end
 
@@ -110,30 +110,32 @@ for k = 1:P
            
             %Yik = getKmat(rout(M*(k-1)+1:k*M,:),q(k,:)); % same thing
             Yik = kron(eye(M),Rk)*Yi*[Rk' zeros(3); zeros(3) Rk'];
-            R((k-1)*db+1:k*db,:) = Yik'*u((k-1)*3*M+1:k*3*M,:);
+            S((k-1)*db+1:k*db,:) = Yik'*u((k-1)*3*M+1:k*3*M,:);
         else
-            R((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
+            S((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
         end
 
     elseif lr>2
         if opt.ellipsoid
             Rk = RR{k};
             Yik = reshape(rotate_vector(Yi,Rk),3*M,db);
-            R((k-1)*db+1:k*db,:) = Yik'*u((k-1)*3*M+1:k*3*M,:);
+            S((k-1)*db+1:k*db,:) = Yik'*u((k-1)*3*M+1:k*3*M,:);
         else
-            R((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
+            S((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
         end
 
     else
-        R((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
+        S((k-1)*db+1:k*db,:) = Yi'*u((k-1)*3*M+1:k*3*M,:);
     end
 
     
 end
-
+%Rdiag = kron(eye(P),R(1:db,1:db));
+%cond(R-Rdiag)
+%hodlrR = hodlr(R) ; %it doesn't have the right structure... 
 % Faster computation using FMM??
 
-Rinv = (R\eye(db*P));
+Sinv = (S\eye(db*P));
    
     
 end

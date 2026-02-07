@@ -35,8 +35,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %   See also: LARGE_ELLIPSOID_EX, SOLVE_MOBILITY
 %
 %   NOTES:
-%       - If opt.plot is true, a surface visualization is produced.
-%       - Traction visualization is computed only when opt.plot is true.
+%       - If opt.plot is true, a visualization of the geometry is produced.
+%       - Boundary velocity and traction visualization is computed only when opt.plot is true.
 %
 %   Anna Broms, June 13, 2025
 
@@ -46,6 +46,9 @@ if nargin==0, test_solve;
 
 P = size(q,1); %number of spheres
 
+if ~isfield(opt,'gmres_verbose')
+    opt.gmres_verbose = 1;
+end
 if nargin < 6
     R = eye(3);
     E0 = [1 1 1];
@@ -156,7 +159,7 @@ end
 
 
 %% Solve problem
-verbose = 1; 
+verbose = opt.gmres_verbose; 
 if opt.lr
     Pf = applyPmat(u_bndry,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt); 
     [mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) lr_matvecStokesMFS(x,rvec_in,rvec_out,q,UU,Y,opt,R,Rinv,Zi,Yi),Pf,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,verbose,0);

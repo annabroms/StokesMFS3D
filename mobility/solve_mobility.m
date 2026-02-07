@@ -35,8 +35,8 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %   See also: SOLVE_RESISTANCE
 %
 %   NOTES:
-%       - If opt.plot is true, a surface visualization is produced.
-%       - Surface velocity visualization is computed only when opt.plot is true.
+%       - If opt.plot is true, a visualization of the geometry is produced.
+%       - Surface velocity and traction visualization is computed only when opt.plot is true.
 %
 %   Anna Broms, June 13, 2025
 
@@ -53,6 +53,9 @@ end
 
 P = size(q,1);
 
+if ~isfield(opt,'gmres_verbose')
+    opt.gmres_verbose = 1;
+end
 
 
 %% One-body preconditioning
@@ -105,7 +108,7 @@ uvec = -uvec;
 
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UUii,Yii,opt,0,R,LL),uvec,3*size(rvec_out,1),opt.maxit,opt.gmres_tol);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS(x,rvec_in,rvec_out,q,UUii,Yii,opt,0,R,LL),uvec,3*size(rvec_out,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 %check residual
 %abs_res = norm(matvecStokesMFS(x_gmres,rvec_in,rvec_out,q,UUii,Yii,opt,0,R,LL)-uvec);

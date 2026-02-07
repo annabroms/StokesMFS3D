@@ -55,6 +55,12 @@ end
 
 P = size(q,1);
 
+if ~isfield(opt,'compute_residual')
+    opt.compute_residual = true;
+end
+if ~isfield(opt,'gmres_verbose')
+    opt.gmres_verbose = 1;
+end
 
 
 %% One-body preconditioning
@@ -64,22 +70,26 @@ M = size(rvec_out,1)/P; %numer of collocation points per particle
 opt.N = N;
 opt.M = M;
 
-%Create pseudoinverse of self-interaction matrix,
-if opt.ellipsoid
-    [Y,UU,LL,Kin] = oneBodyPrecondMobDLP((R{1}'*rvec_in(1:N,:)')',...
-        (R{1}'*rvec_out(1:M,:)')',q(1,:));
+%Create pseudoinverse of self-interaction matrix (or use precomputed)
+if isfield(opt,'precond') && ~isempty(opt.precond)
+    Y = opt.precond.Y;
+    UU = opt.precond.UU;
+    LL = opt.precond.LL;
+    Kin = opt.precond.Kin;
 else
-    [Y,UU,LL,Kin] = oneBodyPrecondMobDLP(rvec_in(1:N,:),...
-        rvec_out(1:M,:),q(1,:));
+    if opt.ellipsoid
+        [Y,UU,LL,Kin] = oneBodyPrecondMobDLP((R{1}'*rvec_in(1:N,:)')',...
+            (R{1}'*rvec_out(1:M,:)')',q(1,:));
+    else
+        [Y,UU,LL,Kin] = oneBodyPrecondMobDLP(rvec_in(1:N,:),...
+            rvec_out(1:M,:),q(1,:));
+    end
 end
 
 %The format is used to prepare for the case when different shapes are is
 %use
 Yii{1} = Y;
 UUii{1} = UU; 
-
-%get normal vectors:
-nn = repmat(rvec_out(1:M,:)-q(1,:),P,1); 
 
 %% Assemble completion source, given force and torque
 
@@ -107,9 +117,17 @@ end
 uvec = getStokesletFlow(lambda_vec,rvec_in,rvec_out,opt); 
 
 % Apply T to the velocity induced on the collocation surface.
+nn = repmat(rvec_out(1:M,:)-q(1,:),P,1);
 uvec_T = -getStressletFlow(rvec_out,rvec_in,nn,uvec,M*P,opt);
+if isfield(opt,'extra_uvec_T') && ~isempty(opt.extra_uvec_T)
+    uvec_T = uvec_T + opt.extra_uvec_T;
+end
 
-Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)); % precomputed, to later deal with self interaction
+if isfield(opt,'precond') && ~isempty(opt.precond) && isfield(opt.precond,'Tblock')
+    Tblock = opt.precond.Tblock;
+else
+    Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)); % precomputed, to later deal with self interaction
+end
 
 % tested block diagonal T in the past. Does this give the same thing?
 % 
@@ -120,7 +138,7 @@ Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)); 
 
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,nn,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,1);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,nn,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 %% Map back to the sought density in source points, determine rigid body velocities 
@@ -142,7 +160,7 @@ for i = 1:P
 end
 lambda_norm = norm(lambda_gmres,inf);
 
-
+if opt.compute_residual
 %% Check residual
 % Get new nodes for evaluating velocity residuals
 % Set up a baseline ellipsoid at the origin, axis-aligne
@@ -192,11 +210,9 @@ end
 ubdry = getStokesletFlow(densityK,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);
-
-
-
-
-   
+else
+    uerr = NaN;
+end
 
 end
 

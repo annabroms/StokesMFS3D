@@ -2,7 +2,7 @@ clear;
 close all
 
 solve_dense = 0;
-iterate_RFD = 1;
+iterate_RFD = 1; % or solve densely
 
 rng(5);
 
@@ -19,7 +19,7 @@ else
     q = [0 0 0; 2+delta 0 0];
 end
 
-%% Discretize!
+%% Set resolution and discretize
 %Rp = 0.33;
 Rp = 0.15; %Proxy sphere radius -- very coarse resolution
 N = 50;  % Number of proxy sources
@@ -44,8 +44,7 @@ M = size(rvec_out,1)/P;
 % if solve_dense
 %     [Y,UU,LL,Kin,B] = oneBodyPrecondMob(rvec_in(1:N,:),rvec_out(1:M,:),q(1,:)); 
 %     [Ys,UUs] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:)); 
-% end
-    % Use the product blkdiag(T)*S. 
+% end 
     [Y,UU,LL,Kin,B] = oneBodyPrecondMobDLP(rvec_in(1:N,:),rvec_out(1:M,:),q(1,:));  
    % [Ys,UUs] = oneBodyPrecondResDLP(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:)); 
 %end
@@ -73,11 +72,14 @@ M = size(rvec_out,1)/P;
 
 Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
 Tdiag = kron(eye(P),Tblock);
+n = repmat(rvec_out(1:M,:)-q(1,:),P,1);
+T = getTraction(rvec_in,rvec_out,n);
+
 
 %% Param selection 
 %loop in time 
 tsteps = 1e5;
-%tsteps = 1e4;
+tsteps = 1e4;
 %tsteps = 1e3; 
 %tsteps = 1e2; 
 % tsteps = 1000;
@@ -95,6 +97,7 @@ qhist = cell(tsteps,1);
 %Spring model for two particles
 k = 10; 
 l = 4; % spring relaxation length
+%l = 5; 
 %l = 6;
 Ufunc = @(x1,x2) k*0.5*(norm(x1-x2)-l).^2;
 Ffunc = @(x1,x2) k*(norm(x1-x2)-l)*(x1-x2)./norm(x1-x2);
@@ -102,8 +105,35 @@ Ffunc = @(x1,x2) k*(norm(x1-x2)-l)*(x1-x2)./norm(x1-x2);
 opt.dt = dt;
 opt.gmres_tol = 1e-5;
 
+tol_krylov = 1e-5;
+maxit = 100; 
+
+%% Prepare for preconditioned Lanczos using block diagonal preconditioning
+Tti = getTractionMat(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)); 
+Si = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+Ai = Tti'*Si;
+Bi = (Ai+Ai')/2;
+[Ve,De] = eig(Bi);
+d = diag(De);
+
+ind = find(real(d)>1e-14);
+diff_set = setdiff(1:length(d),ind);
+%d2 = sqrt(d(ind));
+
+dsqrt = 1./sqrt(d);
+dsqrt(diff_set) = 0;
+Ci = diag(dsqrt)*Ve';
+
+dsqrt_plus = sqrt(d); 
+dsqrt_plus(diff_set) = 0;
+Ci_plus = Ve*diag(dsqrt_plus);
+C = kron(eye(P),Ci);
+Cplus = kron(eye(P),Ci_plus);
+            
+
 %% Loop in time
 d = zeros(tsteps,1);
+iter_hist = zeros(tsteps,1); 
 
 
 for i = 1:tsteps
@@ -143,12 +173,12 @@ for i = 1:tsteps
         else
 
             %Build densely
-            S_up = generate_stokes_mat(rinUp,routUp);
+            S_up = stokes_SLP_mat(rinUp,routUp);
             [Ytot,Utot] = getPseudoFactors(S_up,1e-13,0);
             Rup = Ktot'*Ytot*(Utot'*Btot);
             Mup = Rup\eye(6*P);
 
-            S_down = generate_stokes_mat(rinDown,routDown);
+            S_down = stokes_SLP_mat(rinDown,routDown);
             [Ytot,Utot] = getPseudoFactors(S_down,1e-13,0);
             Rdown = Ktot'*Ytot*(Utot'*Btot);
             Mdown = Rdown\eye(6*P);
@@ -176,7 +206,7 @@ for i = 1:tsteps
     %     %U = sqrt(2 * dt / (6*pi)) * randn(6,1);
     % else
         %% Solve with dense sqrt of M. The naive and dense way of solving the problem.
-        S = generate_stokes_mat(rvec_in,rvec_out);
+        S = stokes_SLP_mat(rvec_in,rvec_out);
         if solve_dense
             %U = solve_mobility(q,rvec_in, rvec_out,Fvec,opt);
             [UT, ~, ~] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,0, opt);
@@ -196,22 +226,25 @@ for i = 1:tsteps
         else
 
             %% Solve instead with blockdiag(T)*S iteratively
-            A = -Tdiag*S;
+            A = -T*S;
             %A = -Tdiag*S; %the weights will cancel out
             Asym = M/(4*pi)*(A+A')/2;
             %sqrtA = chol(Asym); %results in very large errors!
-            [Vs,Ds] = eig(Asym);
-           % Ainv = A\eye(size(A)); 
-            ds = diag(Ds); 
-            tol = 1e-8; 
-            ind = find(real(ds)>tol);
-            % diff_set = setdiff(1:length(ds),ind);
-            % sqds = sqrt(ds); 
-            % sqds(diff_set) = 0;
-            % sqrtA = Vs*diag(sqds)*Vs';
             
-            %same thing
-            sqrtA = Vs(:,ind)*diag(sqrt(ds(ind)))*Vs(:,ind)';
+           %  [Vs,Ds] = eig(Asym);
+           % % Ainv = A\eye(size(A)); 
+           %  ds = diag(Ds); 
+           %  tol = 1e-8; %works
+           %  tol = 1e-15; %1e-12 works
+           %  ind = find(real(ds)>tol);
+           %  % diff_set = setdiff(1:length(ds),ind);
+           %  % sqds = sqrt(ds); 
+           %  % sqds(diff_set) = 0;
+           %  % sqrtA = Vs*diag(sqds)*Vs';
+           % 
+           %  %same thing
+           %  sqrtA = Vs(:,ind)*diag(sqrt(ds(ind)))*Vs(:,ind)';
+            
             
             % Check that we compute the right RBM!
             % [Ytot,Utot] = getPseudoFactors(A,1e-13,0);
@@ -222,8 +255,17 @@ for i = 1:tsteps
             % R3 = Ktot'*Ytot*(Utot'*Btot);
             dW = randn(3*N*P,1); %different noise here for different N!
             % Udense = (R3\eye(P*6))*(Fvec+Ktot'*Ainv*sqrtA*sqrt(2/opt.dt)*dW);
+            %noise = sqrtA*dW;
 
-            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, sqrtA,dW);
+            %% Terrible convergence for Lanczos without precond
+            %[noise,~,iters] = KrylovSqrtMsing((A+A')/2,dW,tol_krylov);
+            %% Set up Lanczos with preconditioning (implemented in slow way)
+            B_precond = C*Asym*C';    
+            [noise,iter_errv5,iters] = KrylovSqrtMsing(B_precond,dW,tol_krylov,maxit,Cplus);
+            iter_hist(i) = iters;
+    %% Solve mobility problem
+           % [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, sqrtA,dW);
+            [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec, 1,opt, [],noise);
         end
     %end
 

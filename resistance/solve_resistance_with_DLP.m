@@ -43,6 +43,10 @@ if nargin==0, test_solve;
 
 P = size(q,1); %number of spheres
 
+if ~isfield(opt,'gmres_verbose')
+    opt.gmres_verbose = 1;
+end
+
 if nargin < 6
     R = eye(3);
     E0 = [1 1 1];
@@ -152,9 +156,7 @@ end
 u_bndry = u_bndry';
 
 %% Solve problem
-verbose = 1; 
-
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,verbose,0);
+[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 if opt.profile
