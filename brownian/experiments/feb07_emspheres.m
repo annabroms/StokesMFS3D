@@ -1,8 +1,8 @@
 clear;
 close all
 
-solve_dense = 0;
-iterate_RFD = 1; % or solve for drift term densely
+solve_dense = 1;
+iterate_RFD = 0; % or solve for drift term densely
 use_dense_lanczos = 0; % use dense matrices in Lanczos (old path) vs matvecs
 
 rng(5);
@@ -18,11 +18,10 @@ tsteps = 1e4;
 dt = 1e-1; %time step size
 %dt = 1e-2;
 
-%delta = 1e-3; % parameter in RFD scheme
-%delta = 5e-1;
-delta = 1e-3; %pretty good with dt = 1e-2;
-%delta = 5e-2;
-%delta = 1; 
+%delta_rfd = 1e-2; % parameter in RFD scheme
+delta_rfd = 1e-3; %pretty good with dt = 1e-2;
+%delta_rfd = 5e-2;
+ 
 
 %Spring model for two particles
 k = 10; 
@@ -42,9 +41,9 @@ P=2;
 if P==1
     q = [0 0 0];
 else
-    delta = 3; %initial particle particle distance
+    delta_init = 3; %initial particle particle distance
     warning('Choose according to equilibrium distribution')
-    q = [0 0 0; 2+delta 0 0];
+    q = [0 0 0; 2+delta_init 0 0];
 end
 
 %% Set resolution and discretize
@@ -56,8 +55,8 @@ N = 50;  % Number of proxy sources
 % Rp = 0.30; 
 
 % 
-%Rp = 0.10;´
-%N = 20; 
+% Rp = 0.10;
+% N = 20; 
 
 % Rp = 0.63; %fine resolution
 % N = 700;
@@ -68,7 +67,7 @@ a = 2; %Determines oversampling factor for the collocation points
 opt.dt = dt;
 opt.gmres_tol = gmres_tol; 
 opt.gmres_verbose = 0; 
-opt.delta = delta;
+opt.delta = delta_rfd;
 opt.iterate_RFD = iterate_RFD;
 
 N = size(rvec_in,1)/P;
@@ -140,6 +139,7 @@ qhist = cell(tsteps,1);
 for i = 1:tsteps
     i
     
+    %% Set external force
     if P == 2
         d(i) = norm(q(1,:)-q(2,:)); %compute center center distance
         Fvec = [-Ffunc(q(1,:),q(2,:))'; zeros(3,1); Ffunc(q(1,:),q(2,:))'; zeros(3,1)];
@@ -190,7 +190,7 @@ for i = 1:tsteps
         U = U+R'*W;
     else
         %% Solve instead with fluctuating velocity field in rhs, with the
-        % mobility problem iteratively
+        % mobility solve iteratively
 
         % Prepare for Lanczos
         dW = randn(3*N*P,1); % white noise
