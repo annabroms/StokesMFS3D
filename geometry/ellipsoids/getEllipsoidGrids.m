@@ -1,7 +1,7 @@
-function [rin, rout, q, R, E] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, q)
+function [rin, rout, qvec, R, E, w, n_out] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, qvec)
 %GETELLIPSOIDGRIDS Generate MFS source and collocation grids on multiple ellipsoids.
 %
-%   [rin, rout, t, R, E] = GETELLIPSOIDGRIDS(E0, P, delta, N1, N2, sep, R, q)
+%   [rin, rout, qvec, R, E, w, n_out] = GETELLIPSOIDGRIDS(E0, P, delta, N1, N2, sep, R, qvec)
 %
 %   Constructs source (proxy) points `rin` and collocation points `rout` on the
 %   boundaries of `P` ellipsoidal particles, with prescribed geometric and spatial
@@ -22,16 +22,21 @@ function [rin, rout, q, R, E] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, 
 %       R     - (Optional) 1 x P cell array of 3x3 rotation matrices for orientation.
 %               If omitted or empty, positions and orientations are
 %               generated at random.
-%       q     - (Optional) 1 x P cell array of 3D translation vectors for each ellipsoid.
+%       qvec  - (Optional) P x 3 matrix of translation vectors for each
+%               ellipsoid. A 1 x P cell array of 3D vectors is also accepted.
 %               If omitted or empty, positions and orientations are
-%               generated at random. 
+%               generated at random.
 %
 %   OUTPUTS:
-%       rin   - 3*P*N1 x 1 vector: concatenated source points for all particles.
-%       rout  - 3*P*N2 x 1 vector: concatenated collocation points on all surfaces.
-%       t     - P x 3 matrix of translation vectors (used or generated).
+%       rin   - concatenated source points for all particles.
+%       rout  - concatenated collocation points on all surfaces.
+%       qvec  - P x 3 matrix of translation vectors (used or generated).
 %       R     - 1 x P cell array of 3x3 rotation matrices (used or generated).
 %       E     - 1 x P cell array of aspect ratios for the P particles.
+%       w     - PM x 1 vector of collocation quadrature weights, formed by
+%               stacking one copy of b_outer.w for each ellipsoid.
+%       n_out - PM x 3 array of collocation normals, stacked in the same
+%               order as rout.
 %
 %   NOTES:
 %       - The generated `rin` and `rout` can be used in MFS solvers for
@@ -50,20 +55,25 @@ function [rin, rout, q, R, E] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, 
 %
 %  
 
-% E0 = [.5 .5 1]; %set size /aspect ratio
-% P=1;   % build cluster of P same shape ellipsoids
-% delta = 0.01;    % target dist of each to prev ellipsoids
-% rng(0);    % seed
-% tic; 
+if nargin == 0
+    self_test;
+    return;
+end
 
 %Create source points
-if nargin<7 || nargin<8
-    [E R q xnear] = ellipsoid_cluster(E0,P,delta);
+if nargin < 7 || isempty(R) || nargin < 8 || isempty(qvec)
+    [E, R, t] = ellipsoid_cluster(E0,P,delta);
+    qvec = cell_centers_to_matrix(t);
+else
+    E = cell(1,P);
+    if iscell(qvec)
+        qvec = cell_centers_to_matrix(qvec);
+    end
 end
-%N1 = 40; 
-%N2 = 30; 
-rin = [];
-rout = []; 
+
+if size(qvec,1) ~= P || size(qvec,2) ~= 3
+    error('getEllipsoidGrids:qvec_size', 'qvec must be of size P x 3.');
+end
 
 %Create proxy grid
 b_inner = ellipsoid_param(E0(1),E0(2),E0(3));   % baseline object at the origin, aligned
@@ -72,37 +82,83 @@ b_inner = setupsurfquad(b_inner,[ceil(N1),ceil(N2)]);
 %Create grid of collocation points
 b_outer = ellipsoid_param(E0(1),E0(2),E0(3));   % baseline object at the oridin, aligned
 b_outer = setupsurfquad(b_outer,[ceil(N1*1.15),ceil(N2*1.15)]);
+w_i = b_outer.w;
+
+Nin = size(b_inner.x,2);
+Nout = size(b_outer.x,2);
+rin = zeros(P*Nin,3);
+rout = zeros(P*Nout,3);
+w = repmat(w_i(:),P,1);
+n_out = zeros(P*Nout,3);
 
 for k = 1:P
-    
+    ii_in = (k-1)*Nin + (1:Nin);
+    ii_out = (k-1)*Nout + (1:Nout);
+
     R_k = R{k};
     R{k} = R_k; 
-    t_k = q{k}; 
-    x = t_k + R_k * b_inner.x;    % rot then transl, b just for vis
-    nx = R_k*b_inner.nx;
-    
+    t_k = qvec(k,:)';
     y = b_inner.x-b_inner.nx*sep;
     y = t_k+R_k*y;
-    
-    rin = [rin; y']; 
-
-%     figure()
-% %   plot source points
-%     plot3(y(1,:),y(2,:),y(3,:),'r.');
-%     hold on
-%     plot3(x(1,:),x(2,:),x(3,:),'b.');
-%     quiver3(y(1,:),y(2,:),y(3,:),nx(1,:),nx(2,:),nx(3,:))
-%     axis equal
+    rin(ii_in,:) = y';
     % 
     %% Create collocation points
 
     x = t_k + R_k * b_outer.x;    % rot then transl, b just for vis
-    %Plot collocation points
-    % plot3(b.x(1,:),b.x(2,:),b.x(3,:),'b.');
-    % axis equal vis3d   % gonna need always
+    n_k = R_k * b_outer.nx;
     E{k} = E0; 
-    rout = [rout; x'];
+    rout(ii_out,:) = x';
+    n_out(ii_out,:) = n_k';
 end
 
 
+end
+
+function self_test()
+rng(1);
+
+E0 = [0.7 0.45 1.1];
+P = 3;
+delta = 0.125;
+N1 = 28;
+N2 = 18;
+sep = 0.06;
+
+[rin, rout, qvec, ~, ~, ~, n_out] = getEllipsoidGrids(E0,P,delta,N1,N2,sep);
+
+Nin = size(rin,1) / P;
+Nout = size(rout,1) / P;
+cols = lines(P);
+
+figure('Name','getEllipsoidGrids self-test');
+hold on
+h_out = [];
+h_in = [];
+for k = 1:P
+    ii_in = (k-1)*Nin + (1:Nin);
+    ii_out = (k-1)*Nout + (1:Nout);
+    h1 = scatter3(rout(ii_out,1),rout(ii_out,2),rout(ii_out,3),18,cols(k,:),'filled');
+    h2 = scatter3(rin(ii_in,1),rin(ii_in,2),rin(ii_in,3),8,cols(k,:));
+    if k == 1
+        h_out = h1;
+        h_in = h2;
+    end
+    plot3(qvec(k,1),qvec(k,2),qvec(k,3),'ko','MarkerFaceColor','k','MarkerSize',5);
+end
+qstep = max(floor(size(rout,1)/40),1);
+quiver3(rout(1:qstep:end,1),rout(1:qstep:end,2),rout(1:qstep:end,3), ...
+    n_out(1:qstep:end,1),n_out(1:qstep:end,2),n_out(1:qstep:end,3),0.2,'k');
+axis equal
+grid on
+view(3)
+xlabel('x')
+ylabel('y')
+zlabel('z')
+title('getEllipsoidGrids self-test: 3-ellipsoid cluster')
+legend([h_out, h_in],{'collocation','source'},'Location','bestoutside')
+
+end
+
+function qvec = cell_centers_to_matrix(qcell)
+qvec = reshape(cell2mat(qcell(:).'),3,[]).';
 end

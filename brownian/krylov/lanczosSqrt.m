@@ -1,7 +1,7 @@
-function [y,iter_errv, iters, exact_errv] = KrylovSqrtMsing(M,z,tol,max_it,pre_cond,yexact)
-%KRYLOVSQRTMSING Apply Lanczos to approximate sqrt(M)*z with optional preconditioning.
+function [y,iter_errv, iters, exact_errv] = lanczosSqrt(M,z,tol,max_it,pre_cond,yexact)
+%LANCZOSSQRT Apply Lanczos to approximate sqrt(M)*z with optional preconditioning.
 %
-%   [y, iter_errv, iters, exact_errv] = KrylovSqrtMsing(M, z, tol, max_it, pre_cond, yexact)
+%   [y, iter_errv, iters, exact_errv] = lanczosSqrt(M, z, tol, max_it, pre_cond, yexact)
 %
 %   This routine uses a Lanczos/Krylov subspace method to approximate
 %   y ≈ sqrt(M) * z for a symmetric (semi-)definite operator M. It builds the
@@ -71,13 +71,13 @@ while (iter_err > tol) && (j<max_it)
     yold = y;
     y = norm(z) * (v(:,1:j) * hsqrt(:,1));
     y = real(y);
-    if ~isempty(pre_cond)
-        if isa(pre_cond,'function_handle')
-            y = pre_cond(y);
-        else
-            y = pre_cond*y;
-        end
-    end
+    % if ~isempty(pre_cond)
+    %     if isa(pre_cond,'function_handle')
+    %         y = pre_cond(y);
+    %     else
+    %         y = pre_cond*y;
+    %     end
+    % end
     
    
     iter_err = norm(y-yold)/norm(yold);
@@ -89,6 +89,14 @@ while (iter_err > tol) && (j<max_it)
     
     j = j+1;
 %    [j,iter_err]    
+end
+
+if ~isempty(pre_cond)
+    if isa(pre_cond,'function_handle')
+        y = pre_cond(y);
+    else
+        y = pre_cond*y;
+    end
 end
 
 if nargin<6

@@ -40,6 +40,7 @@ plot_eigs = 0;
 M = size(rvec_out,1)/P; 
 N = size(rvec_in,1)/P; 
 n_out = repmat(rvec_out(1:M,:),P,1);
+w = (4*pi/M)*ones(P*M,1);
 
 if dense
     T = stokes_DLP(rvec_out,rvec_in,n_out);
@@ -48,7 +49,7 @@ if dense
     B = (A+A')/2;
 end
 
-dW2 = rand(3*N*P,1);
+dW2 = randn(3*N*P,1);
 
 %% Block block-diagonal preconditioner 
 Ti = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:));
@@ -100,12 +101,12 @@ for i = 1:length(tolvec)
         CBC = @(x) B_precond*x;
 
     else
-        BC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,Ci,vars);
+        BC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,w,Ci,vars);
     end
     if fast
-        [y,iter_errv5] = KrylovSqrtMsing_fast(BC,dW2,tol,maxit,Cplus);
+        [y,iter_errv5] = lanczosSqrt_fast(BC,dW2,tol,maxit,Cplus);
     else
-        [y,iter_errv5] = KrylovSqrtMsing(CBC,dW2,tol,maxit,Cplus);
+        [y,iter_errv5] = lanczosSqrt(CBC,dW2,tol,maxit,Cplus);
     end
     
     figure(10)
@@ -115,7 +116,7 @@ for i = 1:length(tolvec)
 
     %Use the non-symmetrized version of A - does NOT work
     % A_precond = C*A*C';
-    % [y,iter_errv6] = KrylovSqrtMsing(A_precond,dW2,tol,maxit,C);
+    % [y,iter_errv6] = lanczosSqrt(A_precond,dW2,tol,maxit,C);
     % figure(11)
     % semilogy(iter_errv6,'Marker',m{mod(i,4)+1},'Color',c{mod(i,5)+1},'DisplayName',num2str(tolvec(i)));
     % hold on

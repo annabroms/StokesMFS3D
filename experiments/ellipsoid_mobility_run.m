@@ -43,7 +43,7 @@ function ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_na
 %% Set aspect ratio of ellipsoid and distance to others
 E0 = [.5 .5 1]; %Type S in the mobility paper
 %E0 = [1 1 1]; % Sphere
-%E0 = [.4 .6 1]; %Type T in the mobility paper
+E0 = [.4 .6 1]; %Type T in the mobility paper
 
 
 if nargin<1

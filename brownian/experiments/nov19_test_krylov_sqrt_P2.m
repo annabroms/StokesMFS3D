@@ -60,10 +60,10 @@ dW1 = rand(size(S,1),1);
 dW2 = rand(size(A,1),1);
 maxit = 500; 
 tol = 1e-8; 
-[~,iter_errv1] = KrylovSqrtMsing(S,dW1,tol,maxit);
-[y,iter_errv2] = KrylovSqrtMsing(A,dW2,tol,maxit);
-[~,iter_errv3] = KrylovSqrtMsing(A+A',dW2,tol,maxit);
-[~,iter_errv4] = KrylovSqrtMsing(A3,dW2,tol,maxit);
+[~,iter_errv1] = lanczosSqrt(S,dW1,tol,maxit);
+[y,iter_errv2] = lanczosSqrt(A,dW2,tol,maxit);
+[~,iter_errv3] = lanczosSqrt(A+A',dW2,tol,maxit);
+[~,iter_errv4] = lanczosSqrt(A3,dW2,tol,maxit);
 y2 = krylov_sqrt(A,dW2,20);
 norm(y-y2,inf)/norm(y,inf)
 
@@ -128,7 +128,7 @@ for i = 1:length(tolvec)
     % hold on
     % semilogy(sort(e))
     %% Run lanczos with this truncation level in the preconditioner
-    [y,iter_errv5] = KrylovSqrtMsing(B_precond,dW2,tol,maxit,Cplus);
+    [y,iter_errv5] = lanczosSqrt(B_precond,dW2,tol,maxit,Cplus);
     
     figure(10)
     semilogy(iter_errv5,'Marker',m{mod(i,4)+1},'Color',c{mod(i,5)+1},'DisplayName',num2str(tolvec(i)));
@@ -136,7 +136,7 @@ for i = 1:length(tolvec)
 
     %Use the non-symmetrized version of A - does NOT work
     % A_precond = C*A*C';
-    % [y,iter_errv6] = KrylovSqrtMsing(A_precond,dW2,tol,maxit,C);
+    % [y,iter_errv6] = lanczosSqrt(A_precond,dW2,tol,maxit,C);
     % figure(11)
     % semilogy(iter_errv6,'Marker',m{mod(i,4)+1},'Color',c{mod(i,5)+1},'DisplayName',num2str(tolvec(i)));
     % hold on

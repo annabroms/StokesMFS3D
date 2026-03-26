@@ -1,7 +1,7 @@
 clear;
 close all
 
-solve_dense = 1;
+solve_dense = 0;
 iterate_RFD = 0; % or solve for drift term densely
 use_dense_lanczos = 0; % use dense matrices in Lanczos (old path) vs matvecs
 
@@ -72,6 +72,7 @@ opt.iterate_RFD = iterate_RFD;
 
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P;
+w = (4*pi/M)*ones(P*M,1);
 
 %% One-body preconditioning will be the same for everyone -- precompute!
 [Y,UU,LL,Kin,B] = oneBodyPrecondMobDLP(rvec_in(1:N,:),rvec_out(1:M,:),q(1,:));  
@@ -122,14 +123,7 @@ dsqrt_plus = sqrt(d);
 dsqrt_plus(diff_set) = 0;
 Pi_plus = Ve*diag(dsqrt_plus);
 
-if use_dense_lanczos
-    PP = kron(eye(P),Pi);
-    PPplus = kron(eye(P),Pi_plus);
-    PPplus = @(x) apply_block_diag(x, Pi_plus, P, Ve, diag(dsqrt_plus));
-else
-    PPplus = @(x) apply_block_diag(x, Pi_plus, P, Ve, diag(dsqrt_plus));
-end
-            
+PPplus = @(x) apply_block_diag(x, Pi_plus, P);            
 
 %% Loop in time
 d = zeros(tsteps,1);
@@ -217,17 +211,17 @@ for i = 1:tsteps
             A = T*G;
             C = M/(4*pi)*(A+A')/2; % correlation matrix for fluctuating velocity field
             B_precond = PP*C*PP';     
-           % [noise,iter_errv,iters] = KrylovSqrtMsing(B_precond,dW,tol_lanczos,maxit);
-            [noise,iter_errv,iters] = KrylovSqrtMsing(B_precond,dW,tol_lanczos,maxit,PPplus);
-           % [noise2,iter_errv,iters2] = KrylovSqrtMsing_fast(B_precond,dW,tol_lanczos,maxit,PPplus);
+           % [noise,iter_errv,iters] = lanczosSqrt(B_precond,dW,tol_lanczos,maxit);
+            [noise,iter_errv,iters] = lanczosSqrt(B_precond,dW,tol_lanczos,maxit,PPplus);
+           % [noise2,iter_errv,iters2] = lanczosSqrt_fast(B_precond,dW,tol_lanczos,maxit,PPplus);
 
-            Mfun = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n,Pi,opt);
-            %[noise3,iter_errv,iters3] = KrylovSqrtMsing_fast(Mfun,dW,tol_lanczos,maxit,PPplus);
+            Mfun = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n,w,Pi,opt);
+            %[noise3,iter_errv,iters3] = lanczosSqrt_fast(Mfun,dW,tol_lanczos,maxit,PPplus);
            % disp('debug')
         else
             % Build matrix via matvec
-            Mfun = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n,Pi,opt);
-            [noise,iter_errv,iters] = KrylovSqrtMsing_fast(Mfun,dW,tol_lanczos,maxit,PPplus);
+            Mfun = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n,w,Pi,opt);
+            [noise,iter_errv,iters] = lanczosSqrt_fast(Mfun,dW,tol_lanczos,maxit,PPplus);
       
         end
         iter_hist(i) = iters;

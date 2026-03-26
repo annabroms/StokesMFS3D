@@ -4,15 +4,17 @@ close all;
 
 %% Generate geometry
 P = 200; %number of bodies
-P = 50; 
-delta = 0.2; %smallest particle particle distance 
+P = 100; 
+delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0; 0 2+delta 0]+[1 1 2]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0];
 %random configurations
 %L = 10; %set size of domain
 %q = set_position(P,L,delta); %Random in a qube or in a layer, with minimum
 %distance
-[q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
+%[q,B] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
+x = [0:2+delta:(P-1)*(delta+2)];
+q = [x' zeros(P,2)];
   
 fmm = 0; %only activate if many particles (say, more than 40)
 
@@ -30,12 +32,12 @@ N = 100;
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N);
 %[rvec_in,rvec_out,opt] = init_spheres(q); %more well-resolved
 opt.fmm = fmm;
-opt.lr = 0; % no long range precond
-disp('...solve without deflation...')
-
-[Fvec0,it_res0,lambda_norm_res0,err_res0] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
-% % Now, with long range precond
-opt.lr = 1;  
+% opt.lr = 0; % no long range precond
+% disp('...solve without deflation...')
+% 
+% [Fvec0,it_res0,lambda_norm_res0,err_res0] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
+% % % Now, with long range precond
+opt.lr = 30;  
 disp('...solve with deflation 1...')
 [Fvec1,it_res1,lambda_norm_res1,err_res1] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
 opt.lr = 30;

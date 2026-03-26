@@ -70,10 +70,10 @@ M = size(rvec_out,1)/P;
 %     %sqrtA = U*(ss_sqrt*V');
 % end
 
-Tblock = getTraction(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
+Tblock = getTractionMat(rvec_in(1:N,:),rvec_out(1:M,:),rvec_out(1:M,:)-q(1,:));
 Tdiag = kron(eye(P),Tblock);
 n = repmat(rvec_out(1:M,:)-q(1,:),P,1);
-T = getTraction(rvec_in,rvec_out,n);
+T = getTractionMat(rvec_in,rvec_out,n);
 
 
 %% Param selection 

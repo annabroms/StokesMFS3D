@@ -18,14 +18,14 @@ rng(6);
 ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name,lr)
 %%
 read_name = save_name; 
-save_name2 = "test_wit_deflation_lr1";
+save_name2 = "test_with_deflation_lr1";
 lr = 1; %first solve without long range preconditioning
 rng(6);
 ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name2,lr)  
 
 %% Solve with deflation 
 read_name = save_name; %use same configuration and 
-save_name = 'test_with_deflation_finer';
+save_name = 'test_with_deflation_fine';
 lr = 23;
 %rng(6); %want to create the same geometry, and solve with long range precond
 ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name,lr)

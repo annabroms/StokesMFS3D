@@ -6,17 +6,19 @@ close all;
 %corresponding singular vectors. Conclusion: TG, G and sym(TG) all have a
 %joint null-space, namely in the normal direction of the proxy surface. 
 
-P=2;
+P=1;
 delta = 0.2; 
 if P==1
     q = [0 0 0];
 else
     q = [0 0 0; 2+delta 0 0];
     q = q+[1 1 1];
+
+    [q,B] = grow_cluster(P,delta);
+    q = q+rand(1,3); 
 end
 
-[q,B] = grow_cluster(P,delta);
-q = q+rand(1,3); 
+
 
 % Set resolution
 Rp = 0.63; %fine resolution
@@ -33,13 +35,25 @@ tol = 1e-15;
 visualise = 1; 
 
 
-for a = 2 %; %[1 1.2 1.5 2 3] %Determines oversampling factor for the collocation points
+for a = [1 1.2 1.5 2 3] %Determines oversampling factor for the collocation points
 
     [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a); %Assign source and collocation points
     N = size(rvec_in,1)/P;
     MM = size(rvec_out,1)/P; 
-    
-    n = rvec_out - kron(q,ones(MM,1));
+
+    if P == 1
+        n = rvec_out;
+    else
+        n = rvec_out - kron(q,ones(MM,1));
+    end
+
+    % Visualise geometry
+    figure(10)
+    scatter3(rvec_in(:,1),rvec_in(:,2),rvec_in(:,3));
+    hold on
+    scatter3(rvec_out(:,1),rvec_out(:,2),rvec_out(:,3));
+    axis equal
+    quiver3(rvec_out(:,1),rvec_out(:,2),rvec_out(:,3),n(:,1),n(:,2),n(:,3));
     
     % Attempt at removing the null space of Tt (per-body correction)
     if P==1

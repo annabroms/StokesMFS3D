@@ -49,6 +49,7 @@ for ip = 1:nP
             M = size(rvec_out,1)/P;
             N = size(rvec_in,1)/P;
             n_out = repmat(rvec_out(1:M,:),P,1);
+            w = (4*pi/M)*ones(P*M,1);
 
             dW2 = rand(3*N*P,1);
 
@@ -72,9 +73,9 @@ for ip = 1:nP
             Ci_plus = Ve*diag(dsqrt_plus);
             Cplus = @(x) apply_block_diag(x, Ci_plus, P);
 
-            CBC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,Ci,vars);
+            CBC = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,w,Ci,vars);
 
-            [~,iter_err] = KrylovSqrtMsing(CBC,dW2,tol,maxit,Cplus);
+            [~,iter_err] = lanczosSqrt(CBC,dW2,tol,maxit,Cplus);
 
             idx = find(iter_err <= err_target, 1, 'first');
             if isempty(idx)

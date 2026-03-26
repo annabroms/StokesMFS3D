@@ -1,12 +1,12 @@
-function [y,iter_errv,iters, exact_errv] = KrylovSqrtMsing_fast(M,z,tol,max_it,pre_cond,yexact)
-%KRYLOVSQRTMSING_FAST Lanczos sqrt using tridiagonal eig for speed.
+function [y,iter_errv,iters, exact_errv] = lanczosSqrt_fast(M,z,tol,max_it,pre_cond,yexact)
+%LANCZOSSQRT_FAST Lanczos sqrt using tridiagonal eig for speed.
 %
-%   [y,iter_errv,iters,exact_errv] = KrylovSqrtMsing_fast(M,z,tol,max_it,pre_cond,yexact)
+%   [y,iter_errv,iters,exact_errv] = lanczosSqrt_fast(M,z,tol,max_it,pre_cond,yexact)
 %
-%   Same interface as KrylovSqrtMsing, but exploits the tridiagonal structure
+%   Same interface as lanczosSqrt, but exploits the tridiagonal structure
 %   of the Lanczos matrix to avoid full sqrtm.
 %
-%   See also: KrylovSqrtMsing
+%   See also: lanczosSqrt
 
 if nargin < 5
     pre_cond = [];
@@ -55,7 +55,7 @@ while (iter_err > tol) && (j<max_it)
 
     yold = y;
     y = norm(z) * (v(:,1:j) * hsqrt_e1);
-    y = real(y);
+    %y = real(y);
 
     if ~isempty(pre_cond)
         if isa(pre_cond,'function_handle')
@@ -75,6 +75,14 @@ while (iter_err > tol) && (j<max_it)
     j = j+1;
 end
 
+% if ~isempty(pre_cond)
+%     if isa(pre_cond,'function_handle')
+%         y = pre_cond(y);
+%     else
+%         y = pre_cond*y;
+%     end
+% end
+
 if nargin<6
     exact_errv = [];
 end
@@ -84,39 +92,48 @@ iters = j;
 end
 
 function self_test()
-% Compare KrylovSqrtMsing_fast vs KrylovSqrtMsing
+% Compare lanczosSqrt_fast against lanczosSqrt and sqrtm(M)*z.
 
 rng(7);
 
-n = 5000;
-A = randn(n);
-M = A'*A + 0.5*eye(n); % SPD test matrix
+n = 80;
+[Q,~] = qr(randn(n));
+d = linspace(0.5,3,n)';
+M = Q*diag(d)*Q'; % SPD test matrix with controlled spectrum
+Mfun = @(x) M*x;
 z = randn(n,1);
+y_dense = sqrtm(M)*z;
 
-tol = 1e-10;
-max_it = 100;
+tol = 0;
+max_it = n+1;
 
 tic;
-[y_ref, err_ref] = KrylovSqrtMsing(M, z, tol, max_it);
+[y_ref, err_ref, iters_ref] = lanczosSqrt(Mfun, z, tol, max_it, [], y_dense);
 t_ref = toc;
 
 tic;
-[y_fast, err_fast] = KrylovSqrtMsing_fast(M, z, tol, max_it);
+[y_fast, err_fast, iters_fast, exact_errv] = lanczosSqrt_fast(Mfun, z, tol, max_it, [], y_dense);
 t_fast = toc;
 
-rel_y = norm(y_fast - y_ref) / norm(y_ref);
+rel_ref = norm(y_fast - y_ref) / norm(y_ref);
+rel_dense = norm(y_fast - y_dense) / norm(y_dense);
 
-fprintf('KrylovSqrtMsing_fast self-test (n=%d):\n', n);
+fprintf('lanczosSqrt_fast self-test (n=%d):\n', n);
 fprintf('  iters ref:  %d\n', numel(err_ref));
 fprintf('  iters fast: %d\n', numel(err_fast));
+fprintf('  iters ref flag:  %d\n', iters_ref);
+fprintf('  iters flag: %d\n', iters_fast);
 fprintf('  time ref:   %.3g s\n', t_ref);
 fprintf('  time fast:  %.3g s\n', t_fast);
-fprintf('  rel diff y: %.3e\n', rel_y);
+fprintf('  rel diff ref:   %.3e\n', rel_ref);
+fprintf('  rel diff sqrtm: %.3e\n', rel_dense);
+fprintf('  final exact err: %.3e\n', exact_errv(end));
 
-if rel_y < 1e-10
-    fprintf('  y reproduced within tolerance (1e-10).\n');
-else
-    fprintf('  y NOT reproduced within tolerance (1e-10).\n');
+if rel_ref >= 1e-12 || rel_dense >= 1e-12
+    error('lanczosSqrt_fast:self_test', ...
+        'Lanczos result did not match the SPD reference solutions on the self-test.');
 end
+
+fprintf('  self-test passed.\n');
 
 end
