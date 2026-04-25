@@ -63,6 +63,16 @@ opt.N = N;
 opt.M = M; 
 opt.P = P; 
 
+if opt.ellipsoid
+    [rin_block, rout_block] = get_body_frame_block_data( ...
+        rvec_in(1:N,:), rvec_out(1:M,:), q(1,:), R{1});
+    opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
+    opt.TSblock = stokes_DLP_mat(rout_block, rin_block, rout_block) * opt.Sblock;
+else
+    opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+    opt.TSblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)) * opt.Sblock;
+end
+
 if ~opt.ellipsoid
     nvec = repmat(rvec_out(1:M,:),P,1);
 end
@@ -137,7 +147,7 @@ if debug
         k
         x(:) = 0; 
         x(k) = 1; 
-        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R);
+        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt.TSblock,nvec,opt,1,R);
         CC(:,k) = uu;
     end
     toc
@@ -157,7 +167,7 @@ end
 u_bndry = u_bndry';
 
 %% Solve problem
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,Tblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
+[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt.TSblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 if opt.profile

@@ -20,6 +20,7 @@ function res = matvecStokesMFS(mu, rin, rout, q, Uii, Yii, vars, resistance_flag
 %                - vars.fmm: if true, use FMM3D to evaluate flow.
 %                - vars.profile: if true, calls memorygraph profiling tool.
 %                - vars.ellipsoid: if true, need rotation matrices in R.
+%                - vars.Sblock: cached one-body self block.
 %       resistance_flag - boolean to determine whether a resistance or mobility
 %                   problem is solved
 %       R      - (Optional) Cell array of 3x3 rotation matrices for ellipsoidal particles.
@@ -58,50 +59,56 @@ Y = Yii{1};
 
 %% First, map density for all particles lambda <- mu, using blocks for
 %pseudoinverse
-lambda_stokes = zeros(3*P*N,1);
 
 if vars.profile
     memorygraph('label','apply precond in matvec');
 end
 
-for i = 1:P
-%Precomputation is done only for a single paricle (all are assumed to have
-%the same shape). Otherwise we would need to retrieve self evaluation
-%blocks U{i} and Y{i} here.
-    if resistance_flag %solving a resistance problem
-        if vars.ellipsoid %rotations needed
-            Ri = R{i};
-        
-            step0 = rotate_vector(mu((i-1)*3*M+1:M*i*3),Ri');
-            step1 = U*step0;
-            lambda_i = rotate_vector(Y*step1,Ri);
-        else
-            %spheres: no rotations needed
-            step1 = U*mu((i-1)*3*M+1:M*i*3);
-            lambda_i = Y*step1;
-        end
-    else %solving a mobility problem
-        if vars.ellipsoid 
-       
-            Ri = R{i};
-        
-            step0 = rotate_vector(mu((i-1)*3*M+1:M*i*3),Ri');
-            step1 = U*step0; 
-            tau_mapped1 = Y*step1;
-            tau_mapped2 = rotate_vector(tau_mapped1,Ri);
-    
-            lambda_i = tau_mapped2-rotate_vector(L*tau_mapped1,Ri);
-            
-        else
-            step1 = U*mu((i-1)*3*M+1:M*i*3);
-            tau_mapped = Y*step1; 
-            lambda_i = tau_mapped-L*tau_mapped; 
-        end
+if vars.ellipsoid
+    Rpages = cat(3, R{:});
+    mu_body = rotate_vector_pages(mu, permute(Rpages, [2 1 3]), M);
+    step1 = U * reshape(mu_body, 3*M, P);
+    tau_body = Y * step1;
+    if resistance_flag
+        lambda_stokes = rotate_vector_pages(tau_body, Rpages, N);
+    else
+        lambda_stokes = rotate_vector_pages(tau_body - L * tau_body, Rpages, N);
     end
-
-    lambda_stokes(3*(i-1)*N+1:3*i*N) = lambda_i(1:3*N);
-
+    lambda_stokes = lambda_stokes(:);
+else
+    step1 = U * reshape(mu, 3*M, P);
+    tau_body = Y * step1;
+    if resistance_flag
+        lambda_stokes = tau_body(:);
+    else
+        lambda_stokes = reshape(tau_body - L * tau_body, [], 1);
+    end
 end
+
+% Reference loop kept for comparison:
+% lambda_stokes = zeros(3*P*N,1);
+% for i = 1:P
+%     rows_m = (i-1)*3*M + (1:3*M);
+%     rows_n = (i-1)*3*N + (1:3*N);
+%     if vars.ellipsoid
+%         Ri = R{i};
+%         step0 = rotate_vector(mu(rows_m), Ri');
+%         tau_i = Y * (U * step0);
+%         if resistance_flag
+%             lambda_i = rotate_vector(tau_i, Ri);
+%         else
+%             lambda_i = rotate_vector(tau_i - L*tau_i, Ri);
+%         end
+%     else
+%         tau_i = Y * (U * mu(rows_m));
+%         if resistance_flag
+%             lambda_i = tau_i;
+%         else
+%             lambda_i = tau_i - L*tau_i;
+%         end
+%     end
+%     lambda_stokes(rows_n) = lambda_i(1:3*N);
+% end
 
 
 if vars.profile
@@ -117,14 +124,25 @@ res = res+mu;
 
 vars.fmm = 0; %a small block, fmm not needed. Maybe better compute full matrix vector product?
 %Correct self evaluation: subtract self-interaction 
-for i = 1:P
 
-    rin_i = rin(N*(i-1)+1:N*i,:); %sources on body i    
-    rows_i = (i-1)*M+1:i*M;
-    targ = rout(rows_i,:);  %collocation points on body i
-    u_self = getStokesletFlow(lambda_stokes(3*(i-1)*N+1:3*i*N),rin_i,targ,vars); %self-interaction
-    res((i-1)*3*M+1:i*3*M) = res((i-1)*3*M+1:i*3*M)-u_self;
-
+if vars.ellipsoid
+    Rpages = cat(3, R{:});
+    lambda_body = rotate_vector_pages(lambda_stokes, permute(Rpages, [2 1 3]), N);
+    u_body = vars.Sblock * reshape(lambda_body, 3*N, P);
+    u_self = rotate_vector_pages(u_body, Rpages, M);
+    res = res - u_self(:);
+else
+    u_self = vars.Sblock * reshape(lambda_stokes, 3*N, P);
+    res = res - u_self(:);
 end
+
+% Reference loop kept for comparison:
+% for i = 1:P
+%     rin_i = rin(N*(i-1)+1:N*i,:);
+%     rows_i = (i-1)*M+1:i*M;
+%     targ = rout(rows_i,:);
+%     u_self_i = getStokesletFlow(lambda_stokes(3*(i-1)*N+1:i*3*N),rin_i,targ,vars);
+%     res((i-1)*3*M+1:i*3*M) = res((i-1)*3*M+1:i*3*M)-u_self_i;
+% end
 
 end

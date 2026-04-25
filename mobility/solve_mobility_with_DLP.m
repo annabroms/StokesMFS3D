@@ -72,12 +72,29 @@ M = size(rvec_out,1)/P; %numer of collocation points per particle
 opt.N = N;
 opt.M = M;
 
+if opt.ellipsoid
+    [rin_block, rout_block] = get_body_frame_block_data( ...
+        rvec_in(1:N,:), rvec_out(1:M,:), q(1,:), R{1});
+    opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
+    Tself = stokes_DLP_mat(rout_block, rin_block, rout_block);
+else
+    opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+    Tself = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:));
+end
+opt.TSblock = Tself * opt.Sblock;
+
 %Create pseudoinverse of self-interaction matrix (or use precomputed)
 if isfield(opt,'precond') && ~isempty(opt.precond)
     Y = opt.precond.Y;
     UU = opt.precond.UU;
     LL = opt.precond.LL;
     Kin = opt.precond.Kin;
+    if isfield(opt.precond,'Sblock')
+        opt.Sblock = opt.precond.Sblock;
+    end
+    if isfield(opt.precond,'TSblock')
+        opt.TSblock = opt.precond.TSblock;
+    end
 else
     if opt.ellipsoid
         [Y,UU,LL,Kin] = oneBodyPrecondMobDLP((R{1}'*rvec_in(1:N,:)')',...
@@ -140,7 +157,7 @@ end
 
 
 %% Solve for source strengths
-[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,Tblock,nn,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
+[x_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UUii,Yii,opt.TSblock,nn,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 %% Map back to the sought density in source points, determine rigid body velocities 

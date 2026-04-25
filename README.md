@@ -33,7 +33,7 @@ To use your own method for accelerated or direct evaluation of Stokeslets, just 
 Used for profiling and checks on memory usage.
 
 ## Example
-In the experiments folder:
+In the demo folder:
 - Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
 - Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.
 
