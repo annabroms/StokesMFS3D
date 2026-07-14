@@ -1,14 +1,15 @@
-function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, TGblock, nn, vars, resistance_flag,R,L)
+function res = matvecStokesMFS_DLP(mu, rin, rout, q, varargin)
 %MATVECSTOKESMFS_DLP Matrix-vector product for basic but non-standard
 %Stokes MFS. This is without image enhancement, but using a combined
-%ansatz, TG, with T a DLP (stresslet) mapping and G are the standard
-%stokeslets. 
+%ansatz, TWG, with T a DLP (stresslet) mapping and G are the standard
+%stokeslets. W is a matrix of quadrature nodes.
 %
-%   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, TSblock, nn, vars, resistance_flag, R, L)
+%   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, wout, nout, Uii, Yii, TSblock, vars, resistance_flag, R, L)
+%   res = MATVECSTOKESMFS_DLP(mu, rin, rout, q, Uii, Yii, TSblock, nout, vars, resistance_flag, R, L)
 %
 %   Computes the matrix-vector product A*mu for the linear system arising
 %   in a 1-body precomputed Stokes problem solved via the Method of Fundamental Solutions 
-%   (MFS) with the TG ansatz (composed DLP and SLP).
+%   (MFS) with the TWG ansatz (composed DLP and SLP).
 %   Used as a callback in GMRES, both for the resistance and mobility problems
 %
 %   INPUTS:
@@ -16,12 +17,14 @@ function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, TGblock, nn, vars
 %       rin    - N*P x 3 matrix of all source (proxy) point positions.
 %       rout   - M*P x 3 matrix of all target (collocation) point positions.
 %       q      - P x 3 array of particle centers.
+%       nout   - (M*P) × 3 DLP directions/normals on rvec_out.
+%       wout   - (Optional) (M*P) × 1 quadrature weights on rvec_out.
 %       Uii    - Cell array {U} containing left preconditioner matrix from
 %               one-body SVD for body i in cell i
 %       Yii    - Cell array {Y} containing right preconditioner matrix from one-body SVD.
-%       TSblock - Precomputed body-frame T*S matrix (DLP times SLP) for a
+%       TWGblock - Precomputed body-frame T*W*G matrix (DLP times SLP, with appropriate quadrature) for a
 %               single body. For ellipsoids this must be formed in the body
-%               frame: TSblock = stokes_DLP_mat(rout_body,...) * stokes_SLP_mat(rin_body,rout_body).
+%               frame: TWGblock = stokes_DLP_mat(rout_body,...) *diag(wout)* stokes_SLP_mat(rin_body,rout_body).
 %       vars   - Struct with solver settings and flags:
 %                - vars.fmm: if true, use FMM3D to evaluate flow.
 %                - vars.profile: if true, calls memorygraph profiling tool.
@@ -52,8 +55,64 @@ function res = matvecStokesMFS_DLP(mu, rin, rout, q, Uii, Yii, TGblock, nn, vars
 %
 %  Anna Broms, November 12, 2025, updated April 25, 2026
 
+if iscell(varargin{1})
+    % Backward-compatible unweighted call:
+    % (Uii, Yii, TGblock, nout, vars, resistance_flag, R, L)
+    Uii = varargin{1};
+    Yii = varargin{2};
+    TWGblock = varargin{3};
+    nout = varargin{4};
+    vars = varargin{5};
+    resistance_flag = varargin{6};
+    wout = [];
+    if numel(varargin) >= 7
+        R = varargin{7};
+    else
+        R = [];
+    end
+    if numel(varargin) >= 8
+        L = varargin{8};
+    else
+        L = [];
+    end
+else
+    % Weighted call:
+    % (wout, nout, Uii, Yii, TWGblock, vars, resistance_flag, R, L)
+    wout = varargin{1};
+    nout = varargin{2};
+    Uii = varargin{3};
+    Yii = varargin{4};
+    TWGblock = varargin{5};
+    vars = varargin{6};
+    resistance_flag = varargin{7};
+    if numel(varargin) >= 8
+        R = varargin{8};
+    else
+        R = [];
+    end
+    if numel(varargin) >= 9
+        L = varargin{9};
+    else
+        L = [];
+    end
+end
+
 P = size(q,1); %number of particles 
 N = vars.N; %points per particle on proxy surface
+use_weighted_operator = ~isempty(wout);
+symmetrize_weighted = use_weighted_operator && ...
+    isfield(vars,'symmetrize_weighted') && logical(vars.symmetrize_weighted);
+add_rank1 = isfield(vars,'add_rank1') && logical(vars.add_rank1);
+if isfield(vars,'rank1_scale')
+    rank1_scale = vars.rank1_scale;
+else
+    rank1_scale = 1;
+end
+nin = [];
+if add_rank1
+    nin = get_inner_normals(rin,q,vars,R);
+end
+
 
 %For now, we assume everyone has the same shape
 U = Uii{1};
@@ -122,10 +181,19 @@ end
 
 %% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
-res_stokes = getStokesletFlow(lambda_stokes,rin,rout,vars);
-
-% apply the matrix T from the left, i.e. evaluate a stresslet flow
-res = getStressletFlow(rout,rin,nn,res_stokes,vars.M*P,vars);
+if use_weighted_operator
+    res = apply_weighted_B_core(lambda_stokes,rin,rout,nout,wout,vars);
+    if symmetrize_weighted
+        res_t = apply_weighted_BT_core(lambda_stokes,rin,rout,nout,wout,vars);
+        res = 0.5 * (res + res_t);
+    end
+else
+    res_stokes = getStokesletFlow(lambda_stokes,rin,rout,vars);
+    res = getStressletFlow(rout,rin,nout,res_stokes,vars.M*P,vars);
+end
+if add_rank1
+    res = res + apply_normal_rank1(lambda_stokes,nin,rank1_scale);
+end
 
 %% Adjust to obtain identity blocks on diagonal of system matrix
 res = res+mu; 
@@ -136,11 +204,11 @@ vars.fmm = 0; %a small block, fmm not needed. Maybe better compute full matrix v
 if vars.ellipsoid
     Rpages = cat(3, R{:});
     lambda_body = rotate_vector_pages(lambda_stokes, permute(Rpages, [2 1 3]), N);
-    u_body = TGblock * reshape(lambda_body, 3*N, P);
+    u_body = TWGblock * reshape(lambda_body, 3*N, P);
     u_self = rotate_vector_pages(u_body, Rpages, N);
     res = res - u_self(:);
 else
-    u_self = TGblock * reshape(lambda_stokes, 3*N, P);
+    u_self = TWGblock * reshape(lambda_stokes, 3*N, P);
     res = res - u_self(:);
 end
 
@@ -150,7 +218,7 @@ end
 %     if vars.ellipsoid
 %         Ri = R{i};
 %         lambda_body_i = rotate_vector(lambda_stokes(vec_n), Ri');
-%         u_self_i = rotate_vector(TGblock * lambda_body_i, Ri);
+%         u_self_i = rotate_vector(TWGblock * lambda_body_i, Ri);
 %     else
 %         u_self_i = TGblock * lambda_stokes(vec_n);
 %     end
@@ -158,4 +226,24 @@ end
 % end
 
 
+end
+
+function y = apply_node_weights(x,w)
+y = reshape(x,3,[]);
+y = y .* reshape(w(:).',1,[]);
+y = y(:);
+end
+
+function y = apply_weighted_B_core(x,rin,rout,nout,wout,vars)
+u = getStokesletFlow(x,rin,rout,vars);
+u = apply_node_weights(u,wout);
+y = getStressletFlow(rout,rin,nout,u,numel(wout),vars);
+end
+
+function y = apply_weighted_BT_core(x,rin,rout,nout,wout,vars)
+traction_vars = vars;
+traction_vars.fmm = 0;
+u = getTractionFast(x,rin,rout,nout,traction_vars);
+u = apply_node_weights(u,wout);
+y = getStokesletFlow(u,rout,rin,vars);
 end

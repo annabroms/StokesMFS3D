@@ -67,8 +67,8 @@ opt.N = N;
 opt.M = M;
 
 if opt.ellipsoid
-    [rin_block, rout_block] = get_body_frame_block_data( ...
-        rvec_in(1:N,:), rvec_out(1:M,:), q(1,:), R{1});
+    rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
+    rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
     opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
 else
     opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
@@ -114,6 +114,19 @@ end
 %% Get flow field due to completion source.
 uvec = getStokesletFlow(lambda_vec,rvec_in,rvec_out,opt); 
 uvec = -uvec;
+
+%% Debug to check matrix
+if opt.debug
+    s = length(rvec_out)*3;
+    e = zeros(s,1);
+    syst_mat = zeros(s);
+    for i = 1:s
+        i
+        e(:) = 0;
+        e(i) = 1;
+        syst_mat(:,i) = matvecStokesMFS(e,rvec_in,rvec_out,q,UUii,Yii,opt,0,R,LL);
+    end
+end
 
 
 %% Solve for source strengths
@@ -217,7 +230,7 @@ function test_solve
 rng(5); %reproducable
 close all
 
-P = 8; %number of bodies
+P = 2; %number of bodies
 delta = 1; %smallest particle particle distance
 [q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
 
@@ -230,6 +243,7 @@ opt.fmm = fmm;
 opt.lr = 0;
 opt.gmres_tol = 1e-10;
 opt.plot = 1; 
+opt.debug = 0; 
 
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
 [U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt);

@@ -66,8 +66,8 @@ opt.M = M;
 opt.P = P; 
 
 if opt.ellipsoid
-    [rin_block, rout_block] = get_body_frame_block_data( ...
-        rvec_in(1:N,:), rvec_out(1:M,:), q(1,:), R{1});
+    rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
+    rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
     opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
 else
     opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));

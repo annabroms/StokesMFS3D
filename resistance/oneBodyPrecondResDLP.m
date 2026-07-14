@@ -1,8 +1,8 @@
-function [Y, U, Si] = oneBodyPrecondResDLP(rin, rout,n)
+function [Y, U, Si] = oneBodyPrecondResDLP(rin, rout,n,wout)
 %ONEBODYPRECONDRESDLP Construct preconditioner for one-body Stokes resistance
 %problem solved with combined DLP and SLP (non-standard)
 %
-%   [Y, UU] = ONEBODYPRECONDRESDLP(rin, rout,n)
+%   [Y, UU] = ONEBODYPRECONDRESDLP(rin, rout,n,wout)
 %
 %   Constructs pseudoinverse factors for a single body's Stokes resistance problem,
 %   using the Method of Fundamental Solutions (MFS). The function builds the 
@@ -44,8 +44,13 @@ visualise = 0;
 
 S = stokes_SLP_mat(rin,rout);
 T = stokes_DLP_mat(rout,rin,n); 
+if nargin < 4 || isempty(wout)
+    W = eye(3*size(rout,1));
+else
+    W = diag(repelem(wout(:),3));
+end
 
-[Y, U, Si] = getPseudoFactors(T*S, tol, visualise);
+[Y, U, Si] = getPseudoFactors(T*W*S, tol, visualise);
 U = U'; 
 
 end

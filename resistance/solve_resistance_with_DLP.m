@@ -1,8 +1,8 @@
-function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec_in, rvec_out, U, opt, R, E0)
+function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec_in, rvec_out, nout, wout, U, opt, R, E0)
 %SOLVE_RESISTANCE_WITH_DLP Solve a Stokes resistance problem using an alternative
 %formulation, with T*G*lambda = K*U
 %
-%   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE_WITH_DLP(q, rvec_in, rvec_out, U, opt, R, E0)
+%   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE_WITH_DLP(q, rvec_in, rvec_out, nout, wout, U, opt, R, E0)
 %
 %   Given prescribed translational and angular velocities, the function computes the resulting hydrodynamic forces 
 %   and torques acting on each particle.
@@ -11,6 +11,8 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 %       q         - P × 3 matrix of particle center positions, x,y,z
 %       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
 %       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
+%       nout      - (M*P) × 3 DLP directions/normals on rvec_out.
+%       wout      - (M*P) × 1 quadrature weights on rvec_out.
 %       U         - 6P × 1 vector of prescribed rigid body velocities: [u1; omega1; u2; omega2; ...].
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %       R         - P × 1 cell array of rotation matrices for the P particles.
@@ -30,7 +32,7 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 %       - Validates accuracy by evaluating velocity residuals in new check points.
 %
 %   DEPENDENCIES:
-%       init_MFS, getDesignGrid, matvecStokesMFS,
+%       init_MFS, getDesignGrid, matvecStokesMFS_DLP,
 %       oneBodyPrecondRes, helsing_gmres, getKmat, getStokesletFlow,
 %       getStressletFlow, rotate_vector, ellipsoid_param, setupsurfquad,
 %       getTractionFast
@@ -42,40 +44,90 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance_with_DLP(q, rvec
 if nargin==0, test_solve; 
     return; end
 
+if nargin < 7
+    error('solve_resistance_with_DLP requires q, rvec_in, rvec_out, nout, wout, U, and opt.');
+end
+
 P = size(q,1); %number of spheres
 
 if ~isfield(opt,'gmres_verbose')
     opt.gmres_verbose = 1;
 end
+if ~isfield(opt,'ellipsoid')
+    opt.ellipsoid = false;
+end
+if ~isfield(opt,'outer_force')
+    opt.outer_force = false;
+end
+opt.outer_force = logical(opt.outer_force);
+if ~isfield(opt,'plot')
+    opt.plot = false;
+end
+if ~isfield(opt,'profile')
+    opt.profile = false;
+end
+if ~isfield(opt,'lr')
+    opt.lr = false;
+end
+if opt.lr && opt.outer_force
+    error('solve_resistance_with_DLP:outerForceLongRange', ...
+        'opt.outer_force=true is not implemented with opt.lr=true.');
+end
 
-if nargin < 6
+if nargin < 8
     R = eye(3);
     E0 = [1 1 1];
-elseif nargin < 7
+elseif nargin < 9
     E0 = [1 1 1];
+end
+if opt.ellipsoid && ~iscell(R)
+    if isequal(size(R),[3 3])
+        R = repmat({R},P,1);
+    else
+        error('solve_resistance_with_DLP:badRotations', ...
+            'R must be a cell array of 3-by-3 rotations for ellipsoids.');
+    end
 end
 
 
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P;
+if abs(N-round(N)) > eps || abs(M-round(M)) > eps
+    error('rvec_in and rvec_out must contain the same number of nodes for each particle.');
+end
+N = round(N);
+M = round(M);
+
+if size(nout,2) ~= 3 || size(nout,1) ~= M*P
+    error('solve_resistance_with_DLP:badNormals', ...
+        'nout must be a (M*P)-by-3 array.');
+end
+wout = full(wout(:));
+if numel(wout) ~= M*P
+    error('solve_resistance_with_DLP:badWeights', ...
+        'wout must contain one quadrature weight for each row of rvec_out.');
+end
 
 opt.N = N;
 opt.M = M; 
 opt.P = P; 
 
 if opt.ellipsoid
-    [rin_block, rout_block] = get_body_frame_block_data( ...
-        rvec_in(1:N,:), rvec_out(1:M,:), q(1,:), R{1});
-    opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
-    opt.TSblock = stokes_DLP_mat(rout_block, rin_block, rout_block) * opt.Sblock;
+    rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
+    rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
+    n_body = (R{1}' * nout(1:M,:)')';
+    q_body = [0 0 0];
 else
-    opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
-    opt.TSblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:)) * opt.Sblock;
+    rin_block = rvec_in(1:N,:);
+    rout_block = rvec_out(1:M,:);
+    n_body = nout(1:M,:);
+    q_body = q(1,:);
 end
-
-if ~opt.ellipsoid
-    nvec = repmat(rvec_out(1:M,:),P,1);
-end
+opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
+[Fmap_body, ~, ~, Kouter_body, Tbody, Wbody] = getDLPForceMap( ...
+    rin_block,rout_block,n_body,wout(1:M),q_body,opt);
+opt.TWSblock = Tbody * Wbody * opt.Sblock;
+opt.TSblock = opt.TWSblock;
 
 %% Visualize geometry
 % Optional block for displaying the particle configuration 
@@ -98,34 +150,23 @@ end
 
 
 %% Assign RHS in resistance problem
-% Builds the boundary data using the DLP block for a reference body.
-Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
-
-%For comparison with Kin
-Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
-Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:));
-%For each particle, get data at surface, given rigid body motion
+% For each particle, get weighted DLP data at the proxy surface from the
+% prescribed rigid body motion.
+u_bndry = zeros(3*N*P,1);
 for k = 1:P
     if opt.ellipsoid
-        Kin = getKmat(rvec_in(1:N,:),[0,0,0]); %If spheres, this will be the same matrix for every one.
+        U_body = [R{k}' * U(6*(k-1)+1:6*(k-1)+3); ...
+                  R{k}' * U(6*(k-1)+4:6*k)];
+        rhs_body = Kouter_body * U_body;
+        u_bndry((k-1)*3*N+1:3*k*N) = rotate_vector(rhs_body,R{k});
+    else
+        u_bndry((k-1)*3*N+1:3*k*N) = Kouter_body * U((k-1)*6+1:k*6);
     end
-    %u_bndry((k-1)*3*N+1:3*k*N) = M/4/pi*Kin*U((k-1)*6+1:k*6);
-    % This uses the stresslet block to map rigid motion to boundary data.
-    u_bndry((k-1)*3*N+1:3*k*N) = Tblock*Kout*U((k-1)*6+1:k*6);
-    %u_bndry2((k-1)*3*M+1:3*k*M) = Kout*U((k-1)*6+1:k*6);
 end
-%u_bndry_ref = getStressletFlow(rvec_out,rvec_in,nvec,u_bndry2,M*P,opt);
-%%This is the same!
 
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
-if opt.ellipsoid
-    [Yk,UUk,Si] = oneBodyPrecondResDLP((R{1}'*rvec_in(1:N,:)')',...
-    (R{1}'*rvec_out(1:M,:)')');
-else
-    
-    [Yk,UUk,Si] = oneBodyPrecondResDLP(rvec_in(1:N,:),rvec_out(1:M,:),nvec);
-end
+[Yk,UUk,~] = oneBodyPrecondResDLP(rin_block,rout_block,n_body,wout(1:M));
 
 %The format is used to prepare for the case when different shapes are is
 %use
@@ -147,7 +188,7 @@ if debug
         k
         x(:) = 0; 
         x(k) = 1; 
-        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt.TSblock,nvec,opt,1,R);
+        uu = matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,wout,nout,UU,Y,opt.TWSblock,opt,1,R);
         CC(:,k) = uu;
     end
     toc
@@ -164,10 +205,8 @@ if debug
 end
 
 
-u_bndry = u_bndry';
-
 %% Solve problem
-[mu_gmres,iters,resvec,real_res] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,UU,Y,opt.TSblock,nvec,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
+[mu_gmres,iters,~,~] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,wout,nout,UU,Y,opt.TWSblock,opt,1,R),u_bndry,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 if opt.profile
@@ -179,6 +218,7 @@ end
 
 Fvec = zeros(6*P,1);
 Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
+lambda_gmres = zeros(3*N*P,1);
 for i = 1:P
     if opt.ellipsoid
         temp_i = Y{1}*(UU{1}*(rotate_vector(mu_gmres((i-1)*3*N+1:i*3*N),R{i}')));
@@ -192,7 +232,17 @@ for i = 1:P
     lambda_gmres(3*(i-1)*N+1:i*3*N) = lambda_i;
 
     if ~opt.lr
-        Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
+        if opt.outer_force
+            if opt.ellipsoid
+                lambda_body = rotate_vector(lambda_i,R{i}');
+                F_body = Fmap_body' * lambda_body;
+                Fvec(6*(i-1)+1:6*i) = [R{i} * F_body(1:3); R{i} * F_body(4:6)];
+            else
+                Fvec(6*(i-1)+1:6*i) = Fmap_body' * lambda_i;
+            end
+        else
+            Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i;
+        end
     end
 end
 
@@ -295,11 +345,17 @@ a = 2;
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
 %[rvec_in,rvec_out,opt] = init_spheres(q);
+M = size(rvec_out,1)/P;
+nout = rvec_out - kron(q,ones(M,1));
+nout = nout ./ vecnorm(nout,2,2);
+wout = (4*pi/M) * ones(P*M,1);
 opt.fmm = fmm;
 opt.gmres_tol = 1e-3;
 opt.lr = 0;
+opt.add_rank1 = false;
+opt.outer_force = false;
 opt.gmres_tol = 1e-10; %does this matter for the accuracy? 
-[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance_with_DLP(q,rvec_in,rvec_out,Uref, opt);
+[Fvec,it_res,lambda_norm_res,err_res] = solve_resistance_with_DLP(q,rvec_in,rvec_out,nout,wout,Uref,opt);
 opt.gmres_tol = 1e-10; 
 [Fvec2,it_res2,lambda_norm_res2,err_res2] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 

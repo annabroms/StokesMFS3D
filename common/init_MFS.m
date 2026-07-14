@@ -25,6 +25,9 @@ opt.eps = 1e-8; %used for FMM
 
 opt.fmm = 0; 
 opt.ellipsoid = 0; %spheres if false 
+opt.add_rank1 = false; % add inner-normal rank-one perturbation to DLP/SLP operators
+opt.rank1_scale = 1; % coefficient for the normal rank-one perturbation
+opt.outer_force = false; % use T*W*Kout instead of Kin for DLP force/torque maps
 
 opt.get_traction = 0; 
 opt.a_glob = 1.2; %M (number of collocation point) > N (number of sources on proxy surface)
