@@ -27,7 +27,7 @@ To run simulations, ensure the following dependencies are available:
 To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m.
 
 - **Spherical Design Nodes**  
-  Used to construct the source/target geometry. See `geometry/README.md` for details.
+  Used to construct the source/target geometry. See `geometry/spheres/spherical_designs/README.md` for details.
 
 - **[Memorygraph](https://github.com/ahbarnett/memorygraph)**
 Used for profiling and checks on memory usage.

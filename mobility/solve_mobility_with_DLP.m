@@ -397,7 +397,7 @@ end
 function test_solve
 rng(5); %reproducable
 
-P = 10; %number of bodies
+P = 2; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
@@ -405,7 +405,7 @@ delta = 1; %smallest particle particle distance
 %random configurations
 [q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
   
-fmm = 0; %only activate if many particles (say, more than 40)
+fmm = 1; %only activate if many particles (say, more than 40)
 
 %% Solve mobility problem (given forces/torques)
 Fref = rand(6*P,1); 
@@ -422,8 +422,9 @@ a = 1.2;
 % a = 2; 
 %a = 2; %or play with SVD truncation level
 
-%Rp = 0.68; %proxy radius
-%N = 700; % approximate number of proxy sources on every particle
+Rp = 0.68; %proxy radius
+Rp = 0.63;
+N = 700; % approximate number of proxy sources on every particle
 
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
@@ -434,9 +435,9 @@ nout = nout ./ vecnorm(nout,2,2);
 wout = (4*pi/M) * ones(P*M,1);
 opt.fmm = fmm;
 opt.lr = 0; % no long range precond for the standard method, to make it more comparable to the DLP version.
-opt.gmres_tol = 1e-12; %does this matter for the accuracy? 
+opt.gmres_tol = 1e-14; %does this matter for the accuracy? 
 opt.inner_only = 0; % use the weighted inner-grid one-body preconditioner
-opt.debug = 1; 
+opt.debug = 0; 
 opt.add_rank1 = 0; 
 opt.outer_force = false;
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
