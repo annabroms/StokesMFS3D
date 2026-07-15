@@ -1,4 +1,4 @@
-%JUL14_FIG4B_TWO_SPHERE_MOBILITY_DLP_COMPARE Mobility analogue of Fig. 4b.
+%JUL14_FIG4B_TWO_SPHERE_CONVERGENCE  
 %
 % This script sets up the two-sphere convergence test from Fig. 4b of
 % Broms, Barnett, and Tornberg (J. Comput. Phys., 2025), but for the
@@ -21,7 +21,7 @@ script_dir = fileparts(mfilename('fullpath'));
 repo_root = fileparts(script_dir);
 start_dir = pwd;
 cleanup_obj = onCleanup(@() cd(start_dir));
-
+%%
 cd(repo_root);
 run(fullfile(repo_root,'setpath.m'));
 
@@ -40,18 +40,19 @@ P = 2;
 
 % Mobility analogue of the translation boundary condition in Fig. 4b:
 % both particles receive the same force and no torque.
-force_direction = [1; 0; 0];
-Fvec = make_equal_force_vector(P,force_direction);
+Fvec = zeros(12,1);
+Fvec(1) = 1; 
+Fvec(7) = 1; 
 
-gmres_tol = 1e-12;
+gmres_tol = 1e-10;
 maxit = 600;
 use_fmm = false;
-fmm_tol = 1e-12;
+fmm_tol = 1e-8; %should be set in relation to 
 
 dlp_inner_only = false;
 dlp_symmetrize_weighted = false;
 dlp_add_rank1 = false;
-dlp_outer_force = false;
+dlp_outer_force = true; %change here!
 
 method_names = {'solve_mobility','solve_mobility_with_DLP'};
 
@@ -118,7 +119,7 @@ fprintf('%8s %6s %6s | %8s %10s %10s %10s | %8s %10s %10s %10s\n', ...
 %% Main sweep
 for id = 1:n_delta
     delta = delta_vec(id);
-    q = two_sphere_centers(delta);
+    q = [0 0 0; 2 + delta 0 0];
 
     [rref_in,rref_out,opt_ref] = init_spheres(q,Rp,N_ref_request,a_glob);
     opt_ref = configure_options(opt_ref,gmres_tol,maxit,use_fmm,fmm_tol);
@@ -181,7 +182,7 @@ for id = 1:n_delta
             it_std,uerr_std,results.mobility.Uerr(1,id,in),ln_std, ...
             it_dlp,uerr_dlp,results.mobility.Uerr(2,id,in),ln_dlp);
 
-        results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
+        results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_convergence.mat');
         save(results_file,'results');
     end
 end
@@ -190,25 +191,26 @@ end
 %% Plot: no R_acc reference lines
 %results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
 %figure('Name','Fig. 4b mobility analogue: residual and velocity error');
-tiledlayout(1,2,'TileSpacing','compact','Padding','compact');
+results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
+load(results_file);
 
-for im = 1:n_method
-    nexttile;
-    plot_fig4b_mobility_panel(results,im);
-    title(short_method_name(method_names{im}),'Interpreter','none');
-end
+plot_fig4b_metric(results,'uerr', ...
+    '$\epsilon_{\mathrm{res}}^{\max}$', ...
+    'Mobility residual comparison',true);
+
+plot_fig4b_metric(results,'Uerr', ...
+    '$\epsilon_U$', ...
+    'Mobility velocity error comparison',true);
+
+plot_fig4b_metric(results,'lambda_norm', ...
+    '$\|\lambda\|_\infty$', ...
+    'Mobility coefficient norm comparison',true);
+
+plot_fig4b_metric(results,'iters', ...
+    '$n_{\mathrm{GMRES}}$', ...
+    'Mobility GMRES iteration comparison',false);
 
 %% Local functions
-function q = two_sphere_centers(delta)
-q = [0 0 0; 2 + delta 0 0];
-end
-
-function Fvec = make_equal_force_vector(P,force_direction)
-Fvec = zeros(6*P,1);
-for k = 1:P
-    Fvec(6*(k-1)+1:6*(k-1)+3) = force_direction;
-end
-end
 
 function opt = configure_options(opt,gmres_tol,maxit,use_fmm,fmm_tol)
 opt.fmm = use_fmm;
@@ -247,59 +249,78 @@ else
 end
 end
 
-function plot_fig4b_mobility_panel(results,method_index)
+function plot_fig4b_metric(results,metric_field,y_label,figure_name,use_log)
+if nargin < 5
+    use_log = true;
+end
+figure('Name',figure_name);
+plot_fig4b_metric_panel(results,metric_field,y_label,use_log);
+title(figure_name,'Interpreter','latex');
+end
+
+function plot_fig4b_metric_panel(results,metric_field,y_label,use_log)
 delta_vec = results.delta_vec;
 N_actual = results.actual.N;
+method_names = results.method_names;
+metric_data = results.mobility.(metric_field);
 colors = [0.85 0.10 0.10; 0.00 0.45 0.74];
-markers = {'s','^'};
+line_styles = {'-','--'};
+markers = {'o','s'};
 
 hold on;
 for id = 1:numel(delta_vec)
     x = sqrt(N_actual(id,:));
-    marker = markers{min(id,numel(markers))};
     color = colors(min(id,size(colors,1)),:);
 
-    plot(x,squeeze(results.mobility.uerr(method_index,id,:)), ...
-        '-', ...
-        'Color',color, ...
-        'Marker',marker, ...
-        'MarkerFaceColor',color, ...
-        'MarkerEdgeColor',color, ...
-        'DisplayName',sprintf('eps_res max, delta = %.3g',delta_vec(id)));
+    for im = 1:numel(method_names)
+        marker = markers{min(im,numel(markers))};
+        line_style = line_styles{min(im,numel(line_styles))};
+        if im == 1
+            marker_face_color = color;
+        else
+            marker_face_color = 'none';
+        end
 
-    plot(x,squeeze(results.mobility.Uerr(method_index,id,:)), ...
-        '-', ...
-        'Color',color, ...
-        'Marker',marker, ...
-        'MarkerFaceColor','none', ...
-        'MarkerEdgeColor',color, ...
-        'DisplayName',sprintf('eps_U, delta = %.3g',delta_vec(id)));
+        plot(x,squeeze(metric_data(im,id,:)), ...
+            line_style, ...
+            'Color',color, ...
+            'Marker',marker, ...
+            'MarkerFaceColor',marker_face_color, ...
+            'MarkerEdgeColor',color, ...
+            'DisplayName',sprintf('$%s,\\ \\delta = %.3g$', ...
+                method_latex_name(method_names{im}),delta_vec(id)));
+    end
 end
 
 grid('on');
 box('on');
-set(gca,'YScale','log');
-xlabel('N');
-ylabel('Error');
-set_sqrtN_ticks(gca,results.N_request_vec);
-legend('Location','southwest','Interpreter','none');
+ax = gca;
+set(ax,'TickLabelInterpreter','latex');
+if use_log
+    set(ax,'YScale','log');
+end
+xlabel('$N$','Interpreter','latex');
+ylabel(y_label,'Interpreter','latex');
+set_sqrtN_ticks(ax,results.N_request_vec);
+legend(ax,'Location','southwest','Interpreter','latex');
 end
 
 function set_sqrtN_ticks(ax,N_request_vec)
 tick_N = unique([N_request_vec(1), 200, 500, 1000, 1500, N_request_vec(end)]);
 tick_N = tick_N(tick_N >= min(N_request_vec) & tick_N <= max(N_request_vec));
 set(ax,'XTick',sqrt(tick_N));
-set(ax,'XTickLabel',compose('%d',tick_N));
+set(ax,'XTickLabel',compose('$%d$',tick_N));
+set(ax,'TickLabelInterpreter','latex');
 xlim(ax,sqrt([min(N_request_vec), max(N_request_vec)]));
 end
 
-function name = short_method_name(method_name)
+function name = method_latex_name(method_name)
 switch method_name
     case 'solve_mobility'
-        name = 'standard mobility';
+        name = '\mathrm{standard}';
     case 'solve_mobility_with_DLP'
-        name = 'DLP mobility';
+        name = '\mathrm{DLP}';
     otherwise
-        name = method_name;
+        name = strrep(method_name,'_','\_');
 end
 end

@@ -230,7 +230,7 @@ function test_solve
 rng(5); %reproducable
 close all
 
-P = 2; %number of bodies
+P = 10; %number of bodies
 delta = 1; %smallest particle particle distance
 [q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
 

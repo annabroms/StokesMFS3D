@@ -59,7 +59,7 @@ if vars.fmm
     targ = rvec_out';
     
     srcinfo.sources = rvec_in';
-    srcinfo.stoklet = zeros(3,Ns); 
+    %srcinfo.stoklet = zeros(3,Ns); 
     
     srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x Ns   
     srcinfo.strsvec = nn';

@@ -1,4 +1,4 @@
-%JUL13_EXAMPLE2_MOBILITY_DLP_RESOLUTION_COMPARE Reproduce Example 2 for mobility.
+%JUL13_EXAMPLE2_MOBILITY_VS_P 
 %
 % This script follows the sphere-cluster setup from Example 2 / Fig. 7 of
 % Broms, Barnett, and Tornberg (Adv. Comput. Math., 2025), but compares only
@@ -34,15 +34,15 @@ delta_vec = [0.2 1.0];
 base_seed = 713;
 
 gmres_tol = 1e-7;
+gmres_tol = 1e-10;
 maxit = 500;
 use_fmm = true;
-fmm_threshold = 50;
 fmm_tol = 1e-8;
 
 dlp_inner_only = false;
 dlp_symmetrize_weighted = false;
 dlp_add_rank1 = false;
-dlp_outer_force = false;
+dlp_outer_force = true;
 
 % In the paper, 2-way error uses distinct resistance and mobility proxy
 % offsets with sep_mob = 1.05*sep_res. Fig. 7 reports Rp_res = 0.7.
@@ -70,46 +70,50 @@ n_res = numel(resolutions);
 n_delta = numel(delta_vec);
 n_P = numel(P_vec);
 
-results = struct();
-results.created = '2026-07-13';
-results.description = 'Example 2 sphere-cluster mobility comparison: solve_mobility vs solve_mobility_with_DLP.';
-results.P_vec = P_vec;
-results.delta_vec = delta_vec;
-results.resolutions = resolutions;
-results.method_names = method_names;
-results.gmres_tol = gmres_tol;
-results.maxit = maxit;
-results.use_fmm = use_fmm;
-results.fmm_threshold = fmm_threshold;
-results.fmm_tol = fmm_tol;
-results.dlp_inner_only = dlp_inner_only;
-results.dlp_symmetrize_weighted = dlp_symmetrize_weighted;
-results.dlp_add_rank1 = dlp_add_rank1;
-results.dlp_outer_force = dlp_outer_force;
-
-results.actual.N_res = nan(n_res,n_delta,n_P);
-results.actual.M_res = nan(n_res,n_delta,n_P);
-results.actual.N_mob = nan(n_res,n_delta,n_P);
-results.actual.M_mob = nan(n_res,n_delta,n_P);
-
-results.resistance.iters = nan(n_res,n_delta,n_P);
-results.resistance.uerr = nan(n_res,n_delta,n_P);
-results.resistance.lambda_norm = nan(n_res,n_delta,n_P);
-results.resistance.solve_time = nan(n_res,n_delta,n_P);
-
-results.mobility.iters = nan(n_method,n_res,n_delta,n_P);
-results.mobility.uerr = nan(n_method,n_res,n_delta,n_P);
-results.mobility.two_way = nan(n_method,n_res,n_delta,n_P);
-results.mobility.lambda_norm = nan(n_method,n_res,n_delta,n_P);
-results.mobility.solve_time = nan(n_method,n_res,n_delta,n_P);
-results.mobility.coeff_count = nan(n_method,n_res,n_delta,n_P);
-results.mobility.gmres_unknown_count = nan(n_method,n_res,n_delta,n_P);
+try
+    results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+    load(results_file,'results');
+catch
+    results = struct();
+    results.created = '2026-07-13';
+    results.description = 'Example 2 sphere-cluster mobility comparison: solve_mobility vs solve_mobility_with_DLP.';
+    results.P_vec = P_vec;
+    results.delta_vec = delta_vec;
+    results.resolutions = resolutions;
+    results.method_names = method_names;
+    results.gmres_tol = gmres_tol;
+    results.maxit = maxit;
+    results.use_fmm = use_fmm;
+    results.fmm_threshold = fmm_threshold;
+    results.fmm_tol = fmm_tol;
+    results.dlp_inner_only = dlp_inner_only;
+    results.dlp_symmetrize_weighted = dlp_symmetrize_weighted;
+    results.dlp_add_rank1 = dlp_add_rank1;
+    results.dlp_outer_force = dlp_outer_force;
+    
+    results.actual.N_res = nan(n_res,n_delta,n_P);
+    results.actual.M_res = nan(n_res,n_delta,n_P);
+    results.actual.N_mob = nan(n_res,n_delta,n_P);
+    results.actual.M_mob = nan(n_res,n_delta,n_P);
+    
+    results.resistance.iters = nan(n_res,n_delta,n_P);
+    results.resistance.uerr = nan(n_res,n_delta,n_P);
+    results.resistance.lambda_norm = nan(n_res,n_delta,n_P);
+    results.resistance.solve_time = nan(n_res,n_delta,n_P);
+    
+    results.mobility.iters = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.uerr = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.two_way = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.lambda_norm = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.solve_time = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.coeff_count = nan(n_method,n_res,n_delta,n_P);
+    results.mobility.gmres_unknown_count = nan(n_method,n_res,n_delta,n_P);
+end
 
 fprintf('Jul 13 Example 2 mobility comparison\n');
 fprintf('  P     = [%s]\n',num2str(P_vec));
 fprintf('  delta = [%s]\n',num2str(delta_vec));
 fprintf('  gmres_tol = %.1e, maxit = %d\n',gmres_tol,maxit);
-fprintf('  use_fmm = %d for P > %d, fmm_tol = %.1e\n\n',use_fmm,fmm_threshold,fmm_tol);
 
 fprintf('%12s %8s %5s %6s %6s | %8s %10s %8s | %8s %10s %10s %10s | %8s %10s %10s %10s\n', ...
     'resolution','delta','P','Nmob','Mmob', ...
@@ -130,9 +134,12 @@ for id = 1:n_delta
 
         for ir = 1:n_res
             if ir == 2
-                use_fmm = 1;
+                fmm_threshold = 70;
             else
-                use_fmm = 0; 
+                fmm_threshold = 700;
+            end
+            if ~isnan(results.actual.N_res(ir,id,ip))
+                continue;
             end
             cfg = resolutions(ir);
 
@@ -202,13 +209,18 @@ for id = 1:n_delta
                 it_res,uerr_res,t_res, ...
                 it_std,uerr_std,results.mobility.two_way(1,ir,id,ip),ln_std, ...
                 it_dlp,uerr_dlp,results.mobility.two_way(2,ir,id,ip),ln_dlp);
+
+            results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+            save(results_file,'results');
         end
     end
 end
 
-results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
-save(results_file,'results');
+
 %%
+results_file = fullfile(repo_root,'data','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+%results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+load(results_file,'results');
 
 P_vec = results.P_vec;
 delta_vec = results.delta_vec;
@@ -221,13 +233,18 @@ plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
     results.mobility.uerr,'relative boundary residual',true,true);
 figure()
 plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.two_way,'2-way error',true,false);
+    results.mobility.two_way,'2-way error',true,true);
 figure()
 plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.lambda_norm,'coefficient vector size, ||\lambda||_\infty',true,false);
+    results.mobility.lambda_norm,'coefficient vector size, ||\lambda||_\infty',true,true);
 figure()
 plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.iters,'GMRES iterations',false,false);
+    results.mobility.iters,'GMRES iterations',false,true);
+
+figure()
+plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.solve_time,'Mobility solve time [s]',false,true);
+
 
 sgtitle('Example 2 mobility: standard MFS vs DLP MFS','Interpreter','none');
 

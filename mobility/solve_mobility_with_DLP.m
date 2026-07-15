@@ -409,6 +409,9 @@ fmm = 1; %only activate if many particles (say, more than 40)
 
 %% Solve mobility problem (given forces/torques)
 Fref = rand(6*P,1); 
+Fref = zeros(12,1);
+Fref(1) = 1; 
+Fref(7) = 1; 
 
 %Test first with very low resolution
 Rp = 0.30;
@@ -422,10 +425,12 @@ a = 1.2;
 % a = 2; 
 %a = 2; %or play with SVD truncation level
 
-Rp = 0.68; %proxy radius
-Rp = 0.63;
-N = 700; % approximate number of proxy sources on every particle
-
+%Rp = 0.68; %proxy radius
+%Rp = 0.63;
+%N = 700; % approximate number of proxy sources on every particle
+Rp = 0.6;
+%Rp = 0.6;
+N = 200;
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
 %[rvec_in,rvec_out,opt] = init_spheres(q);
@@ -441,8 +446,7 @@ opt.debug = 0;
 opt.add_rank1 = 0; 
 opt.outer_force = false;
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
-    q,rvec_in,rvec_out,nout,wout,Fref,opt);
-opt.gmres_tol = 1e-10; 
+    q,rvec_in,rvec_out,nout,wout,Fref,opt); 
 [Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt);
 rel_err = norm(Uvec-Uvec2,inf)/norm(Uvec2,inf);
 
