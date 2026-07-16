@@ -414,7 +414,7 @@ opt.inner_only = 0; % use the weighted inner-grid one-body preconditioner
 opt.debug = 0; 
 opt.add_rank1 = 0; 
 opt.outer_force = false;
-opt.fmm_tol = 1e-10;
+opt.fmm_tol = 1e-8;
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
     q,rvec_in,rvec_out,nout,wout,Fref,opt); 
 [Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt);
