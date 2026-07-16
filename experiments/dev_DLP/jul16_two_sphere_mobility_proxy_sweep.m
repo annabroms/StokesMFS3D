@@ -54,6 +54,7 @@ dlp_outer_force = true;
 
 method_names = {'solve_mobility','solve_mobility_with_DLP'};
 method_labels = {'standard MFS','DLP/SLP MFS'};
+remove_titles = false; % Set true for title-free figures.
 
 cfg = struct();
 cfg.delta_vec = delta_vec;
@@ -73,8 +74,8 @@ cfg.dlp_outer_force = dlp_outer_force;
 cfg.method_names = method_names;
 
 results_file = fullfile(repo_root,'data', ...
-    'jul16_fig2p7d_two_sphere_mobility_proxy_sweep.mat');
-save_results = 1;
+    'jul16_two_sphere_mobility_proxy_sweep.mat');
+save_results = 0;
 resume_results = 1;
 
 %% Storage
@@ -212,17 +213,17 @@ for id = 1:n_delta
 end
 
 %% Plots
-plot_solver_pair(results,'uerr', ...
-    'Max relative residual', ...
+plot_solver_figures(results,'uerr', ...
+    '$e_{\mathrm{res}}^{\max}$', ...
     'Fig. 2.7(d) mobility analogue: proxy-radius residual', ...
-    method_labels);
+    method_labels,remove_titles);
 
-plot_solver_pair(results,'lambda_norm', ...
-    'Max coefficient magnitude', ...
+plot_solver_figures(results,'lambda_norm', ...
+    '$\|\lambda\|_\infty$', ...
     'Fig. 2.7(c) mobility analogue: coefficient magnitude', ...
-    method_labels);
+    method_labels,remove_titles);
 
-plot_velocity_difference(results);
+plot_velocity_difference(results,remove_titles);
 
 %% Local functions
 
@@ -288,23 +289,22 @@ else
 end
 end
 
-function plot_solver_pair(results,metric_field,y_label,figure_name,method_labels)
+function plot_solver_figures( ...
+        results,metric_field,y_label,figure_name,method_labels,remove_titles)
 cfg = results.config;
-figure('Color','w','Name',figure_name);
-tiledlayout(1,numel(cfg.method_names), ...
-    'TileSpacing','compact','Padding','compact');
 
 for im = 1:numel(cfg.method_names)
-    ax = nexttile;
+    window_name = sprintf('%s - %s',figure_name,method_labels{im});
+    figure('Color','w','Name',window_name);
+    ax = axes();
     plot_fig2p7_panel(ax,results,metric_field,im);
-    title(ax,method_labels{im},'Interpreter','none');
-    xlabel(ax,'Proxy radius, R_p');
-    if im == 1
-        ylabel(ax,y_label);
+    xlabel(ax,'$R_p$','Interpreter','latex');
+    ylabel(ax,y_label,'Interpreter','latex');
+    if ~remove_titles
+        title(ax,sprintf('%s: %s',figure_name,method_labels{im}), ...
+            'Interpreter','latex');
     end
 end
-
-sgtitle(figure_name,'Interpreter','none');
 end
 
 function plot_fig2p7_panel(ax,results,metric_field,method_index)
@@ -323,22 +323,23 @@ for id = 1:numel(cfg.delta_vec)
             'Color',color, ...
             'LineStyle',line_style, ...
             'LineWidth',1.5, ...
-            'DisplayName',sprintf('N = %d, delta = %.3g', ...
+            'DisplayName',sprintf('$N=%d,\\ \\delta=%.3g$', ...
             results.actual.N(in),cfg.delta_vec(id)));
     end
 end
 
 set(ax,'YScale','log');
+set(ax,'TickLabelInterpreter','latex');
 grid(ax,'on');
 box(ax,'on');
 if numel(cfg.Rp_vec) > 1
     xlim(ax,[min(cfg.Rp_vec),max(cfg.Rp_vec)]);
     xticks(ax,0.2:0.2:0.8);
 end
-legend(ax,'Location','best','Interpreter','none');
+legend(ax,'Location','best','Interpreter','latex');
 end
 
-function plot_velocity_difference(results)
+function plot_velocity_difference(results,remove_titles)
 cfg = results.config;
 delta_colors = [0.00 0.45 0.74; 1.00 0.10 0.10];
 line_styles = {'--','-',':'};
@@ -356,21 +357,27 @@ for id = 1:numel(cfg.delta_vec)
             'Color',color, ...
             'LineStyle',line_style, ...
             'LineWidth',1.5, ...
-            'DisplayName',sprintf('N = %d, delta = %.3g', ...
+            'DisplayName',sprintf('$N=%d,\\ \\delta=%.3g$', ...
             results.actual.N(in),cfg.delta_vec(id)));
     end
 end
 
 set(ax,'YScale','log');
+set(ax,'TickLabelInterpreter','latex');
 grid(ax,'on');
 box(ax,'on');
-xlabel(ax,'Proxy radius, R_p');
-ylabel(ax,'Relative difference in rigid-body velocity');
-title(ax,'solve_mobility_with_DLP versus solve_mobility', ...
-    'Interpreter','none');
+xlabel(ax,'$R_p$','Interpreter','latex');
+ylabel(ax, ...
+    ['$\|\mathbf{U}_{\mathrm{DLP}}-\mathbf{U}_{\mathrm{standard}}\|_\infty/' ...
+     '\|\mathbf{U}_{\mathrm{standard}}\|_\infty$'], ...
+    'Interpreter','latex');
+if ~remove_titles
+    title(ax,'DLP/SLP MFS versus standard MFS', ...
+        'Interpreter','latex');
+end
 if numel(cfg.Rp_vec) > 1
     xlim(ax,[min(cfg.Rp_vec),max(cfg.Rp_vec)]);
     xticks(ax,0.2:0.2:0.8);
 end
-legend(ax,'Location','best','Interpreter','none');
+legend(ax,'Location','best','Interpreter','latex');
 end

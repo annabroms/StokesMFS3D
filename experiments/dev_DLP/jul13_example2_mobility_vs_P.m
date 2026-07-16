@@ -26,10 +26,10 @@ P_vec = 10:10:200;
 delta_vec = [0.2 1.0];
 base_seed = 713;
 
-gmres_tol = 1e-10;
+gmres_tol = 1e-7;
 maxit = 500;
 use_fmm = true;
-fmm_threshold_by_resolution = [700 70];
+fmm_threshold_by_resolution = [800 80];
 fmm_tol = 1e-8;
 
 dlp_inner_only = false;
@@ -63,8 +63,10 @@ n_res = numel(resolutions);
 n_delta = numel(delta_vec);
 n_P = numel(P_vec);
 
-try
-    results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+%results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_vs_P_results.mat');
+
+try    
     load(results_file,'results');
 catch
     results = struct();
@@ -198,8 +200,7 @@ for id = 1:n_delta
                 it_res,uerr_res,t_res, ...
                 it_std,uerr_std,results.mobility.two_way(1,ir,id,ip),ln_std, ...
                 it_dlp,uerr_dlp,results.mobility.two_way(2,ir,id,ip),ln_dlp);
-
-            results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+     
             save(results_file,'results');
         end
     end
@@ -207,6 +208,7 @@ end
 
 
 %%
+close all;
 results_file = fullfile(repo_root,'data','jul13_example2_mobility_dlp_resolution_compare_results.mat');
 %results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
 load(results_file,'results');
@@ -215,27 +217,27 @@ P_vec = results.P_vec;
 delta_vec = results.delta_vec;
 resolutions = results.resolutions;
 method_names = results.method_names;
+plot_individual = 1;
 
+make_metric_figure(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.uerr,'Relative boundary residual', ...
+    'Relative boundary residual',true,true);
+make_metric_figure(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.two_way,'2-way error', ...
+    '$E_{\mathrm{2-way}}$',true,true);
+make_metric_figure(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.lambda_norm,'Coefficient vector norm', ...
+    '$\|\lambda\|_{\infty}$',true,true);
+make_metric_figure(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.iters,'GMRES iterations', ...
+    '$n_{\mathrm{GMRES}}$',false,true);
+make_metric_figure(P_vec,delta_vec,resolutions,method_names, ...
+    results.mobility.solve_time,'Mobility solve time', ...
+    '$t_{\mathrm{mob}}\ [\mathrm{s}]$',false,true);
 
-figure();
-plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.uerr,'relative boundary residual',true,true);
-figure()
-plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.two_way,'2-way error',true,true);
-figure()
-plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.lambda_norm,'coefficient vector size, ||\lambda||_\infty',true,true);
-figure()
-plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.iters,'GMRES iterations',false,true);
-
-figure()
-plot_metric_panel(P_vec,delta_vec,resolutions,method_names, ...
-    results.mobility.solve_time,'Mobility solve time [s]',false,true);
-
-
-sgtitle('Example 2 mobility: standard MFS vs DLP MFS','Interpreter','none');
+for ir = 1:numel(resolutions)
+    make_resolution_summary_figure(results,ir,plot_individual);
+end
 
 
 
@@ -284,6 +286,134 @@ else
 end
 end
 
+function make_metric_figure(P_vec,delta_vec,resolutions,method_names,data,figure_name,y_label,use_log,show_legend)
+figure('Color','w','Name',figure_name);
+plot_metric_panel(P_vec,delta_vec,resolutions,method_names,data,y_label,use_log,show_legend);
+title(figure_name,'Interpreter','latex');
+end
+
+function make_resolution_summary_figure(results,ir,plot_individual)
+P_vec = results.P_vec;
+delta_vec = results.delta_vec;
+method_names = results.method_names;
+resolution_name = results.resolutions(ir).name;
+metric_data = { ...
+    squeeze(results.mobility.uerr(:,ir,:,:)), ...
+    squeeze(results.mobility.two_way(:,ir,:,:)), ...
+    squeeze(results.mobility.lambda_norm(:,ir,:,:)), ...
+    squeeze(results.mobility.iters(:,ir,:,:)), ...
+    squeeze(results.mobility.solve_time(:,ir,:,:))};
+panel_titles = { ...
+    'Boundary residual', ...
+    '2-way error', ...
+    'Coefficient norm', ...
+    'GMRES iterations', ...
+    'Solve time'};
+y_labels = { ...
+    'Relative boundary residual', ...
+    '$E_{\mathrm{2-way}}$', ...
+    '$\|\lambda\|_{\infty}$', ...
+    '$n_{\mathrm{GMRES}}$', ...
+    '$t_{\mathrm{mob}}\ [\mathrm{s}]$'};
+use_log = [true true true false false];
+
+if plot_individual
+    for k = 1:numel(panel_titles)
+        figure_name = sprintf('Example 2 mobility, %s resolution, %s', ...
+            resolution_name,panel_titles{k});
+        figure('Color','w','Name',figure_name);
+        ax = axes;
+        plot_resolution_metric_panel(ax,P_vec,delta_vec,method_names, ...
+            metric_data{k},panel_titles{k},y_labels{k},use_log(k));
+        title(ax,sprintf('%s resolution: %s', ...
+            latex_text(resolution_name),panel_titles{k}),'Interpreter','latex');
+        legend(ax,'Location','best','Interpreter','latex');
+    end
+else
+    figure_name = sprintf('Example 2 mobility, %s resolution',resolution_name);
+    figure('Color','w','Name',figure_name);
+    layout = tiledlayout(2,3,'TileSpacing','compact','Padding','compact');
+
+    for k = 1:numel(panel_titles)
+        plot_resolution_metric_panel(nexttile(layout),P_vec,delta_vec,method_names, ...
+            metric_data{k},panel_titles{k},y_labels{k},use_log(k));
+    end
+
+    make_resolution_legend_tile(nexttile(layout),delta_vec,method_names);
+    sgtitle(sprintf('Example 2 mobility: %s resolution',latex_text(resolution_name)), ...
+        'Interpreter','latex');
+end
+end
+
+function plot_resolution_metric_panel(ax,P_vec,delta_vec,method_names,data,panel_title,y_label,use_log)
+hold(ax,'on');
+method_colors = [0.0000 0.4470 0.7410; 0.8500 0.3250 0.0980];
+method_markers = {'o','s'};
+delta_line_styles = {'-','--',':'};
+
+for im = 1:numel(method_names)
+    color = method_colors(min(im,size(method_colors,1)),:);
+    marker = method_markers{min(im,numel(method_markers))};
+
+    for id = 1:numel(delta_vec)
+        line_style = delta_line_styles{min(id,numel(delta_line_styles))};
+        marker_face_color = curve_marker_face_color(delta_vec(id),color);
+        plot(ax,P_vec,squeeze(data(im,id,:)), ...
+            'Color',color, ...
+            'LineStyle',line_style, ...
+            'Marker',marker, ...
+            'MarkerFaceColor',marker_face_color, ...
+            'MarkerEdgeColor',color, ...
+            'LineWidth',1.35, ...
+            'MarkerSize',5.5, ...
+            'DisplayName',resolution_curve_label(method_names{im},delta_vec(id)));
+    end
+end
+
+grid(ax,'on');
+box(ax,'on');
+title(ax,panel_title,'Interpreter','latex');
+xlabel(ax,'$P$','Interpreter','latex');
+ylabel(ax,y_label,'Interpreter','latex');
+set(ax,'TickLabelInterpreter','latex','FontSize',11);
+if use_log
+    set(ax,'YScale','log');
+end
+axis(ax,'tight');
+if ~use_log
+    ylim([0 inf])
+end
+end
+
+function make_resolution_legend_tile(ax,delta_vec,method_names)
+hold(ax,'on');
+axis(ax,'off');
+method_colors = [0.0000 0.4470 0.7410; 0.8500 0.3250 0.0980];
+method_markers = {'o','s'};
+delta_line_styles = {'-','--',':'};
+
+for im = 1:numel(method_names)
+    color = method_colors(min(im,size(method_colors,1)),:);
+    marker = method_markers{min(im,numel(method_markers))};
+
+    for id = 1:numel(delta_vec)
+        line_style = delta_line_styles{min(id,numel(delta_line_styles))};
+        marker_face_color = curve_marker_face_color(delta_vec(id),color);
+        plot(ax,NaN,NaN, ...
+            'Color',color, ...
+            'LineStyle',line_style, ...
+            'Marker',marker, ...
+            'MarkerFaceColor',marker_face_color, ...
+            'MarkerEdgeColor',color, ...
+            'LineWidth',1.35, ...
+            'MarkerSize',5.5, ...
+            'DisplayName',sprintf('$%s$, $\\delta = %.3g$', ...
+                method_latex_name(method_names{im}),delta_vec(id)));
+    end
+end
+
+legend(ax,'Location','northwest','Interpreter','latex');
+end
 
 function plot_metric_panel(P_vec,delta_vec,resolutions,method_names,data,y_label,use_log,show_legend)
 colors = lines(numel(resolutions));
@@ -295,14 +425,20 @@ for ir = 1:numel(resolutions)
         for id = 1:numel(delta_vec)
             marker = markers{min(im,numel(markers))};
             line_style = line_styles{min(id,numel(line_styles))};
-            display_name = sprintf('%s, %s, delta=%.3g', ...
-                short_method_name(method_names{im}),resolutions(ir).name,delta_vec(id));
+            display_name = sprintf('$%s$, %s, $\\delta = %.3g$', ...
+                method_latex_name(method_names{im}), ...
+                latex_text(resolutions(ir).name),delta_vec(id));
 
             y = squeeze(data(im,ir,id,:));
+            marker_face_color = curve_marker_face_color(delta_vec(id),colors(ir,:));
             plot(P_vec,y, ...
                 'Color',colors(ir,:), ...
                 'LineStyle',line_style, ...
                 'Marker',marker, ...
+                'MarkerFaceColor',marker_face_color, ...
+                'MarkerEdgeColor',colors(ir,:), ...
+                'LineWidth',1.2, ...
+                'MarkerSize',6, ...
                 'DisplayName',display_name);
             hold on
         end
@@ -311,24 +447,46 @@ end
 
 grid('on');
 box('on');
-xlabel('P');
-ylabel(y_label);
-ax = gca; 
+xlabel('$P$','Interpreter','latex');
+ylabel(y_label,'Interpreter','latex');
+ax = gca;
+set(ax,'TickLabelInterpreter','latex','FontSize',12);
 if use_log
     set(ax,'YScale','log');
 end
+axis(ax,'tight');
+if ~use_log
+    ylim([0 inf])
+end
 if show_legend
-    legend(ax,'Location','bestoutside');
+    legend(ax,'Location','bestoutside','Interpreter','latex');
 end
 end
 
-function name = short_method_name(method_name)
+function label = resolution_curve_label(method_name,delta)
+label = sprintf('$%s$, $\\delta = %.3g$',method_latex_name(method_name),delta);
+end
+
+function marker_face_color = curve_marker_face_color(delta,color)
+is_delta_one = abs(delta - 1) < 10*eps(max(1,abs(delta)));
+if is_delta_one
+    marker_face_color = 'none';
+else
+    marker_face_color = color;
+end
+end
+
+function name = method_latex_name(method_name)
 switch method_name
     case 'solve_mobility'
-        name = 'standard';
+        name = '\mathrm{rectangular}';
     case 'solve_mobility_with_DLP'
-        name = 'DLP';
+        name = '\mathrm{symmetrized}';
     otherwise
-        name = method_name;
+        name = latex_text(method_name);
 end
+end
+
+function text_out = latex_text(text_in)
+text_out = strrep(text_in,'_','\_');
 end

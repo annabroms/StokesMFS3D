@@ -1,11 +1,13 @@
 # Matlab
 *.m~
 *.asv
+*.mat
 
 spherical_designs/
 data/
 brownian/archive/
 brownian/visuals/
+visuals/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux

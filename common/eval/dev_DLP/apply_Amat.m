@@ -31,8 +31,13 @@ function y = apply_Amat(x,rin,rout,nout,wout,vars)
 %   See also APPLY_SYM_AMAT, APPLY_QUAD_WEIGHTS, GETSTOKESLETFLOW,
 %   GETSTRESSLETFLOW.
 
+
 u = getStokesletFlow(x,rin,rout,vars);
 u = apply_quad_weights(u,wout);
-y = getStressletFlow(rout,rin,nout,u,numel(wout),vars);
+% The magnitudes fed in to the stresslet are smaller. Better results with
+% more strict tolerance here
+vars_stokes = vars;
+vars_stokes.fmm_tol = vars.fmm_tol*1e-2;
+y = getStressletFlow(rout,rin,nout,u,numel(wout),vars_stokes);
 
 end
