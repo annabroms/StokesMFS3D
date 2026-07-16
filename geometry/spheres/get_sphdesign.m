@@ -14,16 +14,17 @@ function [X,w] = get_sphdesign(Nmax)
 % """
     
 
-    dirName = "spherical_designs";
+    this_dir = fileparts(mfilename('fullpath'));
+    dirName = fullfile(this_dir,'spherical_designs');
 
     Ns = getavailablesphdesigns(dirName);
     t = find(Ns<=Nmax,1,'last');% degree
-    assert(size(t,1)==1,"no available N are <= requested Nmax!");
+    assert(~isempty(t),"no available N are <= requested Nmax!");
     N = Ns(t);     %# the largest N not exceeding Nmax -- check indexing here!
     fnam = sprintf('sf%.3d.%.5d', t, N);     % reverse-engineer filename
     
 
-    absfnam = sprintf('%s/%s',dirName,fnam);
+    absfnam = fullfile(dirName,fnam);
     X = load(absfnam);    
     % X = readdlm(absfnam)
     assert(size(X,1)==N,"read wrong number of lines from file! Please see sphdesigns/README");
@@ -31,13 +32,17 @@ function [X,w] = get_sphdesign(Nmax)
 
 end
 
+
 function res = getavailablesphdesigns(dirName)
     % file list with leading "sf" chars removed (dot is separator)...
     
     % (note linux, OSX, not Windows)
-    fileName = sprintf('%s/filelist.txt',dirName);
+    fileName = fullfile(dirName,'filelist.txt');
     %fileName = "~/NOBACKUP/qbx_with_brownian/spherical_designs/filelist.txt";
     fileID = fopen(fileName, 'r');
+    if fileID < 0
+        error('get_sphdesign:fileNotFound','Could not open %s.',fileName);
+    end
     dataCell = textscan(fileID, '%*[^.].%d');
     
     % Close the file
@@ -45,17 +50,3 @@ function res = getavailablesphdesigns(dirName)
     res = dataCell{1};
 
 end
-
-function hostname = get_hostname()
-  [status, hostname] = system('hostname -s');
-  if status ~= 0
-    [status, hostname] = system('hostname');
-  end
-  if status ~= 0
-    warning('UnknownHostName', 'Host name set to UNKNOWN');
-    hostname = 'UNKNOWN';
-  end
-end
-
-
-    

@@ -1,5 +1,6 @@
 function [U, iters, lambda_norm, uerr] = solve_mobility_sym_left(q,rvec_in,rvec_out,nout,wout,Fvec,opt,R,E0)
-%SOLVE_MOBILITY_SYM_LEFT Solve a 3D Stokes mobility problem with left preconditioning.
+%SOLVE_MOBILITY_SYM_LEFT Solve a 3D Stokes mobility problem written with the symmetrized 
+% formulation using left preconditioning.
 %
 %   [U,iters,lambda_norm,uerr] = SOLVE_MOBILITY_SYM_LEFT( ...
 %       q,rvec_in,rvec_out,nout,wout,Fvec,opt,R,E0)
@@ -10,8 +11,8 @@ function [U, iters, lambda_norm, uerr] = solve_mobility_sym_left(q,rvec_in,rvec_
 %   The recompleted operator is B*(I-L) plus a rigid-body completion.
 %
 %   Set opt.inner_only = true to use the inner-grid completion Kin*Kin'.
-%   Set opt.inner_only = false to use the outer-grid completion
-%   T*W*Kout*Kin'. The default is true, matching the original left solver.
+%   Set opt.inner_only = false to use the quadrature approximation 
+%   T*W*Kout*Kin' for the completion. The default is true, as it results in higher accuracy.
 %   Set opt.symmetrize_weighted = true to replace B by 0.5*(B+B'), using
 %   the matrix-free adjoint action from the Brownian TWS code.
 
@@ -200,10 +201,10 @@ end
 end
 
 function y = apply_weighted_B(x,rvec_in,rvec_out,nout,wout,opt,symmetrize_weighted,nin)
-y = apply_weighted_B_core(x,rvec_in,rvec_out,nout,wout,opt);
 if symmetrize_weighted
-    yt = apply_weighted_BT_core(x,rvec_in,rvec_out,nout,wout,opt);
-    y = 0.5 * (y + yt);
+    y = apply_sym_Amat(x,rvec_in,rvec_out,nout,wout,opt);
+else
+    y = apply_Amat(x,rvec_in,rvec_out,nout,wout,opt);
 end
 if isfield(opt,'add_rank1') && logical(opt.add_rank1)
     if nargin < 8 || isempty(nin)
@@ -212,26 +213,6 @@ if isfield(opt,'add_rank1') && logical(opt.add_rank1)
     end
     y = y + apply_normal_rank1(x,nin,opt.rank1_scale);
 end
-end
-
-function y = apply_weighted_B_core(x,rvec_in,rvec_out,nout,wout,opt)
-u = getStokesletFlow(x,rvec_in,rvec_out,opt);
-u = apply_node_weights(u,wout);
-y = getStressletFlow(rvec_out,rvec_in,nout,u,numel(wout),opt);
-end
-
-function y = apply_weighted_BT_core(x,rvec_in,rvec_out,nout,wout,opt)
-traction_opt = opt;
-traction_opt.fmm = 0;
-u = getTractionFast(x,rvec_in,rvec_out,nout,traction_opt);
-u = apply_node_weights(u,wout);
-y = getStokesletFlow(u,rvec_out,rvec_in,opt);
-end
-
-function y = apply_node_weights(x,w)
-y = reshape(x,3,[]);
-y = y .* reshape(w,1,[]);
-y = y(:);
 end
 
 function y = apply_left_precond(x,Y,UU,N,P,opt,R)
@@ -305,7 +286,7 @@ for k = 1:P
     end
 end
 
-uout = apply_node_weights(uout,wout);
+uout = apply_quad_weights(uout,wout);
 source = getStressletFlow(rvec_out,rvec_in,nout,uout,numel(wout),opt);
 end
 

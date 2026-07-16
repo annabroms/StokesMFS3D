@@ -17,7 +17,7 @@ function u = getStressletFlow(rvec_in,rvec_out,nn,strslet,Ns,vars)
 %       Ns        : Number of sources 
 %       vars     : Struct with options:
 %                  - vars.fmm : Logical. If true, use FMM3D for fast evaluation.
-%                  - vars.eps : Precision parameter for FMM3D.
+%                  - vars.fmm_tol : Precision parameter for FMM3D.
 %
 %   OUTPUT:
 %       u        : 3*Nt x 1 stacked velocity at targets.
@@ -64,7 +64,7 @@ if vars.fmm
     srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x Ns   
     srcinfo.strsvec = nn';
     
-    U = stfmm3d(vars.eps,srcinfo,ifppreg,targ,ifppregtarg);
+    U = stfmm3d(vars.fmm_tol,srcinfo,ifppreg,targ,ifppregtarg);
     u = U.pottarg;
     u = -u(:); %there is a sign difference!
 else
@@ -101,7 +101,7 @@ vars.fmm = 0;
 u_direct = getStressletFlow(rvec_in, rvec_out, nn, strslet, Ns, vars);
 
 vars.fmm = 1;
-vars.eps = 1e-10;
+vars.fmm_tol = 1e-10;
 u_fmm = getStressletFlow(rvec_in, rvec_out, nn, strslet, Ns, vars);
 
 rel_err = norm(u_fmm - u_direct) / norm(u_direct);

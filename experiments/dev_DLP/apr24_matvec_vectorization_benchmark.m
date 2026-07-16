@@ -167,11 +167,15 @@ M = size(rout, 1) / Pmax;
 
 rin1 = rin(1:N,:);
 rout1 = rout(1:M,:);
+nout1 = rout1;
+nout1 = nout1 ./ vecnorm(nout1,2,2);
+wout1 = (4*pi/M) * ones(M,1);
 
 [Yres_std, Ures_std] = oneBodyPrecondRes(rin1, rout1);
 [Ymob_std, Umob_std, Lstd] = oneBodyPrecondMob(rin1, rout1, [0 0 0]);
 [Yres_dlp, Ures_dlp] = oneBodyPrecondResDLP(rin1, rout1, rout1);
-[Ymob_dlp, Umob_dlp, Ldlp] = oneBodyPrecondMobDLP(rin1, rout1, [0 0 0]);
+[Ymob_dlp, Umob_dlp, Ldlp] = oneBodyPrecondMobDLP( ...
+    rin1, rout1, struct(), [0 0 0], wout1, nout1);
 
 Sblock = stokes_SLP_mat(rin1, rout1);
 Tblock = stokes_DLP_mat(rout1, rin1, rout1);
@@ -211,16 +215,19 @@ N1 = 0.75 * Nv;
 sep = 0.125;
 q = [(0:Pmax-1)' * 4, zeros(Pmax, 2)];
 R = random_rotations(Pmax);
-[rin, rout] = getEllipsoidGrids(E0, Pmax, 1, N1, Nv, sep, R, q);
+[rin, rout, ~, ~, ~, wout, nout] = getEllipsoidGrids(E0, Pmax, 1, N1, Nv, sep, R, q);
 
 N = size(rin, 1) / Pmax;
 M = size(rout, 1) / Pmax;
 
-[rin_body, rout_body] = get_body_frame_block_data(rin(1:N,:), rout(1:M,:), q(1,:), R{1});
+rin_body = (R{1}' * (rin(1:N,:) - q(1,:))')';
+rout_body = (R{1}' * (rout(1:M,:) - q(1,:))')';
+nout_body = (R{1}' * nout(1:M,:)')';
 
 [Yres_std, Ures_std] = oneBodyPrecondRes(rin_body, rout_body);
 [Ymob_std, Umob_std, Lstd] = oneBodyPrecondMob(rin_body, rout_body, [0 0 0]);
-[Ymob_dlp, Umob_dlp, Ldlp] = oneBodyPrecondMobDLP(rin_body, rout_body, [0 0 0]);
+[Ymob_dlp, Umob_dlp, Ldlp] = oneBodyPrecondMobDLP( ...
+    rin_body, rout_body, struct(), [0 0 0], wout(1:M), nout_body);
 
 Sblock = stokes_SLP_mat(rin_body, rout_body);
 Tbody = stokes_DLP_mat(rout_body, rin_body, rout_body);
@@ -264,7 +271,7 @@ function vars = benchmark_vars(opt, M, N, is_ellipsoid, Sblock, TSblock)
 vars = opt;
 vars.fmm = 0;
 vars.profile = 0;
-vars.eps = 1e-8;
+vars.fmm_tol = 1e-8;
 vars.M = M;
 vars.N = N;
 vars.ellipsoid = is_ellipsoid;

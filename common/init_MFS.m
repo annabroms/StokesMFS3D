@@ -20,8 +20,8 @@ opt.profile = 0; %activate profiling
 opt.remove_last = 0; %remove last singular value in SVD?
 opt.image = 0; %default not to use images
 
-opt.eps = 1e-8; %used for FMM
-%opt.eps = 1e-10; %change tol in fmm to see effect
+opt.fmm_tol = 1e-8; %used for FMM
+%opt.fmm_tol = 1e-10; %change tol in fmm to see effect
 
 opt.fmm = 0; 
 opt.ellipsoid = 0; %spheres if false 

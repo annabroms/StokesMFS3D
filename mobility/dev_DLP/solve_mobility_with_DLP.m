@@ -239,13 +239,19 @@ for k = 1:P
 end
 
 %% Get flow field due to completion source: TWG*lambda_0
-uvec_T = -apply_weighted_B( ...
-    lambda_vec,rvec_in,rvec_out,nout,wout,opt,opt.symmetrize_weighted,nin);
+if opt.symmetrize_weighted
+    u_rhs = -apply_sym_Amat(lambda_vec,rvec_in,rvec_out,nout,wout,opt);
+else
+    u_rhs = -apply_Amat(lambda_vec,rvec_in,rvec_out,nout,wout,opt);
+end
+
+%% Add on slip velocity to rhs
 if isfield(opt,'extra_uvec_T') && ~isempty(opt.extra_uvec_T)
-    uvec_T = uvec_T + opt.extra_uvec_T;
+    u_rhs = u_rhs + opt.extra_uvec_T;
     warning('check extra flow field')
 end
 
+%% Solve for source strenghts
 % Debug: look at system matrix
 if opt.debug
     s = length(rvec_in)*3;
@@ -264,8 +270,7 @@ if opt.debug
 end
 
 
-%% Solve for source strengths
-[x_gmres,iters,~,~] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,wout,nout,UUii,Yii,opt.TWSblock,opt,0,R,LL),uvec_T,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
+[x_gmres,iters,~,~] = helsing_gmres(@(x) matvecStokesMFS_DLP(x,rvec_in,rvec_out,q,wout,nout,UUii,Yii,opt.TWSblock,opt,0,R,LL),u_rhs,3*size(rvec_in,1),opt.maxit,opt.gmres_tol,opt.gmres_verbose,0);
 
 
 %% Map back to the sought density in source points, determine rigid body velocities 
@@ -358,46 +363,10 @@ end
 end
 
 
-
-function y = apply_node_weights(x,w)
-y = reshape(x,3,[]);
-y = y .* reshape(w,1,[]);
-y = y(:);
-end
-
-function y = apply_weighted_B(x,rvec_in,rvec_out,nout,wout,opt,symmetrize_weighted,nin)
-y = apply_weighted_B_core(x,rvec_in,rvec_out,nout,wout,opt);
-if symmetrize_weighted
-    yt = apply_weighted_BT_core(x,rvec_in,rvec_out,nout,wout,opt);
-    y = 0.5 * (y + yt);
-end
-if isfield(opt,'add_rank1') && logical(opt.add_rank1)
-    if nargin < 8 || isempty(nin)
-        error('solve_mobility_with_DLP:missingInnerNormals', ...
-            'opt.add_rank1=true requires inner normals for the weighted operator.');
-    end
-    y = y + apply_normal_rank1(x,nin,opt.rank1_scale);
-end
-end
-
-function y = apply_weighted_B_core(x,rvec_in,rvec_out,nout,wout,opt)
-u = getStokesletFlow(x,rvec_in,rvec_out,opt);
-u = apply_node_weights(u,wout);
-y = getStressletFlow(rvec_out,rvec_in,nout,u,numel(wout),opt);
-end
-
-function y = apply_weighted_BT_core(x,rvec_in,rvec_out,nout,wout,opt)
-traction_opt = opt;
-traction_opt.fmm = 0;
-u = getTractionFast(x,rvec_in,rvec_out,nout,traction_opt);
-u = apply_node_weights(u,wout);
-y = getStokesletFlow(u,rvec_out,rvec_in,opt);
-end
-
 function test_solve
 rng(5); %reproducable
 
-P = 2; %number of bodies
+P = 10; %number of bodies
 delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
@@ -409,9 +378,9 @@ fmm = 1; %only activate if many particles (say, more than 40)
 
 %% Solve mobility problem (given forces/torques)
 Fref = rand(6*P,1); 
-Fref = zeros(12,1);
-Fref(1) = 1; 
-Fref(7) = 1; 
+% Fref = zeros(12,1);
+% Fref(1) = 1; 
+% Fref(7) = 1; 
 
 %Test first with very low resolution
 Rp = 0.30;
@@ -426,11 +395,11 @@ a = 1.2;
 %a = 2; %or play with SVD truncation level
 
 %Rp = 0.68; %proxy radius
-%Rp = 0.63;
-%N = 700; % approximate number of proxy sources on every particle
-Rp = 0.6;
+Rp = 0.63;
+N = 700; % approximate number of proxy sources on every particle
 %Rp = 0.6;
-N = 200;
+%Rp = 0.6;
+%N = 1500;
 
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp,N,a);
 %[rvec_in,rvec_out,opt] = init_spheres(q);
@@ -440,11 +409,12 @@ nout = nout ./ vecnorm(nout,2,2);
 wout = (4*pi/M) * ones(P*M,1);
 opt.fmm = fmm;
 opt.lr = 0; % no long range precond for the standard method, to make it more comparable to the DLP version.
-opt.gmres_tol = 1e-14; %does this matter for the accuracy? 
+opt.gmres_tol = 1e-7; %does this matter for the accuracy? 
 opt.inner_only = 0; % use the weighted inner-grid one-body preconditioner
 opt.debug = 0; 
 opt.add_rank1 = 0; 
 opt.outer_force = false;
+opt.fmm_tol = 1e-10;
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
     q,rvec_in,rvec_out,nout,wout,Fref,opt); 
 [Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt);

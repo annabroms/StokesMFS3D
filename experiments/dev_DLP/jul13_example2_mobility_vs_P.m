@@ -18,25 +18,18 @@ clc;
 
 %% Paths
 script_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(script_dir);
-start_dir = pwd;
-cleanup_obj = onCleanup(@() cd(start_dir));
-
-cd(repo_root);
+repo_root = find_repo_root(script_dir);
 run(fullfile(repo_root,'setpath.m'));
-
-% get_sphdesign.m reads spherical_designs/filelist.txt relative to pwd.
-cd(fullfile(repo_root,'geometry','spheres'));
 
 %% Example 2 configuration
 P_vec = 10:10:200;
 delta_vec = [0.2 1.0];
 base_seed = 713;
 
-gmres_tol = 1e-7;
 gmres_tol = 1e-10;
 maxit = 500;
 use_fmm = true;
+fmm_threshold_by_resolution = [700 70];
 fmm_tol = 1e-8;
 
 dlp_inner_only = false;
@@ -84,7 +77,7 @@ catch
     results.gmres_tol = gmres_tol;
     results.maxit = maxit;
     results.use_fmm = use_fmm;
-    results.fmm_threshold = fmm_threshold;
+    results.fmm_threshold_by_resolution = fmm_threshold_by_resolution;
     results.fmm_tol = fmm_tol;
     results.dlp_inner_only = dlp_inner_only;
     results.dlp_symmetrize_weighted = dlp_symmetrize_weighted;
@@ -133,11 +126,7 @@ for id = 1:n_delta
         Uref = rand(6*P,1);
 
         for ir = 1:n_res
-            if ir == 2
-                fmm_threshold = 70;
-            else
-                fmm_threshold = 700;
-            end
+            fmm_threshold = fmm_threshold_by_resolution(ir);
             if ~isnan(results.actual.N_res(ir,id,ip))
                 continue;
             end
@@ -250,9 +239,25 @@ sgtitle('Example 2 mobility: standard MFS vs DLP MFS','Interpreter','none');
 
 
 
+function repo_root = find_repo_root(start_dir)
+repo_root = start_dir;
+while true
+    if isfile(fullfile(repo_root,'setpath.m'))
+        return;
+    end
+
+    parent_dir = fileparts(repo_root);
+    if isempty(parent_dir) || strcmp(parent_dir,repo_root)
+        error('jul13_example2_mobility_vs_P:repoRootNotFound', ...
+            'Could not find setpath.m starting from %s.',start_dir);
+    end
+    repo_root = parent_dir;
+end
+end
+
 function opt = configure_options(opt,P,gmres_tol,maxit,use_fmm,fmm_threshold,fmm_tol)
 opt.fmm = use_fmm && P > fmm_threshold;
-opt.eps = fmm_tol;
+opt.fmm_tol = fmm_tol;
 opt.lr = 0;
 opt.gmres_tol = gmres_tol;
 opt.gmres_verbose = 0;

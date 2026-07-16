@@ -16,7 +16,7 @@ function res = getTractionFast(tau_stokes, rin, rout, nn,vars)
 %       nn         : M x 3 matrix of normals at target points
 %       vars       : Struct containing optional settings:
 %                    - vars.fmm  : Logical. If true, use FMM3D for fast evaluation.
-%                    - vars.eps  : Precision parameter used by FMM3D.
+%                    - vars.fmm_tol : Precision parameter used by FMM3D.
 %
 %   OUTPUT:
 %       res        : 3M x 1 vector of traction at each target point, stacked
@@ -47,8 +47,8 @@ end
 if vars.fmm 
     % -------- Use FMM3D --------
     warning('too slow!')
-    if ~isfield(vars,'eps')
-        vars.eps = 1e-10;
+    if ~isfield(vars,'fmm_tol')
+        vars.fmm_tol = 1e-10;
     end
     ifppreg = 0;      % no eval at sources
     ifppregtarg = 3;  % eval at targets
@@ -60,7 +60,7 @@ if vars.fmm
     targnor = nn';                          % 3 x Nt
     nt = size(rout,1);
     tic
-    U = stfmm3d(vars.eps,srcinfo,ifppreg,targ,ifppregtarg);
+    U = stfmm3d(vars.fmm_tol,srcinfo,ifppreg,targ,ifppregtarg);
     toc
     p = U.pretarg(:).';    % pressure (1 x Nt)
     gradu = U.gradtarg;    % grad vel (3 x 3 x Nt)
@@ -112,7 +112,7 @@ t_mex = toc;
 
 % FMM traction
 vars.fmm = 1;
-vars.eps = 1e-10;
+vars.fmm_tol = 1e-10;
 tic;
 res_fmm = getTractionFast(tau, rin, rout, nn, vars);
 t_fmm = toc;

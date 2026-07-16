@@ -5,7 +5,7 @@ StokesMFS3D provides a minimal working implementation of the **Method of Fundame
 
 This code demonstrates the basic algorithm using source points on proxy surfaces only. 
 
-> **Note**: The advanced image enhancement technique for spheres presented in [Broms et al. (2024)](#publications) is *not yet included* in this version. It is therefore recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
+> **Note**: The more advanced image enhancement technique for spheres presented in [Broms et al. (2024)](#publications) is *not yet included* in this version. It is therefore recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
 
 ## Features
 
@@ -55,6 +55,7 @@ This work is based on the following research papers:
 Planned additions include:
 
 - Lubrication-based image enhancement (as in [1])
+- A symmetrized version of the MFS solver to enable Brownian motion (in progress, see dev_DLP folders)
 
 ![Clustered particles](cluster.png)
 

@@ -18,15 +18,8 @@ clc;
 
 %% Paths
 script_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(script_dir);
-start_dir = pwd;
-cleanup_obj = onCleanup(@() cd(start_dir));
-%%
-cd(repo_root);
+repo_root = find_repo_root(script_dir);
 run(fullfile(repo_root,'setpath.m'));
-
-% get_sphdesign.m reads spherical_designs/filelist.txt relative to pwd.
-cd(fullfile(repo_root,'geometry','spheres'));
 
 %% Fig. 4b mobility configuration
 delta_vec = [0.1 0.2];
@@ -47,7 +40,6 @@ Fvec(7) = 1;
 gmres_tol = 1e-10;
 maxit = 600;
 use_fmm = false;
-fmm_tol = 1e-8; %should be set in relation to 
 
 dlp_inner_only = false;
 dlp_symmetrize_weighted = false;
@@ -71,7 +63,6 @@ results.N_ref_request = N_ref_request;
 results.Rp = Rp;
 results.a_glob = a_glob;
 results.P = P;
-results.force_direction = force_direction;
 results.Fvec = Fvec;
 results.method_names = method_names;
 results.reference_method = 'solve_mobility';
@@ -191,7 +182,8 @@ end
 %% Plot: no R_acc reference lines
 %results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
 %figure('Name','Fig. 4b mobility analogue: residual and velocity error');
-results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
+%results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
+results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_07.mat');
 load(results_file);
 
 plot_fig4b_metric(results,'uerr', ...
@@ -212,9 +204,25 @@ plot_fig4b_metric(results,'iters', ...
 
 %% Local functions
 
+function repo_root = find_repo_root(start_dir)
+repo_root = start_dir;
+while true
+    if isfile(fullfile(repo_root,'setpath.m'))
+        return;
+    end
+
+    parent_dir = fileparts(repo_root);
+    if isempty(parent_dir) || strcmp(parent_dir,repo_root)
+        error('jul14_fig4b_two_sphere_convergence:repoRootNotFound', ...
+            'Could not find setpath.m starting from %s.',start_dir);
+    end
+    repo_root = parent_dir;
+end
+end
+
 function opt = configure_options(opt,gmres_tol,maxit,use_fmm,fmm_tol)
 opt.fmm = use_fmm;
-opt.eps = fmm_tol;
+opt.fmm_tol = fmm_tol;
 opt.lr = 0;
 opt.gmres_tol = gmres_tol;
 opt.gmres_verbose = 0;
@@ -317,9 +325,9 @@ end
 function name = method_latex_name(method_name)
 switch method_name
     case 'solve_mobility'
-        name = '\mathrm{standard}';
+        name = '\mathrm{rectangular}';
     case 'solve_mobility_with_DLP'
-        name = '\mathrm{DLP}';
+        name = '\mathrm{symmetrized}';
     otherwise
         name = strrep(method_name,'_','\_');
 end

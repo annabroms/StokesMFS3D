@@ -55,47 +55,25 @@ function res = matvecStokesMFS_DLP(mu, rin, rout, q, varargin)
 %
 %  Anna Broms, November 12, 2025, updated April 25, 2026
 
-if iscell(varargin{1})
-    % Backward-compatible unweighted call:
-    % (Uii, Yii, TGblock, nout, vars, resistance_flag, R, L)
-    Uii = varargin{1};
-    Yii = varargin{2};
-    TWGblock = varargin{3};
-    nout = varargin{4};
-    vars = varargin{5};
-    resistance_flag = varargin{6};
-    wout = [];
-    if numel(varargin) >= 7
-        R = varargin{7};
-    else
-        R = [];
-    end
-    if numel(varargin) >= 8
-        L = varargin{8};
-    else
-        L = [];
-    end
+
+wout = varargin{1};
+nout = varargin{2};
+Uii = varargin{3};
+Yii = varargin{4};
+TWGblock = varargin{5};
+vars = varargin{6};
+resistance_flag = varargin{7};
+if numel(varargin) >= 8
+    R = varargin{8};
 else
-    % Weighted call:
-    % (wout, nout, Uii, Yii, TWGblock, vars, resistance_flag, R, L)
-    wout = varargin{1};
-    nout = varargin{2};
-    Uii = varargin{3};
-    Yii = varargin{4};
-    TWGblock = varargin{5};
-    vars = varargin{6};
-    resistance_flag = varargin{7};
-    if numel(varargin) >= 8
-        R = varargin{8};
-    else
-        R = [];
-    end
-    if numel(varargin) >= 9
-        L = varargin{9};
-    else
-        L = [];
-    end
+    R = [];
 end
+if numel(varargin) >= 9
+    L = varargin{9};
+else
+    L = [];
+end
+
 
 P = size(q,1); %number of particles 
 N = vars.N; %points per particle on proxy surface
@@ -182,10 +160,10 @@ end
 %% Do one call to FMM (or direct evaluation) with all sources and targets
  %points
 if use_weighted_operator
-    res = apply_weighted_B_core(lambda_stokes,rin,rout,nout,wout,vars);
     if symmetrize_weighted
-        res_t = apply_weighted_BT_core(lambda_stokes,rin,rout,nout,wout,vars);
-        res = 0.5 * (res + res_t);
+        res = apply_sym_Amat(lambda_stokes,rin,rout,nout,wout,vars);
+    else
+        res = apply_Amat(lambda_stokes,rin,rout,nout,wout,vars);
     end
 else
     res_stokes = getStokesletFlow(lambda_stokes,rin,rout,vars);
@@ -226,24 +204,4 @@ end
 % end
 
 
-end
-
-function y = apply_node_weights(x,w)
-y = reshape(x,3,[]);
-y = y .* reshape(w(:).',1,[]);
-y = y(:);
-end
-
-function y = apply_weighted_B_core(x,rin,rout,nout,wout,vars)
-u = getStokesletFlow(x,rin,rout,vars);
-u = apply_node_weights(u,wout);
-y = getStressletFlow(rout,rin,nout,u,numel(wout),vars);
-end
-
-function y = apply_weighted_BT_core(x,rin,rout,nout,wout,vars)
-traction_vars = vars;
-traction_vars.fmm = 0;
-u = getTractionFast(x,rin,rout,nout,traction_vars);
-u = apply_node_weights(u,wout);
-y = getStokesletFlow(u,rout,rin,vars);
 end

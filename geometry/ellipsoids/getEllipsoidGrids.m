@@ -1,7 +1,7 @@
-function [rin, rout, qvec, R, E, w, n_out] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, qvec)
+function [rin, rout, qvec, R, E, w, n_out, n_in] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, qvec)
 %GETELLIPSOIDGRIDS Generate MFS source and collocation grids on multiple ellipsoids.
 %
-%   [rin, rout, qvec, R, E, w, n_out] = GETELLIPSOIDGRIDS(E0, P, delta, N1, N2, sep, R, qvec)
+%   [rin, rout, qvec, R, E, w, n_out, n_in] = GETELLIPSOIDGRIDS(E0, P, delta, N1, N2, sep, R, qvec)
 %
 %   Constructs source (proxy) points `rin` and collocation points `rout` on the
 %   boundaries of `P` ellipsoidal particles, with prescribed geometric and spatial
@@ -37,6 +37,8 @@ function [rin, rout, qvec, R, E, w, n_out] = getEllipsoidGrids(E0, P, delta, N1,
 %               stacking one copy of b_outer.w for each ellipsoid.
 %       n_out - PM x 3 array of collocation normals, stacked in the same
 %               order as rout.
+%       n_in  - PN x 3 array of inner proxy normals, stacked in the same
+%               order as rin.
 %
 %   NOTES:
 %       - The generated `rin` and `rout` can be used in MFS solvers for
@@ -90,6 +92,7 @@ rin = zeros(P*Nin,3);
 rout = zeros(P*Nout,3);
 w = repmat(w_i(:),P,1);
 n_out = zeros(P*Nout,3);
+n_in = zeros(P*Nin,3);
 
 for k = 1:P
     ii_in = (k-1)*Nin + (1:Nin);
@@ -100,7 +103,9 @@ for k = 1:P
     t_k = qvec(k,:)';
     y = b_inner.x-b_inner.nx*sep;
     y = t_k+R_k*y;
+    n_inner_k = R_k * b_inner.nx;
     rin(ii_in,:) = y';
+    n_in(ii_in,:) = n_inner_k';
     % 
     %% Create collocation points
 

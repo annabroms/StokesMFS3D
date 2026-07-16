@@ -1,0 +1,1 @@
+This folder contains an alternative mobility solver and its associated helper functions. This is based on a symmetrized MFS formulation that uses the Stokes double layer potential. See also the associated resistance solver. 

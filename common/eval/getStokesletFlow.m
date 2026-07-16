@@ -15,7 +15,7 @@ function res = getStokesletFlow(tau_stokes, rin, rout, vars)
 %       rout       : M x 3 matrix of target point locations where the velocity is evaluated.
 %       vars       : Struct containing optional settings:
 %                    - vars.fmm  : Logical. If true, use FMM3D for fast evaluation.
-%                    - vars.eps  : Precision parameter used by FMM3D.
+%                    - vars.fmm_tol : Precision parameter used by FMM3D.
 %
 %   OUTPUT:
 %       res        : 3M x 1 vector of fluid velocity at each target point, stacked
@@ -66,10 +66,10 @@ if vars.fmm
     srcinfo.stoklet = reshape(tau_stokes, 3, []); % Format: 3 x N
     
     targ = rout';                     % Transpose target: 3 x M
-    eps = vars.eps;                   % FMM precision (e.g., 1e-6)
+    fmm_tol = vars.fmm_tol;           % FMM precision (e.g., 1e-6)
     
     % Call FMM3D driver for Stokeslet potentials
-    U = stfmm3d(eps, srcinfo, ifppreg, targ, ifppregtarg); 
+    U = stfmm3d(fmm_tol, srcinfo, ifppreg, targ, ifppregtarg);
     
     % Extract and reshape velocity result
     res = U.pottarg(:); 
@@ -107,7 +107,7 @@ vars.fmm = 0;
 res_direct = getStokesletFlow(tau, rin, rout, vars);
 
 vars.fmm = 1;
-vars.eps = 1e-10;
+vars.fmm_tol = 1e-10;
 res_fmm = getStokesletFlow(tau, rin, rout, vars);
 
 rel_err = norm(res_fmm - res_direct) / norm(res_direct);
