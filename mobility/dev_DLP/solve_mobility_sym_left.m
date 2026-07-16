@@ -379,7 +379,7 @@ opt_dlp.inner_only = true;
 opt_dlp.symmetrize_weighted = false;
 opt_dlp.debug = 0; 
 [U_dlp,it_dlp,lambda_norm_dlp,err_dlp] = ...
-    solve_mobility_with_DLP(q,rvec_in,rvec_out,nout,wout,Fref,opt_dlp);
+    solve_mobility_with_DLP(q,rvec_in,rvec_out,nout,wout,Fref,[],opt_dlp);
 [U_std,it_std,lambda_norm_std,err_std] = ...
     solve_mobility(q,rvec_in,rvec_out,Fref,opt);
 

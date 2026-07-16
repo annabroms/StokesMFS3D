@@ -120,7 +120,8 @@ for id = 1:n_delta
             opt_dlp.inner_only = right_dlp_inner_only;
             t_start = tic;
             [U_dlp,it_dlp,ln_dlp,uerr_dlp] = ...
-                solve_mobility_with_DLP(q,rvec_in,rvec_out,nout,wout,Fref,opt_dlp);
+                solve_mobility_with_DLP( ...
+                    q,rvec_in,rvec_out,nout,wout,Fref,[],opt_dlp);
             t_dlp = toc(t_start);
 
             results.left.iters(im,id,ip) = it_left;

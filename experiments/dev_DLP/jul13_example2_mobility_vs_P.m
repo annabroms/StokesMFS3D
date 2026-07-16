@@ -184,7 +184,7 @@ for id = 1:n_delta
 
             t_start = tic;
             [U_dlp,it_dlp,ln_dlp,uerr_dlp] = solve_mobility_with_DLP( ...
-                q,rmob_in,rmob_out,nout,wout,Fvec,opt_dlp);
+                q,rmob_in,rmob_out,nout,wout,Fvec,[],opt_dlp);
             t_dlp = toc(t_start);
 
             results.mobility.iters(2,ir,id,ip) = it_dlp;

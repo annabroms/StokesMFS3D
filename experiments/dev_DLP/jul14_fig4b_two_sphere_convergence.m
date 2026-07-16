@@ -157,7 +157,7 @@ for id = 1:n_delta
 
         t_start = tic;
         [U_dlp,it_dlp,ln_dlp,uerr_dlp] = solve_mobility_with_DLP( ...
-            q,rvec_in,rvec_out,nout,wout,Fvec,opt_dlp);
+            q,rvec_in,rvec_out,nout,wout,Fvec,[],opt_dlp);
         t_dlp = toc(t_start);
 
         results.mobility.iters(2,id,in) = it_dlp;
