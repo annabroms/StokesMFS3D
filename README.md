@@ -15,10 +15,17 @@ This code demonstrates the basic algorithm using source points on proxy surfaces
 - Large scale suspensions of spheres or ellipsoidals simulated at low cost.
 - One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
 
-Prescribed-slip mobility problems are supported. On particle surface $\partial\Omega_i$, the generalized boundary conditions are
-$$
-\mathbf u(\mathbf x)=\mathbf v_i+\boldsymbol\omega_i\times(\mathbf x-\mathbf c_i)+\mathbf u_{\mathrm{slip},i}(\mathbf x).
-$$
+Prescribed-slip mobility problems are supported. On particle surface $\partial\Omega^{(i)}$, the generalized boundary condition is
+
+```math
+\mathbf{u}(\mathbf{x})
+=
+\mathbf{v}^{(i)}
++
+\boldsymbol{\omega}^{(i)} \times (\mathbf{x}-\mathbf{c}^{(i)})
++
+\mathbf{u}_{\mathrm{slip}}^{(i)}(\mathbf{x}).
+```
 Pass the physical slip velocities at the collocation points to `solve_mobility`, or `[]` for no slip.
 
 ## Dependencies
