@@ -10,12 +10,10 @@ This code demonstrates the basic algorithm using source points on proxy surfaces
 ## Features
 
 - **Resistance problem:** prescribe rigid-body velocities and compute forces and torques.
-- **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with surface slip.
-- Demonstrates the method using minimal input.
-- Large scale suspensions of spheres or ellipsoidals simulated at low cost.
-- One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
-
-Prescribed-slip mobility problems are supported. On particle surface $\partial\Omega^{(i)}$, the generalized boundary condition is
+- **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with prescribed surface slip.
+  * Large scale suspensions of spheres or ellipsoidals simulated at low cost.
+  * One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
+  *  On particle i, the generalized boundary condition is
 
 ```math
 \mathbf{u}(\mathbf{x})
@@ -26,7 +24,9 @@ Prescribed-slip mobility problems are supported. On particle surface $\partial\O
 +
 \mathbf{u}_{\mathrm{slip}}^{(i)}(\mathbf{x}).
 ```
-Pass the physical slip velocities at the collocation points to `solve_mobility`, or `[]` for no slip.
+
+
+  
 
 ## Dependencies
 
@@ -48,7 +48,7 @@ To use your own method for accelerated or direct evaluation of Stokeslets, just 
 Used for profiling and checks on memory usage.
 
 ## Example
-In the demo folder:
+In the demo folder, we demonstrate the method using minimal input:
 - Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
 - Run `demo_slip.m` for force- and torque-free spherical particles with prescribed surface slip.
 - Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.

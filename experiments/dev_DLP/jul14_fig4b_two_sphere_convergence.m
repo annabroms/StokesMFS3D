@@ -22,13 +22,32 @@ repo_root = find_repo_root(script_dir);
 run(fullfile(repo_root,'setpath.m'));
 
 %% Fig. 4b mobility configuration
-delta_vec = [0.1 0.2];
+% Set false to run: (a,delta) = (2,0.1),(2,0.2) with DLP only, and
+% (a,delta) = (1.2,1) with both solvers. Alternative results use a
+% different output file stem.
+run_original = false;
+
+method_names = {'solve_mobility','solve_mobility_with_DLP'};
+original_delta_vec = [0.1 0.2];
+
+if logical(run_original)
+    delta_vec = original_delta_vec;
+    a_glob_vec = 1.2 * ones(size(delta_vec));
+    run_method = true(numel(method_names),numel(delta_vec));
+    results_stem = 'jul14_fig4b_two_sphere_convergence';
+else
+    delta_vec = [original_delta_vec 1];
+    a_glob_vec = [2 * ones(size(original_delta_vec)) 1.2];
+    run_method = true(numel(method_names),numel(delta_vec));
+    run_method(1,1:numel(original_delta_vec)) = false; % a=2: DLP only.
+    results_stem = 'jul14_fig4b_two_sphere_convergence_alternative_settings';
+end
+
 N_request_vec = 100:200:1900;
 N_ref_request = 3529;
 %N_ref_request = 100;
 
 Rp = 0.6;
-a_glob = 1.2;
 P = 2;
 
 % Mobility analogue of the translation boundary condition in Fig. 4b:
@@ -40,13 +59,14 @@ Fvec(7) = 1;
 gmres_tol = 1e-10;
 maxit = 600;
 use_fmm = false;
+fmm_tol = 1e-12;
 
 dlp_inner_only = false;
 dlp_symmetrize_weighted = false;
 dlp_add_rank1 = false;
 dlp_outer_force = true; %change here!
 
-method_names = {'solve_mobility','solve_mobility_with_DLP'};
+results_file = fullfile(repo_root,'experiments',[results_stem '.mat']);
 
 %% Storage
 n_method = numel(method_names);
@@ -58,13 +78,21 @@ results.created = '2026-07-14';
 results.description = ['Two-sphere Fig. 4b mobility analogue: ', ...
     'solve_mobility vs solve_mobility_with_DLP.'];
 results.delta_vec = delta_vec;
+results.a_glob_vec = a_glob_vec;
 results.N_request_vec = N_request_vec;
 results.N_ref_request = N_ref_request;
 results.Rp = Rp;
-results.a_glob = a_glob;
+if all(a_glob_vec == a_glob_vec(1))
+    results.a_glob = a_glob_vec(1);
+else
+    results.a_glob = a_glob_vec;
+end
 results.P = P;
 results.Fvec = Fvec;
 results.method_names = method_names;
+results.run_original = run_original;
+results.run_method = run_method;
+results.results_file = results_file;
 results.reference_method = 'solve_mobility';
 results.gmres_tol = gmres_tol;
 results.maxit = maxit;
@@ -96,20 +124,23 @@ results.mobility.coeff_count = nan(n_method,n_delta,n_N);
 results.mobility.gmres_unknown_count = nan(n_method,n_delta,n_N);
 
 fprintf('Jul 14 Fig. 4b two-sphere mobility comparison\n');
+fprintf('  run_original = %d\n',run_original);
 fprintf('  delta = [%s]\n',num2str(delta_vec));
+fprintf('  a_glob = [%s]\n',num2str(a_glob_vec));
 fprintf('  N request = [%s]\n',num2str(N_request_vec));
 fprintf('  N reference request = %d\n',N_ref_request);
-fprintf('  Rp = %.3g, a_glob = %.3g\n',Rp,a_glob);
+fprintf('  Rp = %.3g\n',Rp);
 fprintf('  gmres_tol = %.1e, maxit = %d\n\n',gmres_tol,maxit);
 
-fprintf('%8s %6s %6s | %8s %10s %10s %10s | %8s %10s %10s %10s\n', ...
-    'delta','N','M', ...
+fprintf('%8s %8s %6s %6s | %8s %10s %10s %10s | %8s %10s %10s %10s\n', ...
+    'delta','a','N','M', ...
     'it std','uerr std','Uerr std','|lam| std', ...
     'it DLP','uerr DLP','Uerr DLP','|lam| DLP');
 
 %% Main sweep
 for id = 1:n_delta
     delta = delta_vec(id);
+    a_glob = a_glob_vec(id);
     q = [0 0 0; 2 + delta 0 0];
 
     [rref_in,rref_out,opt_ref] = init_spheres(q,Rp,N_ref_request,a_glob);
@@ -141,41 +172,54 @@ for id = 1:n_delta
         results.actual.N(id,in) = N_actual;
         results.actual.M(id,in) = M_actual;
 
-        t_start = tic;
-        [U_std,it_std,ln_std,uerr_std] = solve_mobility( ...
-            q,rvec_in,rvec_out,Fvec,[],opt);
-        t_std = toc(t_start);
+        it_std = nan;
+        uerr_std = nan;
+        Uerr_std = nan;
+        ln_std = nan;
+        if run_method(1,id)
+            t_start = tic;
+            [U_std,it_std,ln_std,uerr_std] = solve_mobility( ...
+                q,rvec_in,rvec_out,Fvec,[],opt);
+            t_std = toc(t_start);
 
-        results.mobility.iters(1,id,in) = it_std;
-        results.mobility.uerr(1,id,in) = uerr_std;
-        results.mobility.Uerr(1,id,in) = relerr_inf(U_std,Uref);
-        results.mobility.lambda_norm(1,id,in) = ln_std;
-        results.mobility.solve_time(1,id,in) = t_std;
-        results.mobility.coeff_count(1,id,in) = 3*N_actual*P;
-        results.mobility.gmres_unknown_count(1,id,in) = 3*M_actual*P;
+            Uerr_std = relerr_inf(U_std,Uref);
+            results.mobility.iters(1,id,in) = it_std;
+            results.mobility.uerr(1,id,in) = uerr_std;
+            results.mobility.Uerr(1,id,in) = Uerr_std;
+            results.mobility.lambda_norm(1,id,in) = ln_std;
+            results.mobility.solve_time(1,id,in) = t_std;
+            results.mobility.coeff_count(1,id,in) = 3*N_actual*P;
+            results.mobility.gmres_unknown_count(1,id,in) = 3*M_actual*P;
+        end
 
         opt_dlp = configure_dlp_options(opt, ...
             dlp_inner_only,dlp_symmetrize_weighted,dlp_add_rank1,dlp_outer_force);
 
-        t_start = tic;
-        [U_dlp,it_dlp,ln_dlp,uerr_dlp] = solve_mobility_with_DLP( ...
-            q,rvec_in,rvec_out,nout,wout,Fvec,[],opt_dlp);
-        t_dlp = toc(t_start);
+        it_dlp = nan;
+        uerr_dlp = nan;
+        Uerr_dlp = nan;
+        ln_dlp = nan;
+        if run_method(2,id)
+            t_start = tic;
+            [U_dlp,it_dlp,ln_dlp,uerr_dlp] = solve_mobility_with_DLP( ...
+                q,rvec_in,rvec_out,nout,wout,Fvec,[],opt_dlp);
+            t_dlp = toc(t_start);
 
-        results.mobility.iters(2,id,in) = it_dlp;
-        results.mobility.uerr(2,id,in) = uerr_dlp;
-        results.mobility.Uerr(2,id,in) = relerr_inf(U_dlp,Uref);
-        results.mobility.lambda_norm(2,id,in) = ln_dlp;
-        results.mobility.solve_time(2,id,in) = t_dlp;
-        results.mobility.coeff_count(2,id,in) = 3*N_actual*P;
-        results.mobility.gmres_unknown_count(2,id,in) = 3*N_actual*P;
+            Uerr_dlp = relerr_inf(U_dlp,Uref);
+            results.mobility.iters(2,id,in) = it_dlp;
+            results.mobility.uerr(2,id,in) = uerr_dlp;
+            results.mobility.Uerr(2,id,in) = Uerr_dlp;
+            results.mobility.lambda_norm(2,id,in) = ln_dlp;
+            results.mobility.solve_time(2,id,in) = t_dlp;
+            results.mobility.coeff_count(2,id,in) = 3*N_actual*P;
+            results.mobility.gmres_unknown_count(2,id,in) = 3*N_actual*P;
+        end
 
-        fprintf('%8.3g %6d %6d | %8d %10.3e %10.3e %10.3e | %8d %10.3e %10.3e %10.3e\n', ...
-            delta,N_actual,M_actual, ...
-            it_std,uerr_std,results.mobility.Uerr(1,id,in),ln_std, ...
-            it_dlp,uerr_dlp,results.mobility.Uerr(2,id,in),ln_dlp);
+        fprintf('%8.3g %8.3g %6d %6d | %8.0f %10.3e %10.3e %10.3e | %8.0f %10.3e %10.3e %10.3e\n', ...
+            delta,a_glob,N_actual,M_actual, ...
+            it_std,uerr_std,Uerr_std,ln_std, ...
+            it_dlp,uerr_dlp,Uerr_dlp,ln_dlp);
 
-        results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_convergence.mat');
         save(results_file,'results');
     end
 end
@@ -185,8 +229,12 @@ end
 %results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
 %figure('Name','Fig. 4b mobility analogue: residual and velocity error');
 %results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
-results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_07.mat');
-load(results_file);
+if logical(run_original)
+    plot_results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_07.mat');
+else
+    plot_results_file = results_file;
+end
+load(plot_results_file);
 
 plot_fig4b_metric(results,'uerr', ...
     '$\epsilon_{\mathrm{res}}^{\max}$', ...
@@ -270,10 +318,15 @@ end
 
 function plot_fig4b_metric_panel(results,metric_field,y_label,use_log)
 delta_vec = results.delta_vec;
+a_glob_vec = get_result_a_glob_vec(results);
 N_actual = results.actual.N;
 method_names = results.method_names;
 metric_data = results.mobility.(metric_field);
-colors = [0.85 0.10 0.10; 0.00 0.45 0.74];
+if numel(delta_vec) <= 2
+    colors = [0.85 0.10 0.10; 0.00 0.45 0.74];
+else
+    colors = lines(numel(delta_vec));
+end
 line_styles = {'-','--'};
 markers = {'o','s'};
 
@@ -290,15 +343,19 @@ for id = 1:numel(delta_vec)
         else
             marker_face_color = 'none';
         end
+        y = squeeze(metric_data(im,id,:));
+        if all(isnan(y))
+            continue;
+        end
 
-        plot(x,squeeze(metric_data(im,id,:)), ...
+        plot(x,y, ...
             line_style, ...
             'Color',color, ...
             'Marker',marker, ...
             'MarkerFaceColor',marker_face_color, ...
             'MarkerEdgeColor',color, ...
-            'DisplayName',sprintf('$%s,\\ \\delta = %.3g$', ...
-                method_latex_name(method_names{im}),delta_vec(id)));
+            'DisplayName',curve_latex_name( ...
+                method_names{im},delta_vec(id),a_glob_vec(id)));
     end
 end
 
@@ -322,6 +379,28 @@ set(ax,'XTick',sqrt(tick_N));
 set(ax,'XTickLabel',compose('$%d$',tick_N));
 set(ax,'TickLabelInterpreter','latex');
 xlim(ax,sqrt([min(N_request_vec), max(N_request_vec)]));
+end
+
+function a_glob_vec = get_result_a_glob_vec(results)
+if isfield(results,'a_glob_vec')
+    a_glob_vec = results.a_glob_vec;
+elseif isfield(results,'a_glob') && isscalar(results.a_glob)
+    a_glob_vec = results.a_glob * ones(size(results.delta_vec));
+elseif isfield(results,'a_glob')
+    a_glob_vec = results.a_glob;
+else
+    a_glob_vec = nan(size(results.delta_vec));
+end
+end
+
+function name = curve_latex_name(method_name,delta,a_glob)
+if isnan(a_glob)
+    name = sprintf('$%s,\\ \\delta = %.3g$', ...
+        method_latex_name(method_name),delta);
+else
+    name = sprintf('$%s,\\ a = %.3g,\\ \\delta = %.3g$', ...
+        method_latex_name(method_name),a_glob,delta);
+end
 end
 
 function name = method_latex_name(method_name)

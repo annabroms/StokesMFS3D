@@ -504,7 +504,7 @@ function test_solve
 rng(5); %reproducable
 
 P = 2; %number of bodies
-delta = 0.1; %smallest particle particle distance 
+delta = 1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
 
@@ -551,8 +551,8 @@ opt.gmres_tol = 1e-12; %does this matter for the accuracy?
 opt.inner_only = 0; % use the weighted inner-grid one-body preconditioner
 opt.debug = 0; 
 opt.add_rank1 = 0; 
-opt.outer_force = true;
-opt.tol = 1e-10;
+opt.outer_force = false;
+opt.tol = 1e-13;
 opt.fmm_tol = 1e-8; %set in relation to the GMRES tol
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
     q,rvec_in,rvec_out,nout,wout,Fref,[],opt);
