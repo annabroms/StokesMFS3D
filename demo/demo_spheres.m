@@ -53,10 +53,12 @@ Fref = rand(6*P,1);
 [rvec_in,rvec_out,opt] = init_spheres(q);
 opt.fmm = fmm;
 opt.lr = 1;
+opt.plot = 1; 
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt); 
 Rp = 1-1.05*(1-opt.Rp);
 [rvec_in,rvec_out,opt] = init_spheres(q,Rp);
-[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt); 
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility( ...
+    q,rvec_in,rvec_out,Fvec,[],opt);
 
 %might want to change proxy radius a little to get fair 2-way error, when solving resistance followed by mobility. 
 % Use Rp as extra argument to solve_mobility (see commented code below)
@@ -67,7 +69,6 @@ disp('Residual in mobility problem')
 err_mob
 disp('Residual in resistance problem')
 err_res
-
 
 
 

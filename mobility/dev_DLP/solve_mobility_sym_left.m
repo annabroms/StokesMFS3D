@@ -381,7 +381,7 @@ opt_dlp.debug = 0;
 [U_dlp,it_dlp,lambda_norm_dlp,err_dlp] = ...
     solve_mobility_with_DLP(q,rvec_in,rvec_out,nout,wout,Fref,[],opt_dlp);
 [U_std,it_std,lambda_norm_std,err_std] = ...
-    solve_mobility(q,rvec_in,rvec_out,Fref,opt);
+    solve_mobility(q,rvec_in,rvec_out,Fref,[],opt);
 
 rel_left_dlp = norm(U_left-U_dlp,inf) / max(norm(U_dlp,inf),eps);
 rel_left_std = norm(U_left-U_std,inf) / max(norm(U_std,inf),eps);

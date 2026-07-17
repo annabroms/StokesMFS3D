@@ -23,12 +23,18 @@ function [U, iters, lambda_norm, uerr, lambda] = solve_mobility_with_DLP(q,rvec_
 %       Fvec      - 6P × 1 vector of applied forces and torques, format: [F1; T1; F2; T2; ...].
 %       u_slip    - Slip contribution. If opt.transform_slip is true,
 %                   u_slip is an (M*P)-by-3 physical slip velocity on
-%                   rvec_out, which is mapped to -T*W*u_slip. If false,
-%                   u_slip is an already transformed and signed 3*N*P
-%                   proxy-grid right-hand-side vector and is used directly.
+%                   rvec_out, which is mapped to +T*W*u_slip. If false,
+%                   u_slip is an already transformed 3*N*P proxy-grid
+%                   right-hand-side contribution and is used directly.
 %                   Use [] for zero slip.
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
 %                   opt.transform_slip defaults to true.
+%                   A reusable one-body cache may be supplied as
+%                   opt.precond. If it contains Y, UU, LL, Kin, Sblock,
+%                   and TWSblock (plus Fmap when opt.outer_force=true),
+%                   both dense self-block construction and factorization
+%                   are skipped. TSblock is accepted as a legacy alias for
+%                   TWSblock.
 %       R         - P x 1 cell array of rotation matrices for the P
 %                   particles 
 %       E0        - 1 × 3 vector of semiaxes [a, b, c] of the ellipsoidal particles.
@@ -179,7 +185,7 @@ elseif opt.transform_slip
     weighted_slip = apply_quad_weights(u_slip_vec,wout);
     opt_slip = opt;
     opt_slip.fmm_tol = opt.fmm_tol * 1e-2;
-    slip_rhs = -getStressletFlow( ...
+    slip_rhs = getStressletFlow( ...
         rvec_out,rvec_in,nout,weighted_slip,M*P,opt_slip);
 else
     if ~isnumeric(u_slip) || ~isreal(u_slip) || ~isvector(u_slip) || ...
@@ -202,76 +208,96 @@ if opt.add_rank1
     opt.nin = nin;
 end
 
-if opt.ellipsoid
-    rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
-    rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
-else
-    rin_block = rvec_in(1:N,:);
-    rout_block = rvec_out(1:M,:);
-end
-
-nin_body = [];
-if opt.add_rank1
-    nin_body = nin(1:N,:);
-    if opt.ellipsoid
-        nin_body = (R{1}' * nin_body')';
-    end
-end
-
-% Prepare self-correction block needed in block-diagonal right precond
-opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
-n_self = nout(1:M,:);
-if opt.ellipsoid
-    n_self = (R{1}' * n_self')';
-end
-Tself = stokes_DLP_mat(rout_block,rin_block,n_self);
-
-Wself = diag(repelem(wout(1:M),3));
-opt.TWSblock = Tself * Wself * opt.Sblock;
-if opt.symmetrize_weighted
-    opt.TWSblock = 0.5 * (opt.TWSblock + opt.TWSblock');
-end
-if opt.add_rank1
-    opt.TWSblock = opt.TWSblock + normal_rank1_block(nin_body,opt.rank1_scale);
-end
-
 %Create pseudoinverse of self-interaction matrix (or use precomputed, which 
 % saves computational time in any dynamic setting)
-if isfield(opt,'precond') && ~isempty(opt.precond)
+has_precond = isfield(opt,'precond') && ~isempty(opt.precond);
+complete_precond = has_precond && ...
+    is_complete_preconditioner(opt.precond,opt.outer_force);
+
+if complete_precond
     Y = opt.precond.Y;
     UU = opt.precond.UU;
     LL = opt.precond.LL;
     Kin = opt.precond.Kin;
-    if opt.outer_force
-        if isfield(opt.precond,'Fmap')
-            Fmap_body = opt.precond.Fmap;
-        elseif isfield(opt.precond,'Kforce')
-            Fmap_body = opt.precond.Kforce;
-        else
-            error('solve_mobility_with_DLP:missingPrecondForceMap', ...
-                'opt.outer_force=true with opt.precond requires precond.Fmap.');
-        end
-    else
-        Fmap_body = Kin;
-    end
-    if isfield(opt.precond,'Sblock')
-        opt.Sblock = opt.precond.Sblock;
-    end
-    if isfield(opt.precond,'TSblock')
-        opt.TWSblock = opt.precond.TSblock;
-    end
+    Fmap_body = select_preconditioner_force_map( ...
+        opt.precond,opt.outer_force,Kin);
+    opt.Sblock = opt.precond.Sblock;
     if isfield(opt.precond,'TWSblock')
         opt.TWSblock = opt.precond.TWSblock;
-    end
-else
-    opt_precond = opt;
-    if opt.ellipsoid
-        n_precond = (R{1}' * nout(1:M,:)')';
-        [Y,UU,LL,Kin,~,Fmap_body] = oneBodyPrecondMobDLP( ...
-            rin_block,rout_block,opt_precond,[0 0 0],wout(1:M),n_precond,nin_body);
     else
-        [Y,UU,LL,Kin,~,Fmap_body] = oneBodyPrecondMobDLP(rvec_in(1:N,:),...
-            rvec_out(1:M,:),opt_precond,q(1,:),wout(1:M),nout(1:M,:),nin_body);
+        opt.TWSblock = opt.precond.TSblock;
+    end
+    validate_complete_preconditioner( ...
+        Y,UU,LL,Kin,Fmap_body,opt.Sblock,opt.TWSblock,N,M);
+else
+    if opt.ellipsoid
+        rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
+        rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
+    else
+        rin_block = rvec_in(1:N,:);
+        rout_block = rvec_out(1:M,:);
+    end
+
+    nin_body = [];
+    if opt.add_rank1
+        nin_body = nin(1:N,:);
+        if opt.ellipsoid
+            nin_body = (R{1}' * nin_body')';
+        end
+    end
+
+    % Prepare self-correction blocks needed by the right preconditioner.
+    opt.Sblock = stokes_SLP_mat(rin_block,rout_block);
+    n_self = nout(1:M,:);
+    if opt.ellipsoid
+        n_self = (R{1}' * n_self')';
+    end
+    Tself = stokes_DLP_mat(rout_block,rin_block,n_self);
+    Wself = diag(repelem(wout(1:M),3));
+    opt.TWSblock = Tself * Wself * opt.Sblock;
+    if opt.symmetrize_weighted
+        opt.TWSblock = 0.5 * (opt.TWSblock + opt.TWSblock');
+    end
+    if opt.add_rank1
+        opt.TWSblock = opt.TWSblock + ...
+            normal_rank1_block(nin_body,opt.rank1_scale);
+    end
+
+    if has_precond
+        required = {'Y','UU','LL','Kin'};
+        for k = 1:numel(required)
+            if ~isfield(opt.precond,required{k})
+                error('solve_mobility_with_DLP:incompletePreconditioner', ...
+                    'opt.precond is missing required field %s.',required{k});
+            end
+        end
+        Y = opt.precond.Y;
+        UU = opt.precond.UU;
+        LL = opt.precond.LL;
+        Kin = opt.precond.Kin;
+        Fmap_body = select_preconditioner_force_map( ...
+            opt.precond,opt.outer_force,Kin);
+        if isfield(opt.precond,'Sblock')
+            opt.Sblock = opt.precond.Sblock;
+        end
+        if isfield(opt.precond,'TSblock')
+            opt.TWSblock = opt.precond.TSblock;
+        end
+        if isfield(opt.precond,'TWSblock')
+            opt.TWSblock = opt.precond.TWSblock;
+        end
+    else
+        opt_precond = opt;
+        if opt.ellipsoid
+            n_precond = (R{1}' * nout(1:M,:)')';
+            [Y,UU,LL,Kin,~,Fmap_body] = oneBodyPrecondMobDLP( ...
+                rin_block,rout_block,opt_precond,[0 0 0], ...
+                wout(1:M),n_precond,nin_body);
+        else
+            [Y,UU,LL,Kin,~,Fmap_body] = oneBodyPrecondMobDLP( ...
+                rvec_in(1:N,:),rvec_out(1:M,:),opt_precond,q(1,:), ...
+                wout(1:M),nout(1:M,:),nin_body);
+        end
     end
 end
 
@@ -353,11 +379,7 @@ for i = 1:P
     else
         lambda_i = Y*(UU*x_gmres((i-1)*3*N+1:i*3*N));
         if opt.outer_force
-            inds_n = N*(i-1)+1:N*i;
-            inds_m = M*(i-1)+1:M*i;
-            Fmap_i = getDLPForceMap( ...
-                rvec_in(inds_n,:),rvec_out(inds_m,:),nout(inds_m,:),wout(inds_m),q(i,:),opt);
-            U(6*(i-1)+1:6*i) = -Fmap_i' * lambda_i;
+            U(6*(i-1)+1:6*i) = -Fmap_body' * lambda_i;
         else
             U(6*(i-1)+1:6*i) = -Kin' * lambda_i;
         end
@@ -429,25 +451,73 @@ end
 
 end
 
+function tf = is_complete_preconditioner(precond,outer_force)
+required = {'Y','UU','LL','Kin','Sblock'};
+tf = all(isfield(precond,required)) && ...
+    (isfield(precond,'TWSblock') || isfield(precond,'TSblock'));
+if outer_force
+    tf = tf && (isfield(precond,'Fmap') || isfield(precond,'Kforce'));
+end
+end
+
+function Fmap = select_preconditioner_force_map(precond,outer_force,Kin)
+if ~outer_force
+    Fmap = Kin;
+elseif isfield(precond,'Fmap')
+    Fmap = precond.Fmap;
+elseif isfield(precond,'Kforce')
+    Fmap = precond.Kforce;
+else
+    error('solve_mobility_with_DLP:missingPrecondForceMap', ...
+        'opt.outer_force=true with opt.precond requires precond.Fmap.');
+end
+end
+
+function validate_complete_preconditioner( ...
+        Y,UU,LL,Kin,Fmap,Sblock,TWSblock,N,M)
+if size(Y,1) ~= 3*N || size(UU,2) ~= 3*N || ...
+        size(Y,2) ~= size(UU,1)
+    error('solve_mobility_with_DLP:badPreconditionerFactors', ...
+        'precond.Y and precond.UU have incompatible dimensions for N=%d.',N);
+end
+if ~isequal(size(LL),[3*N,3*N]) || ...
+        ~isequal(size(Kin),[3*N,6]) || ...
+        ~isequal(size(Fmap),[3*N,6])
+    error('solve_mobility_with_DLP:badPreconditionerMaps', ...
+        'precond.LL, Kin, and Fmap have incompatible dimensions for N=%d.',N);
+end
+if ~isequal(size(Sblock),[3*M,3*N]) || ...
+        ~isequal(size(TWSblock),[3*N,3*N])
+    error('solve_mobility_with_DLP:badPreconditionerBlocks', ...
+        ['precond.Sblock and precond.TWSblock have incompatible ', ...
+         'dimensions for N=%d and M=%d.'],N,M);
+end
+arrays = {Y,UU,LL,Kin,Fmap,Sblock,TWSblock};
+if any(cellfun(@(x) ~isnumeric(x) || ~isreal(x),arrays))
+    error('solve_mobility_with_DLP:badPreconditionerType', ...
+        'Every complete preconditioner field must be numeric and real.');
+end
+end
+
 
 function test_solve
 rng(5); %reproducable
 
-P = 20; %number of bodies
-delta = 2; %smallest particle particle distance 
+P = 2; %number of bodies
+delta = 0.1; %smallest particle particle distance 
 %q = [0 0 0; 2+delta 0 0]; %center coordiante matrix for P particles, x,y,z: size P x 3
 %q = [0 0 0]; 
 
 %random configurations
 [q,~] = grow_cluster(P,delta); %Every particle has at least one neigbour at distance delta
-  
-fmm = 1; %only activate if many particles (say, more than 40)
+q = [0 0 0; 2+delta 0 0];
+fmm = 0; %only activate if many particles (say, more than 40)
 
 %% Solve mobility problem (given forces/torques)
 Fref = rand(6*P,1); 
-% Fref = zeros(12,1);
-% Fref(1) = 1; 
-% Fref(7) = 1; 
+Fref = zeros(12,1);
+Fref(1) = 1; 
+Fref(7) = 1; 
 
 %Test first with very low resolution
 Rp = 0.30;
@@ -463,7 +533,8 @@ a = 1.2;
 
 %Rp = 0.68; %proxy radius
 Rp = 0.63;
-N = 700; % approximate number of proxy sources on every particle
+Rp = 0.7; 
+N = 800; % approximate number of proxy sources on every particle
 %Rp = 0.6;
 %Rp = 0.6;
 %N = 1500;
@@ -476,15 +547,17 @@ nout = nout ./ vecnorm(nout,2,2);
 wout = (4*pi/M) * ones(P*M,1);
 opt.fmm = fmm;
 opt.lr = 0; % no long range precond for the standard method, to make it more comparable to the DLP version.
-opt.gmres_tol = 1e-7; %does this matter for the accuracy? 
+opt.gmres_tol = 1e-12; %does this matter for the accuracy? 
 opt.inner_only = 0; % use the weighted inner-grid one-body preconditioner
 opt.debug = 0; 
 opt.add_rank1 = 0; 
-opt.outer_force = false;
+opt.outer_force = true;
+opt.tol = 1e-10;
 opt.fmm_tol = 1e-8; %set in relation to the GMRES tol
 [Uvec,it_mob,lambda_norm_mob,err_mob] = solve_mobility_with_DLP( ...
     q,rvec_in,rvec_out,nout,wout,Fref,[],opt);
-[Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility(q,rvec_in,rvec_out,Fref, opt);
+[Uvec2,it_mob2,lambda_norm_mob2,err_mob2] = solve_mobility( ...
+    q,rvec_in,rvec_out,Fref,[],opt);
 rel_err = norm(Uvec-Uvec2,inf)/norm(Uvec2,inf);
 
 fprintf('\nTest summary (solve_mobility_with_DLP)\n');

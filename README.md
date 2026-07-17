@@ -1,7 +1,7 @@
 
 # StokesMFS3D
 
-StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving the **Stokes resistance** and **mobility problems** for spherical or ellipsoidal rigid bodies.
+StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies.
 
 This code demonstrates the basic algorithm using source points on proxy surfaces only. 
 
@@ -9,16 +9,24 @@ This code demonstrates the basic algorithm using source points on proxy surfaces
 
 ## Features
 
+- **Resistance problem:** prescribe rigid-body velocities and compute forces and torques.
+- **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with surface slip.
 - Demonstrates the method using minimal input.
 - Large scale suspensions of spheres or ellipsoidals simulated at low cost.
 - One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
+
+Prescribed-slip mobility problems are supported. On particle surface $\partial\Omega_i$, the generalized boundary conditions are
+$$
+\mathbf u(\mathbf x)=\mathbf v_i+\boldsymbol\omega_i\times(\mathbf x-\mathbf c_i)+\mathbf u_{\mathrm{slip},i}(\mathbf x).
+$$
+Pass the physical slip velocities at the collocation points to `solve_mobility`, or `[]` for no slip.
 
 ## Dependencies
 
 To run simulations, ensure the following dependencies are available:
 
 - **[FMM3D](https://github.com/flatironinstitute/FMM3D)**  
-  Recommended for accelerating calculations with many particles (typically >40 with default settings)
+  Recommended for accelerating calculations with many particles (typically >70 with default settings)
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for direct evaluation of fundamental solutions.  
@@ -35,6 +43,7 @@ Used for profiling and checks on memory usage.
 ## Example
 In the demo folder:
 - Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
+- Run `demo_slip.m` for force- and torque-free spherical particles with prescribed surface slip.
 - Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.
 
 Several functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
@@ -58,4 +67,3 @@ Planned additions include:
 - A symmetrized version of the MFS solver to enable Brownian motion (in progress, see dev_DLP folders)
 
 ![Clustered particles](cluster.png)
-

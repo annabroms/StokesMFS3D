@@ -97,7 +97,7 @@ for id = 1:n_delta
 
         t_start = tic;
         [U_std,it_std,ln_std,uerr_std] = ...
-            solve_mobility(q,rvec_in,rvec_out,Fref,opt);
+            solve_mobility(q,rvec_in,rvec_out,Fref,[],opt);
         t_std = toc(t_start);
 
         results.standard.iters(id,ip) = it_std;

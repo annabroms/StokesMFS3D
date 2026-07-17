@@ -116,7 +116,8 @@ for id = 1:n_delta
     opt_ref = configure_options(opt_ref,gmres_tol,maxit,use_fmm,fmm_tol);
 
     t_start = tic;
-    [Uref,it_ref,ln_ref,uerr_ref] = solve_mobility(q,rref_in,rref_out,Fvec,opt_ref);
+    [Uref,it_ref,ln_ref,uerr_ref] = solve_mobility( ...
+        q,rref_in,rref_out,Fvec,[],opt_ref);
     t_ref = toc(t_start);
 
     results.reference.N_actual(id) = size(rref_in,1)/P;
@@ -141,7 +142,8 @@ for id = 1:n_delta
         results.actual.M(id,in) = M_actual;
 
         t_start = tic;
-        [U_std,it_std,ln_std,uerr_std] = solve_mobility(q,rvec_in,rvec_out,Fvec,opt);
+        [U_std,it_std,ln_std,uerr_std] = solve_mobility( ...
+            q,rvec_in,rvec_out,Fvec,[],opt);
         t_std = toc(t_start);
 
         results.mobility.iters(1,id,in) = it_std;

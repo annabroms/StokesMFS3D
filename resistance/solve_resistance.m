@@ -300,7 +300,8 @@ opt.lr = 0;
 opt.gmres_tol = 1e-10;
 opt.plot = 1; 
 
-[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fref, opt);
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility( ...
+    q,rvec_in,rvec_out,Fref,[],opt);
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,U, opt);
 
 rel_err = norm(Fvec-Fref,inf)/norm(Fref,inf);

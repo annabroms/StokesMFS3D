@@ -158,7 +158,7 @@ for id = 1:n_delta
             if ~results.completed(1,id,in,ir)
                 t_start = tic;
                 [U_std,it_std,ln_std,uerr_std] = solve_mobility( ...
-                    q,rvec_in,rvec_out,Fvec,opt);
+                    q,rvec_in,rvec_out,Fvec,[],opt);
                 t_std = toc(t_start);
 
                 results.U(:,1,id,in,ir) = U_std;

@@ -24,6 +24,7 @@ opt.fmm = 0;
 opt.maxit = 200; %max number of gmres iterations
 opt.gmres_tol = 1e-7;
 opt.plot = 0; %visualise?
+opt.debug = 0; % determine system matrix to look at eigenvalues?
 
 %% Discretize one body
 % Inner proxy surface, outer collocation grid for single sphere using spherical design nodes

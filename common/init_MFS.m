@@ -15,7 +15,7 @@ opt.maxit = 400;  %max number of GMRES iterations
 opt.gmres_tol = 1e-7; %GMRES tol
 
 opt.profile = 0; %activate profiling
-
+opt.debug = 0; % determine system matrix?
 
 opt.remove_last = 0; %remove last singular value in SVD?
 opt.image = 0; %default not to use images
@@ -28,7 +28,7 @@ opt.ellipsoid = 0; %spheres if false
 opt.add_rank1 = false; % add inner-normal rank-one perturbation to DLP/SLP operators
 opt.rank1_scale = 1; % coefficient for the normal rank-one perturbation
 opt.outer_force = false; % use T*W*Kout instead of Kin for DLP force/torque maps
-opt.transform_slip = true; % map physical surface slip to the proxy-grid RHS as -T*W*u_slip
+opt.transform_slip = true; % map physical surface slip to the proxy-grid RHS as +T*W*u_slip
 
 opt.get_traction = 0; 
 opt.a_glob = 1.2; %M (number of collocation point) > N (number of sources on proxy surface)

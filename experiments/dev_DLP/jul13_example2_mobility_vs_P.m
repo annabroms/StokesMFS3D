@@ -165,7 +165,8 @@ for id = 1:n_delta
             results.actual.M_mob(ir,id,ip) = M_mob;
 
             t_start = tic;
-            [U_std,it_std,ln_std,uerr_std] = solve_mobility(q,rmob_in,rmob_out,Fvec,opt_mob);
+            [U_std,it_std,ln_std,uerr_std] = solve_mobility( ...
+                q,rmob_in,rmob_out,Fvec,[],opt_mob);
             t_std = toc(t_start);
 
             results.mobility.iters(1,ir,id,ip) = it_std;
@@ -211,6 +212,7 @@ end
 close all;
 results_file = fullfile(repo_root,'data','jul13_example2_mobility_dlp_resolution_compare_results.mat');
 %results_file = fullfile(repo_root,'experiments','jul13_example2_mobility_dlp_resolution_compare_results.mat');
+results_file = fullfile(repo_root,'data','jul13_example2_mobility_vs_P_results_full_run.mat');
 load(results_file,'results');
 
 P_vec = results.P_vec;

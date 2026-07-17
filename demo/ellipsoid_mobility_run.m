@@ -159,12 +159,14 @@ if solve_res
     [Fvec, iter_r, lambda_norm_r, uerr_r] = solve_resistance(q,rin,rout,Uref, opt,R,E0);
     [rin,rout,~,~] = getEllipsoidGrids(E0,P,delta,0.75*Nv,Nv,sep*1.05,R,qvec); %avoid "inverse crimes"
     opt.gmres_tol = 1e-7;
-    [Uvec, iter_m, lambda_norm, uerr] = solve_mobility(q,rin,rout,Fvec, opt,R,E0);
+    [Uvec, iter_m, lambda_norm, uerr] = solve_mobility( ...
+        q,rin,rout,Fvec,[],opt,R,E0);
     fprintf("Two way error: %1.2e, resistance residual %1.2e, mobility residual %1.2e\n",...
         norm(Uref-Uvec,inf)/norm(Uref,inf),uerr_r,uerr)
 else
     %only solve the mobility problem
-    [Uvec, iter_m, lambda_norm, uerr] = solve_mobility(q,rin,rout,Fvec, opt,R,E0);
+    [Uvec, iter_m, lambda_norm, uerr] = solve_mobility( ...
+        q,rin,rout,Fvec,[],opt,R,E0);
 end
 
 
@@ -246,6 +248,5 @@ function show_basic_test()
     save_name = '';
     ellipsoid_mobility_run(P,delta,Nv,visualise,solve_res,read_name,save_name)
 end
-
 
 

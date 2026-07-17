@@ -1,7 +1,8 @@
-function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec, opt,R,E0)
+function [U, iters, lambda_norm, uerr, lambda] = solve_mobility(q,rvec_in,rvec_out,Fvec,u_slip,opt,R,E0)
 %SOLVE_MOBILITY Solve a Stokes mobility problem for a configuration of ellipsoidal particles using MFS.
 %
-%   [U, iters, lambda_norm, uerr] = SOLVE_MOBILITY(q, rvec_in, rvec_out, Fvec, opt, R, E0)
+%   [U, iters, lambda_norm, uerr, lambda] = SOLVE_MOBILITY( ...
+%       q, rvec_in, rvec_out, Fvec, u_slip, opt, R, E0)
 %
 %   Given the forces and torques applied to each particle, the function computes the resulting translational and rotational
 %   velocities.
@@ -11,7 +12,15 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %       rvec_in   - (N*P) × 3 array of proxy source points (stacked by particle).
 %       rvec_out  - (M*P) × 3 array of collocation points on particle surfaces (stacked by particle).
 %       Fvec      - 6P × 1 vector of applied forces and torques, format: [F1; T1; F2; T2; ...].
+%       u_slip    - (M*P) × 3 physical slip velocity on rvec_out.
+%                   The rows follow rvec_out and vectorize as
+%                   [ux1; uy1; uz1; ux2; ...]. Use [] for zero slip.
+%                   It enters the boundary condition as
+%                   u_MFS = K*U + u_slip.
 %       opt       - Struct containing solver options (e.g., gmres tolerance, fmm flag).
+%                   opt.compute_residual defaults to true. It must be
+%                   false for nonzero slip because the internal check grid
+%                   has no corresponding prescribed slip values.
 %       R         - P x 1 cell array of rotation matrices for the P
 %                   particles 
 %       E0        - 1 × 3 vector of semiaxes [a, b, c] of the ellipsoidal particles.
@@ -20,7 +29,13 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 %       U           - 6P × 1 vector of resulting rigid body velocities: [u1; omega1; u2; omega2; ...].
 %       iters       - Number of GMRES iterations until convergence.
 %       lambda_norm - Infinity norm of the final density vector (for diagnostic use).
-%       uerr        - Maximum relative residual of the velocity field on the surface.
+%       uerr        - Maximum relative residual of the velocity field on
+%                     the surface for zero-slip problems. NaN when
+%                     opt.compute_residual is false.
+%       lambda      - 3*N*P total physical Stokeslet source vector used
+%                     for flow evaluation, including the projected GMRES
+%                     source and completion source. The layout is
+%                     [lambda_x1; lambda_y1; lambda_z1; lambda_x2; ...].
 %
 %   METHOD OVERVIEW:
 %       - Builds MFS representation from proxy and collocation surfaces.
@@ -44,11 +59,15 @@ function [U, iters, lambda_norm, uerr] = solve_mobility(q,rvec_in,rvec_out,Fvec,
 if nargin==0, test_solve; 
     return; end
 
-
 if nargin < 6
+    error(['solve_mobility requires q, rvec_in, rvec_out, Fvec, ', ...
+        'u_slip, and opt.']);
+end
+
+if nargin < 7
     R = eye(3);
     E0 = [1 1 1];
-elseif nargin < 7
+elseif nargin < 8
     E0 = [1 1 1];
 end
 
@@ -56,6 +75,9 @@ P = size(q,1);
 
 if ~isfield(opt,'gmres_verbose')
     opt.gmres_verbose = 1;
+end
+if ~isfield(opt,'compute_residual')
+    opt.compute_residual = true;
 end
 
 
@@ -65,6 +87,22 @@ M = size(rvec_out,1)/P; %numer of collocation points per particle
 
 opt.N = N;
 opt.M = M;
+
+has_slip = ~isempty(u_slip);
+if has_slip
+    if ~isnumeric(u_slip) || ~isreal(u_slip) || ...
+            ~isequal(size(u_slip),[M*P,3]) || ...
+            ~all(isfinite(u_slip(:)))
+        error('solve_mobility:badPhysicalSlip', ...
+            'u_slip must be a finite real (M*P)-by-3 array on rvec_out.');
+    end
+    if opt.compute_residual
+        error('solve_mobility:slipResidualUnsupported', ...
+            ['Set opt.compute_residual=false for nonzero slip; ', ...
+             'the internal check grid has no corresponding slip data.']);
+    end
+    u_slip_vec = reshape(u_slip.',[],1);
+end
 
 if opt.ellipsoid
     rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
@@ -90,7 +128,7 @@ UUii{1} = UU;
 
 %% Assemble completion source, given force and torque
 
-lambda_vec = []; 
+lambda_vec = zeros(3*N*P,1);
 
 for k = 1:P
 
@@ -101,19 +139,22 @@ for k = 1:P
     if opt.ellipsoid
         Rk = R{k};
         lambda_k = getCompletionSource(Rk'*F,Rk'*T,Kin);
-        lambda_vec = [lambda_vec; rotate_vector(lambda_k,Rk)];
+        lambda_k = rotate_vector(lambda_k,Rk);
     else
         lambda_k = getCompletionSource(F,T,Kin);
-        lambda_vec = [lambda_vec; lambda_k];
     end
 
-    
- 
+    lambda_vec(3*N*(k-1)+1:3*N*k) = lambda_k;
 end
 
 %% Get flow field due to completion source.
 uvec = getStokesletFlow(lambda_vec,rvec_in,rvec_out,opt); 
 uvec = -uvec;
+
+% Preserve the physical boundary convention u_MFS = K*U + u_slip.
+if has_slip
+    uvec = uvec + u_slip_vec;
+end
 
 %% Debug to check matrix
 if opt.debug
@@ -155,7 +196,28 @@ for i = 1:P
 end
 lambda_norm = norm(lambda_gmres,inf);
 
+needs_total_source = nargout >= 5 || opt.compute_residual || opt.plot;
+if needs_total_source
+    lambda = zeros(3*N*P,1);
+    if ~opt.ellipsoid
+        ImLL = eye(3*N) - LL;
+    end
+    for i = 1:P
+        rows_n = 3*N*(i-1)+1:3*N*i;
+        if opt.ellipsoid
+            projected_i = lambda_gmres(rows_n) - ...
+                rotate_vector( ...
+                    LL*rotate_vector(lambda_gmres(rows_n),R{i}'),R{i});
+        else
+            projected_i = ImLL * lambda_gmres(rows_n);
+        end
+        lambda(rows_n) = projected_i + lambda_vec(rows_n);
+    end
+else
+    lambda = [];
+end
 
+if opt.compute_residual
 %% Check residual
 % Get new nodes for evaluating velocity residuals
 % Set up a baseline ellipsoid at the origin, axis-aligne
@@ -191,28 +253,21 @@ for k = 1:P
     ucheck((k-1)*3*n_check+1:3*k*n_check) = Kcheck*U((k-1)*6+1:k*6);   
 end
 
-for i =1:P  
-    if opt.ellipsoid
-        densityK_particle = lambda_gmres(3*(i-1)*N+1:i*3*N)-...  %better
-            rotate_vector(LL*rotate_vector(lambda_gmres(3*(i-1)*N+1:i*3*N),R{i}'),R{i})+lambda_vec(3*(i-1)*N+1:i*3*N);
-    else
-        densityK_particle = (eye(3*N)-LL)*lambda_gmres(3*(i-1)*N+1:i*3*N)+lambda_vec(3*(i-1)*N+1:i*3*N);
-    end
-    densityK(3*(i-1)*N+1:i*3*N) = densityK_particle;
-end
-
 %get flow and compare RHS and LHS of representation
-ubdry_check = getStokesletFlow(densityK,rvec_in,rcheck,opt);
+ubdry_check = getStokesletFlow(lambda,rvec_in,rcheck,opt);
 uerr_vec = vecnorm(reshape(ucheck-ubdry_check,3,[]),2,1)/max(vecnorm(reshape(ucheck,3,[]),2,1));
 uerr = max(uerr_vec);
+else
+    uerr = NaN;
+end
 
 %% Optional visualization: color by surface velocity and traction magnitudes
 if opt.plot
-    ubdry_surf = getStokesletFlow(densityK, rvec_in, rvec_out, opt);
+    ubdry_surf = getStokesletFlow(lambda, rvec_in, rvec_out, opt);
     umag = vecnorm(reshape(ubdry_surf,3,[]),2,1).';
     nvec = rvec_out - kron(q, ones(M,1));
     nvec = nvec ./ vecnorm(nvec,2,2);
-    traction = getTractionFast(densityK, rvec_in, rvec_out, nvec, opt);
+    traction = getTractionFast(lambda, rvec_in, rvec_out, nvec, opt);
     tmag = vecnorm(reshape(traction,3,[]),2,1).';
 
     plot_surface_scalar(rvec_out, M, P, umag, ...
@@ -246,7 +301,7 @@ opt.plot = 1;
 opt.debug = 0; 
 
 [Fvec,it_res,lambda_norm_res,err_res] = solve_resistance(q,rvec_in,rvec_out,Uref, opt);
-[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec, opt);
+[U,it_mob,lambda_norm_mob,err_mob]  = solve_mobility(q,rvec_in,rvec_out,Fvec,[],opt);
 
 rel_err = norm(U-Uref,inf)/norm(Uref,inf);
 
