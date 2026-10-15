@@ -1,7 +1,9 @@
 function coefficients = applyOneBodyPinv(boundaryData, factors)
-%APPLYONEBODYPINV Apply the retained local SVD in stable factor order.
-% First take U_r'*boundaryData, then divide by sigma_r, then apply V_r.
-% Column scales are undone last, giving physical [alpha;gamma].
+%APPLYONEBODYPINV Apply the retained one-body pseudoinverse factors.
+% Maps one body's scaled boundary-data block to physical [alpha;gamma]
+% coefficients: project onto retained left singular vectors, divide by
+% their singular values, apply the right singular vectors, then undo any
+% column scaling used when the factors were computed.
 
 if nargin == 0
     self_test();

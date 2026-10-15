@@ -1,12 +1,13 @@
 function Ainteraction = drop_interaction_block( ...
     otherInnerSources, targetPoints, targetNormals, ...
     tangentOne, tangentTwo, targetViscosity)
-%DROP_INTERACTION_BLOCK Recompleted target-from-other-drop MFS block.
-% Columns are the other drop's [alpha;gamma], three components per node.
-% Rows are target-drop [continuity(3M); normal velocity(M);
-% tangent traction(2M, interleaved)]. With the shared incident field,
-% continuity and all gamma columns vanish. The remaining rows are
-% N*G*P and (1-targetViscosity)*D*T*P, respectively.
+%DROP_INTERACTION_BLOCK Map one other drop's coefficients to target rows.
+% Columns are [alpha;gamma] for the source drop; rows are the target's
+% velocity-continuity, normal-velocity, and paired tangential-traction
+% residuals. The incident field is shared by the two sides of the target's
+% velocity jump, so continuity rows vanish. Only the force-free exterior
+% alpha strength acts across drops; gamma columns also vanish. The remaining
+% rows are its normal velocity and viscosity-contrast-weighted traction.
 
 if nargin == 0
     self_test();
@@ -47,7 +48,6 @@ Ainteraction = [zeros(3*targetCount,6*sourceCount); ...
     normalRows, zeros(targetCount,3*sourceCount); ...
     (1-targetViscosity)*tangentRows, ...
         zeros(2*targetCount,3*sourceCount)];
-assert(isequal(size(Ainteraction),[6*targetCount,6*sourceCount]));
 end
 
 function self_test()

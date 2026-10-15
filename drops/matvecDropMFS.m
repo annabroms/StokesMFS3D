@@ -1,8 +1,11 @@
 function response = matvecDropMFS(boundaryData, innerSources, ...
     surfacePoints, normals, factors, opt)
-%MATVECDROPMFS Apply the identity-diagonal one-body regularized system.
-% For each body z_i=A_ii^+ eta_i; only j~=i interactions are evaluated.
-% Thus H_ii=I rather than the rank-deficient projector A_ii*A_ii^+.
+%MATVECDROPMFS Apply the coupled, preconditioned boundary-data operator.
+% Each body block is mapped through its retained one-body pseudoinverse;
+% the recovered exterior strengths are projected to zero net force, then
+% used to evaluate interactions from other drops. The result is the input
+% boundary data plus those off-diagonal contributions, giving an identity
+% diagonal instead of the rank-deficient local range projector.
 
 if nargin == 0
     self_test();

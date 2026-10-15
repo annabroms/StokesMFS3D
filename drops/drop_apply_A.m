@@ -1,8 +1,11 @@
 function response = drop_apply_A(coefficients, innerSources, ...
     surfacePoints, normals, factors, opt)
-%DROP_APPLY_A Apply the row-scaled original recompleted global operator.
-% Local dense self blocks are cached; only cross-body interactions are
-% evaluated directly. Coefficients are body-major [alpha_i;gamma_i].
+%DROP_APPLY_A Apply the row-scaled physical coefficient operator.
+% Maps body-major [alpha_i;gamma_i] coefficients to continuity,
+% normal-velocity, and tangential-traction residuals. Cached one-body
+% matrices supply the diagonal blocks; direct cross-drop sums supply the
+% off-diagonal blocks. This is the original operator, not the identity-
+% diagonal boundary-data operator applied by matvecDropMFS.
 
 if nargin == 0
     self_test();

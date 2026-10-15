@@ -1,7 +1,8 @@
 % OCT14_2026_SINGLE_DROP_MFS  Dense, force-free MFS experiment for one drop.
 % Run this script to solve the representative case first, then the sweep.
-% The model is the fixed spherical interface in MFS_drops-1.pdf. The normal
-% points from the drop into the exterior fluid, whose viscosity is one.
+% The model is a fixed spherical two-fluid interface with a prescribed
+% tangential traction jump. The normal points from the drop into the
+% exterior fluid, whose viscosity is one.
 % All vectors use [x1;y1;z1;x2;y2;z2;...] nodal ordering.
 
 %% Parameters to change

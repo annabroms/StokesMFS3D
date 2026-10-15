@@ -1,10 +1,13 @@
 function factors = oneBodyPrecondDrop(innerSources, outerSources, ...
     surfacePoints, normals, viscosity, completionScale, velocityScale, ...
     tractionScale, tractionRowWeight, svdTolerance, scaleColumns)
-%ONEBODYPRECONDDROP Factor a row-scaled recompleted one-drop block.
-% The block maps [alpha(3N);gamma(3N)] to [continuity(3M);
-% normal velocity(M);tangential traction(2M)]. The retained factors
-% represent the pseudoinverse of the scaled block without forming it.
+%ONEBODYPRECONDDROP Factor the row-scaled one-drop boundary matrix.
+% The 6M-by-6N block maps [alpha;gamma] to continuity, normal-velocity,
+% and tangential-traction residuals. Velocity rows are divided by
+% velocityScale; traction rows are multiplied by
+% tractionRowWeight/tractionScale. Optional column scaling precedes the
+% economy SVD. Factors retain sigma > svdTolerance*sigma_max and are used
+% by applyOneBodyPinv to apply the local pseudoinverse stably.
 
 if nargin == 0
     self_test();

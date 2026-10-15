@@ -18,10 +18,10 @@ function velocityXZ = drop_plane_velocity(pointsXZ, interiorBody, ...
 % OUTPUT
 %   velocityXZ     Q-by-2 physical lab-frame velocity components [u_x,u_z].
 %
-% FIELD FORMULAS (MFS_drops-1.pdf, equations 14-15)
-%   Exterior: u_0 = sum_j S(inner_j)*lambda_j.
-%   In drop i: u_i = S(outer_i)*gamma_i/mu_i +
-%                    sum_{j~=i} S(inner_j)*lambda_j.
+% FIELD FORMULAS
+%   Exterior: sum_j S(inner_j)*lambda_j.
+%   In drop i: S(outer_i)*gamma_i/mu_i plus the incident exterior fields
+%              from all other drops.
 % A streamline in the global frame may cross interfaces. This function
 % chooses the appropriate formula anew at every ode45 evaluation point.
 

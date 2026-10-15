@@ -1,16 +1,16 @@
 function [A, tangentOne, tangentTwo] = drop_recompleted_matrix( ...
     innerSources, outerSources, surfacePoints, normals, ...
     interiorViscosity, completionScale)
-%DROP_RECOMPLETED_MATRIX Dense single-drop block from the supplied model.
-% Columns are [alpha(3N); gamma(3N)], interleaved by source node.
-% Rows are [velocity continuity(3M); normal velocity(M);
-%           tangential traction direction one(M), direction two(M),
-%           interleaved by surface node(2M)].
-%
-% lambda=P*alpha has zero summed force exactly; U=-completionScale*K'*alpha.
-% The normal row therefore contains +completionScale*B*K'. The interior
-% velocity block carries 1/interiorViscosity, while neither traction block
-% does. Both tractions use the same normal pointing out of the drop.
+%DROP_RECOMPLETED_MATRIX Assemble one drop's dense boundary-condition block.
+% A is 6M-by-6N, with columns [alpha; gamma]. Each source node stores
+% [x;y;z]. Rows are 3M velocity-continuity components, M normal-velocity
+% residuals, then two tangential-traction residuals per surface node.
+% alpha is projected to the force-free exterior strength
+% lambda=(I-K*K'/N)*alpha, K=kron(ones(N,1),eye(3)); its removed mean
+% determines U=-completionScale*K'*alpha. The normal row includes the
+% residual contribution from this translation. gamma generates the
+% interior field; its velocity is divided by interiorViscosity. Traction
+% uses the outward normal and is not divided by viscosity here.
 
 if nargin == 0
     self_test();
@@ -61,7 +61,6 @@ A = [forceFreeVelocity, -E; ...
      normalExtraction*forceFreeVelocity + translationColumns, ...
          zeros(targetCount, 3*sourceCount); ...
      tangentExtraction*forceFreeTraction, -tangentExtraction*Q];
-assert(isequal(size(A), [6*targetCount, 6*sourceCount]));
 end
 
 function self_test()

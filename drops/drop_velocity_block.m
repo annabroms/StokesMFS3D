@@ -17,7 +17,8 @@ validateattributes(viscosity, {'numeric'}, ...
     {'real','finite','scalar','positive'}, mfilename, 'viscosity');
 
 G = stokes_SLP_mat(sources, targets) / viscosity;
-assert(all(isfinite(G), 'all'), 'A source coincides with a target.');
+assert(all(isfinite(G), 'all'), ...
+    'Velocity block is nonfinite; check source-target distances and scaling.');
 end
 
 function self_test()

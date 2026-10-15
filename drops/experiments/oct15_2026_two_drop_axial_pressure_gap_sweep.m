@@ -12,7 +12,7 @@ dropRadius = 1;
 innerProxyRadius = 0.6;
 outerProxyRadius = 2;
 S1 = 2;                           % same active-stress strength on both drops
-interiorViscosity = 2;            % ratio to exterior viscosity mu_0 = 1
+interiorViscosity = 10;            % ratio to exterior viscosity mu_0 = 1
 activeDirection = [1 0 0];       % same e_i, along the centre-to-centre axis
 gapList = [1 0.5 0.2 0.1 0.05 0.02 0.01 0.001];
 representativeGap = 0.01;
@@ -270,13 +270,13 @@ if view_solution
     if maximumPressure > 0
         clim([-maximumPressure maximumPressure]);
     end
-    colourHalf = 128;
-    blueToWhite = [linspace(0.12,1,colourHalf).', ...
-        linspace(0.30,1,colourHalf).',ones(colourHalf,1)];
-    whiteToRed = [ones(colourHalf,1), ...
-        linspace(1,0.20,colourHalf).', ...
-        linspace(1,0.12,colourHalf).'];
-    colormap([blueToWhite;whiteToRed]);
+    % A gray zero distinguishes near-zero exterior pressure from the white
+    % masked drop interiors; blue and red retain the pressure sign.
+    colourPositions = linspace(0,1,257).';
+    pressureColours = interp1([0 0.5 1], ...
+        [0.10 0.27 0.60;0.70 0.70 0.70;0.65 0.07 0.12], ...
+        colourPositions);
+    colormap(pressureColours);
     pressureColourbar = colorbar;
     pressureColourbar.Label.String = '$p_0$';
     pressureColourbar.Label.Interpreter = 'latex';

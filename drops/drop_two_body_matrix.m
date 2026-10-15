@@ -1,10 +1,13 @@
 function [A,tangentOne,tangentTwo] = drop_two_body_matrix( ...
     innerSources,outerSources,surfacePoints,normals, ...
     interiorViscosity,completionScale)
-%DROP_TWO_BODY_MATRIX Assemble the full dense, recompleted two-drop matrix.
-% Inputs are 1-by-2 cells, one point array per drop. Body 1 rows and
-% [alpha_1;gamma_1] columns precede body 2. Each body row has continuity,
-% normal velocity, and two tangent traction components in that order.
+%DROP_TWO_BODY_MATRIX Assemble the dense two-drop reference matrix.
+% Each geometry input is a two-cell array, one entry per drop. Rows and
+% columns are body-major: body 1 precedes body 2. Each body's 6M rows are
+% velocity continuity (3M), normal velocity (M), and two tangential
+% traction values per surface node (2M). Its 6N columns are [alpha;gamma].
+% Off-diagonal blocks contain only incident normal-velocity and
+% viscosity-contrast-weighted tangential-traction terms.
 
 if nargin == 0
     self_test();
@@ -32,8 +35,6 @@ interactionTwoFromOne = drop_interaction_block( ...
     innerSources{1},surfacePoints{2},normals{2}, ...
     tangentOne{2},tangentTwo{2},interiorViscosity);
 A = [selfOne,interactionOneFromTwo;interactionTwoFromOne,selfTwo];
-assert(isequal(size(A),[6*sum(cellfun(@(x) size(x,1),surfacePoints)), ...
-    6*sum(cellfun(@(x) size(x,1),innerSources))]));
 end
 
 function self_test()
