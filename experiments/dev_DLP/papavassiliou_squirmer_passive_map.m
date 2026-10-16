@@ -10,26 +10,33 @@ function [mode_map,info] = papavassiliou_squirmer_passive_map(h,a,series_opts)
 %
 %   The particle centres and positive-axis convention are
 %
-%       c^(1) = -(1 + H/2) e_z,   c^(2) = (1 + H/2) e_z.
+%       c^(1) = -(1 + H/2) e_z,   c^(2) = (1 + H/2) e_z,
+%       p = -e_z.
 %
-%   Particle 1 is the squirmer, particle 2 is passive, and positive
-%   velocity points from particle 1 toward particle 2. MODE_MAP is 2-by-2
-%   and is ordered so that
+%   Particle 1 is passive, particle 2 is the squirmer, and positive
+%   velocity along p points from particle 2 toward particle 1. MODE_MAP is
+%   2-by-2. For compatibility with the analytical mode convention, its
+%   output is ordered by physical role rather than particle index:
 %
 %       [V_sq; V_ps] = MODE_MAP * [B1; B2].
 %
-%   Here B1 and B2 are the tangential squirming coefficients in equations
-%   (4.2) and (B3)--(B4) of Papavassiliou and Alexander,
+%   The internal symbols xi1>0 and xi2<0 retain the analytical surface
+%   labels used to evaluate the series. In public particle order,
+%   INFO.geometry.particle_xi = [xi2,xi1].
+%
+%   Here B1 and B2 are the tangential squirming coefficients in section
+%   4.2 and equations (B3)--(B4) of Papavassiliou and Alexander,
 %   "Exact solutions for hydrodynamic interactions of two squirming
 %   spheres", J. Fluid Mech. 813 (2017), 618--646. For alpha=0 their
-%   physical surface-distortion velocity on particle 1 is
+%   physical surface-distortion velocity on particle 2, expressed in the
+%   reflected geometry above, is
 %
-%       u_s = [B1 + B2 (e_z dot n)] sin(theta) e_theta.
+%       u_s = [B1 + B2 (p dot n)] sin(theta) e_theta.
 %
 %   The physical slip array passed to solve_mobility_with_DLP is therefore
 %
 %       u_slip = u_s
-%              = -[B1 + B2 (e_z dot n)] (I - n*n.') e_z,
+%              = -[B1 + B2 (p dot n)] (I - n*n.') p,
 %
 %   and the repository boundary condition is
 %
@@ -55,13 +62,17 @@ function [mode_map,info] = papavassiliou_squirmer_passive_map(h,a,series_opts)
 %   reached first.
 %
 %   INFO contains:
-%       geometry             H, A, xi1, xi2, R, and the two centres
+%       geometry             H, A, analytical xi1 and xi2, particle_xi,
+%                            R, the two centres, roles, and swimming axis
 %       series_opts          validated adaptive-series options
 %       terms                number of retained terms
 %       converged            true on successful return
 %       tail_estimate        largest normalized final term
-%       resistance_matrix    force map for the two conjugate translations
-%       reciprocal_rhs       Appendix-B integrals for unit B1 and unit B2
+%       resistance_matrix    force map in analytical [squirmer,passive]
+%                            role ordering
+%       reciprocal_rhs       Appendix-B integrals in analytical
+%                            [squirmer,passive] role ordering for unit
+%                            B1 and unit B2
 %       reciprocity_defect   relative symmetry defect of the resistance
 %       condition_number     2-norm condition number of the resistance
 %
@@ -212,6 +223,10 @@ end
 info = struct();
 info.geometry = struct( ...
     'h',h,'a',a,'xi1',xi1,'xi2',xi2,'R',R,'centres',centres);
+info.geometry.particle_xi = [xi2 xi1];
+info.geometry.particle_roles = {'passive','squirmer'};
+info.geometry.swimming_axis = [0 0 -1];
+info.velocity_order = {'squirmer','passive'};
 info.series_opts = series_opts;
 info.terms = ell;
 info.converged = converged;

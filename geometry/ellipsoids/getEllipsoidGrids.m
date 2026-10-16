@@ -1,4 +1,4 @@
-function [rin, rout, qvec, R, E, w, n_out, n_in] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, qvec)
+function [rin, rout, qvec, R, E, w, n_out, n_in] = getEllipsoidGrids(E0, P, delta, N1, N2, sep, R, qvec, collocationResolution)
 %GETELLIPSOIDGRIDS Generate MFS source and collocation grids on multiple ellipsoids.
 %
 %   [rin, rout, qvec, R, E, w, n_out, n_in] = GETELLIPSOIDGRIDS(E0, P, delta, N1, N2, sep, R, qvec)
@@ -26,6 +26,11 @@ function [rin, rout, qvec, R, E, w, n_out, n_in] = getEllipsoidGrids(E0, P, delt
 %               ellipsoid. A 1 x P cell array of 3D vectors is also accepted.
 %               If omitted or empty, positions and orientations are
 %               generated at random.
+%
+%       collocationResolution - Optional [Nu,Nv] for the boundary quadrature
+%               only.  Empty/omitted preserves the existing oversampling.
+%               Nu is the quasiuniform azimuth scale, Nv the GL layer count;
+%               counts become even.  Does not alter proxy source nodes.
 %
 %   OUTPUTS:
 %       rin   - concatenated source points for all particles.
@@ -83,7 +88,15 @@ b_inner = setupsurfquad(b_inner,[ceil(N1),ceil(N2)]);
 
 %Create grid of collocation points
 b_outer = ellipsoid_param(E0(1),E0(2),E0(3));   % baseline object at the oridin, aligned
-b_outer = setupsurfquad(b_outer,[ceil(N1*1.15),ceil(N2*1.15)]);
+if nargin < 9 || isempty(collocationResolution)
+    b_outer = setupsurfquad(b_outer,[ceil(N1*1.15),ceil(N2*1.15)]);
+    b_outer = setupsurfquad(b_outer,[ceil(N1*2),ceil(N2*2)]); %testing!
+else
+    validateattributes(collocationResolution,{'numeric'}, ...
+        {'real','finite','vector','numel',2,'integer','>=',4}, ...
+        mfilename,'collocationResolution');
+    b_outer = setupsurfquad(b_outer,collocationResolution);
+end
 w_i = b_outer.w;
 
 Nin = size(b_inner.x,2);

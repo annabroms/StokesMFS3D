@@ -93,7 +93,7 @@ Pi_plus = Vi*diag(dsqrt_plus);
 PPplus = @(x) apply_block_diag(x, Pi_plus, P, Rprecond);
 
 vars.fmm = fmm;
-vars.eps = 1e-10;
+vars.fmm_tol = 1e-10;
 Cfun = @(x) getPrecondTG(x,P,rvec_in,rvec_out,n_out,w,Pi,vars,Rprecond);
 
 dW_hist = randn(ndof,nruns);

@@ -26,6 +26,7 @@ run(fullfile(repo_root,'setpath.m'));
 % (a,delta) = (1.2,1) with both solvers. Alternative results use a
 % different output file stem.
 run_original = false;
+plot_all = true;
 
 method_names = {'solve_mobility','solve_mobility_with_DLP'};
 original_delta_vec = [0.1 0.2];
@@ -64,7 +65,7 @@ fmm_tol = 1e-12;
 dlp_inner_only = false;
 dlp_symmetrize_weighted = false;
 dlp_add_rank1 = false;
-dlp_outer_force = true; %change here!
+dlp_outer_force = false; %change here!
 
 results_file = fullfile(repo_root,'experiments',[results_stem '.mat']);
 
@@ -229,26 +230,31 @@ end
 %results_file = fullfile(repo_root,'experiments','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
 %figure('Name','Fig. 4b mobility analogue: residual and velocity error');
 %results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_mobility_dlp_compare_results.mat');
-if logical(run_original)
-    plot_results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_07.mat');
-else
-    plot_results_file = results_file;
-end
-load(plot_results_file);
+original_plot_results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_07.mat');
+alternative_plot_results_file = fullfile(repo_root,'data','jul14_fig4b_two_sphere_convergence_alternative_settings2.mat');
 
-plot_fig4b_metric(results,'uerr', ...
+if logical(plot_all)
+    plot_results_files = {original_plot_results_file, alternative_plot_results_file};
+elseif logical(run_original)
+    plot_results_files = {original_plot_results_file};
+else
+    plot_results_files = {alternative_plot_results_file};
+end
+plot_results = load_results_files(plot_results_files);
+
+plot_fig4b_metric(plot_results,'uerr', ...
     '$\epsilon_{\mathrm{res}}^{\max}$', ...
     'Mobility residual comparison',true);
 
-plot_fig4b_metric(results,'Uerr', ...
+plot_fig4b_metric(plot_results,'Uerr', ...
     '$\epsilon_U$', ...
     'Mobility velocity error comparison',true);
 
-plot_fig4b_metric(results,'lambda_norm', ...
+plot_fig4b_metric(plot_results,'lambda_norm', ...
     '$\|\lambda\|_\infty$', ...
     'Mobility coefficient norm comparison',true);
 
-plot_fig4b_metric(results,'iters', ...
+plot_fig4b_metric(plot_results,'iters', ...
     '$n_{\mathrm{GMRES}}$', ...
     'Mobility GMRES iteration comparison',false);
 
@@ -307,6 +313,18 @@ else
 end
 end
 
+function result_sets = load_results_files(result_files)
+if ischar(result_files) || isstring(result_files)
+    result_files = cellstr(result_files);
+end
+
+result_sets = cell(size(result_files));
+for i = 1:numel(result_files)
+    loaded = load(result_files{i},'results');
+    result_sets{i} = loaded.results;
+end
+end
+
 function plot_fig4b_metric(results,metric_field,y_label,figure_name,use_log)
 if nargin < 5
     use_log = true;
@@ -317,45 +335,70 @@ title(figure_name,'Interpreter','latex');
 end
 
 function plot_fig4b_metric_panel(results,metric_field,y_label,use_log)
-delta_vec = results.delta_vec;
-a_glob_vec = get_result_a_glob_vec(results);
-N_actual = results.actual.N;
-method_names = results.method_names;
-metric_data = results.mobility.(metric_field);
-if numel(delta_vec) <= 2
+if ~iscell(results)
+    results = {results};
+end
+
+delta_values = get_all_delta_values(results);
+a_glob_values = get_all_a_glob_values(results);
+if numel(delta_values) <= 2
     colors = [0.85 0.10 0.10; 0.00 0.45 0.74];
 else
-    colors = lines(numel(delta_vec));
+    colors = lines(numel(delta_values));
 end
-line_styles = {'-','--'};
+line_styles = {'-','--',':','-.'};
 markers = {'o','s'};
 
 hold on;
-for id = 1:numel(delta_vec)
-    x = sqrt(N_actual(id,:));
-    color = colors(min(id,size(colors,1)),:);
+plot_all_results = numel(results) > 1;
+for idelta = 1:numel(delta_values)
+    color = colors(min(idelta,size(colors,1)),:);
 
-    for im = 1:numel(method_names)
-        marker = markers{min(im,numel(markers))};
-        line_style = line_styles{min(im,numel(line_styles))};
-        if im == 1
-            marker_face_color = color;
-        else
-            marker_face_color = 'none';
-        end
-        y = squeeze(metric_data(im,id,:));
-        if all(isnan(y))
-            continue;
-        end
+    for ia = 1:numel(a_glob_values)
+        line_style = line_styles{min(ia,numel(line_styles))};
 
-        plot(x,y, ...
-            line_style, ...
-            'Color',color, ...
-            'Marker',marker, ...
-            'MarkerFaceColor',marker_face_color, ...
-            'MarkerEdgeColor',color, ...
-            'DisplayName',curve_latex_name( ...
-                method_names{im},delta_vec(id),a_glob_vec(id)));
+        for ir = 1:numel(results)
+            result_i = results{ir};
+            delta_vec = result_i.delta_vec;
+            a_glob_vec = get_result_a_glob_vec(result_i);
+            N_actual = result_i.actual.N;
+            method_names = result_i.method_names;
+            metric_data = result_i.mobility.(metric_field);
+
+            for id = 1:numel(delta_vec)
+                if ~scalar_values_match(delta_vec(id),delta_values(idelta)) || ...
+                        ~scalar_values_match(a_glob_vec(id),a_glob_values(ia))
+                    continue;
+                end
+                if should_skip_curve(metric_field,plot_all_results,delta_vec(id))
+                    continue;
+                end
+
+                x = sqrt(N_actual(id,:));
+
+                for im = 1:numel(method_names)
+                    marker = markers{min(im,numel(markers))};
+                    if im == 1
+                        marker_face_color = color;
+                    else
+                        marker_face_color = 'none';
+                    end
+                    y = squeeze(metric_data(im,id,:));
+                    if all(isnan(y))
+                        continue;
+                    end
+
+                    plot(x,y, ...
+                        line_style, ...
+                        'Color',color, ...
+                        'Marker',marker, ...
+                        'MarkerFaceColor',marker_face_color, ...
+                        'MarkerEdgeColor',color, ...
+                        'DisplayName',curve_latex_name( ...
+                            method_names{im},delta_vec(id),a_glob_vec(id)));
+                end
+            end
+        end
     end
 end
 
@@ -368,8 +411,44 @@ if use_log
 end
 xlabel('$N$','Interpreter','latex');
 ylabel(y_label,'Interpreter','latex');
-set_sqrtN_ticks(ax,results.N_request_vec);
+set_sqrtN_ticks(ax,get_plot_N_request_vec(results));
 legend(ax,'Location','southwest','Interpreter','latex');
+end
+
+function delta_values = get_all_delta_values(results)
+delta_values = [];
+for i = 1:numel(results)
+    delta_values = [delta_values results{i}.delta_vec(:).']; %#ok<AGROW>
+end
+delta_values = unique(delta_values);
+end
+
+function a_glob_values = get_all_a_glob_values(results)
+a_glob_values = [];
+for i = 1:numel(results)
+    a_glob_values = [a_glob_values get_result_a_glob_vec(results{i})]; %#ok<AGROW>
+end
+a_glob_values = unique(a_glob_values);
+end
+
+function tf = scalar_values_match(a,b)
+if isnan(a) || isnan(b)
+    tf = isnan(a) && isnan(b);
+else
+    tf = abs(a - b) <= 1e-12 * max([1 abs(a) abs(b)]);
+end
+end
+
+function tf = should_skip_curve(metric_field,plot_all_results,delta)
+tf = plot_all_results && strcmp(metric_field,'Uerr') && ...
+    scalar_values_match(delta,0.2);
+end
+
+function N_request_vec = get_plot_N_request_vec(results)
+N_request_vec = results{1}.N_request_vec;
+for i = 2:numel(results)
+    N_request_vec = union(N_request_vec,results{i}.N_request_vec);
+end
 end
 
 function set_sqrtN_ticks(ax,N_request_vec)

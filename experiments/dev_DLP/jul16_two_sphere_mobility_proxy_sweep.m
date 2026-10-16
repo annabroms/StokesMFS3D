@@ -53,7 +53,7 @@ dlp_outer_force = true;
 
 
 method_names = {'solve_mobility','solve_mobility_with_DLP'};
-method_labels = {'standard MFS','DLP/SLP MFS'};
+method_labels = {'rectangular','symmetrized'};
 remove_titles = false; % Set true for title-free figures.
 
 cfg = struct();
@@ -213,17 +213,17 @@ for id = 1:n_delta
 end
 
 %% Plots
-plot_solver_figures(results,'uerr', ...
+plot_solver_figure(results,'uerr', ...
     '$e_{\mathrm{res}}^{\max}$', ...
     'Fig. 2.7(d) mobility analogue: proxy-radius residual', ...
-    method_labels,remove_titles);
+    remove_titles);
 
-plot_solver_figures(results,'lambda_norm', ...
+plot_solver_figure(results,'lambda_norm', ...
     '$\|\lambda\|_\infty$', ...
     'Fig. 2.7(c) mobility analogue: coefficient magnitude', ...
-    method_labels,remove_titles);
+    remove_titles);
 
-plot_velocity_difference(results,remove_titles);
+plot_standalone_legend(results,method_labels);
 
 %% Local functions
 
@@ -289,42 +289,42 @@ else
 end
 end
 
-function plot_solver_figures( ...
-        results,metric_field,y_label,figure_name,method_labels,remove_titles)
-cfg = results.config;
-
-for im = 1:numel(cfg.method_names)
-    window_name = sprintf('%s - %s',figure_name,method_labels{im});
-    figure('Color','w','Name',window_name);
-    ax = axes();
-    plot_fig2p7_panel(ax,results,metric_field,im);
-    xlabel(ax,'$R_p$','Interpreter','latex');
-    ylabel(ax,y_label,'Interpreter','latex');
-    if ~remove_titles
-        title(ax,sprintf('%s: %s',figure_name,method_labels{im}), ...
-            'Interpreter','latex');
-    end
+function plot_solver_figure( ...
+        results,metric_field,y_label,figure_name,remove_titles)
+figure('Color','w','Name',figure_name);
+ax = axes();
+plot_fig2p7_combined(ax,results,metric_field);
+xlabel(ax,'$R_p$','Interpreter','latex');
+ylabel(ax,y_label,'Interpreter','latex');
+if ~remove_titles
+    title(ax,figure_name,'Interpreter','latex');
 end
 end
 
-function plot_fig2p7_panel(ax,results,metric_field,method_index)
+function plot_fig2p7_combined(ax,results,metric_field)
 cfg = results.config;
-delta_colors = [0.00 0.45 0.74; 1.00 0.10 0.10];
-line_styles = {'--','-',':'};
+[solver_delta_colors,line_styles,method_markers] = plot_styles();
 metric = results.(metric_field);
+marker_indices = 1:max(1,floor(numel(cfg.Rp_vec)/6)):numel(cfg.Rp_vec);
 
 hold(ax,'on');
-for id = 1:numel(cfg.delta_vec)
-    color = delta_colors(min(id,size(delta_colors,1)),:);
-    for in = 1:numel(cfg.N_request_vec)
-        line_style = line_styles{min(in,numel(line_styles))};
-        y = squeeze(metric(method_index,id,in,:));
-        plot(ax,cfg.Rp_vec,y, ...
-            'Color',color, ...
-            'LineStyle',line_style, ...
-            'LineWidth',1.5, ...
-            'DisplayName',sprintf('$N=%d,\\ \\delta=%.3g$', ...
-            results.actual.N(in),cfg.delta_vec(id)));
+for im = 1:numel(cfg.method_names)
+    marker = method_markers{min(im,numel(method_markers))};
+    for id = 1:numel(cfg.delta_vec)
+        color = reshape(solver_delta_colors(im,id,:),1,3);
+        for in = 1:numel(cfg.N_request_vec)
+            line_style = line_styles{min(in,numel(line_styles))};
+            y = squeeze(metric(im,id,in,:));
+            plot(ax,cfg.Rp_vec,y, ...
+                'Color',color, ...
+                'LineStyle',line_style, ...
+                'LineWidth',1.5, ...
+                'Marker',marker, ...
+                'MarkerIndices',marker_indices, ...
+                'MarkerSize',5, ...
+                'MarkerFaceColor','none', ...
+                'HandleVisibility','off');
+        end
     end
 end
 
@@ -336,48 +336,64 @@ if numel(cfg.Rp_vec) > 1
     xlim(ax,[min(cfg.Rp_vec),max(cfg.Rp_vec)]);
     xticks(ax,0.2:0.2:0.8);
 end
-legend(ax,'Location','best','Interpreter','latex');
 end
 
-function plot_velocity_difference(results,remove_titles)
+function plot_standalone_legend(results,method_labels)
 cfg = results.config;
-delta_colors = [0.00 0.45 0.74; 1.00 0.10 0.10];
-line_styles = {'--','-',':'};
+[solver_delta_colors,line_styles,method_markers] = plot_styles();
 
-figure('Color','w','Name','DLP versus standard rigid-body velocity');
+figure('Color','w','Name','Proxy-sweep legend');
 ax = axes();
 hold(ax,'on');
 
-for id = 1:numel(cfg.delta_vec)
-    color = delta_colors(min(id,size(delta_colors,1)),:);
-    for in = 1:numel(cfg.N_request_vec)
-        line_style = line_styles{min(in,numel(line_styles))};
-        y = squeeze(results.rel_U_dlp_vs_standard(id,in,:));
-        plot(ax,cfg.Rp_vec,y, ...
-            'Color',color, ...
-            'LineStyle',line_style, ...
-            'LineWidth',1.5, ...
-            'DisplayName',sprintf('$N=%d,\\ \\delta=%.3g$', ...
-            results.actual.N(in),cfg.delta_vec(id)));
+n_entry = numel(cfg.method_names)*numel(cfg.delta_vec)* ...
+    numel(cfg.N_request_vec);
+handles = gobjects(n_entry,1);
+labels = cell(n_entry,1);
+entry = 0;
+
+for im = 1:numel(cfg.method_names)
+    marker = method_markers{min(im,numel(method_markers))};
+    for id = 1:numel(cfg.delta_vec)
+        color = reshape(solver_delta_colors(im,id,:),1,3);
+        for in = 1:numel(cfg.N_request_vec)
+            entry = entry + 1;
+            line_style = line_styles{min(in,numel(line_styles))};
+            handles(entry) = plot(ax,nan,nan, ...
+                'Color',color, ...
+                'LineStyle',line_style, ...
+                'LineWidth',1.5, ...
+                'Marker',marker, ...
+                'MarkerSize',5, ...
+                'MarkerFaceColor','none');
+            labels{entry} = legend_label( ...
+                method_labels{im},cfg.delta_vec(id),results.actual.N(in));
+        end
     end
 end
 
-set(ax,'YScale','log');
-set(ax,'TickLabelInterpreter','latex');
-grid(ax,'on');
-box(ax,'on');
-xlabel(ax,'$R_p$','Interpreter','latex');
-ylabel(ax, ...
-    ['$\|\mathbf{U}_{\mathrm{DLP}}-\mathbf{U}_{\mathrm{standard}}\|_\infty/' ...
-     '\|\mathbf{U}_{\mathrm{standard}}\|_\infty$'], ...
+set(ax,'Visible','off');
+legend(ax,handles,labels, ...
+    'Location','north', ...
+    'NumColumns',2, ...
     'Interpreter','latex');
-if ~remove_titles
-    title(ax,'DLP/SLP MFS versus standard MFS', ...
-        'Interpreter','latex');
 end
-if numel(cfg.Rp_vec) > 1
-    xlim(ax,[min(cfg.Rp_vec),max(cfg.Rp_vec)]);
-    xticks(ax,0.2:0.2:0.8);
+
+function [solver_delta_colors,line_styles,method_markers] = plot_styles()
+% Rectangular: gray/black. Symmetrized: light/medium blue. The darker blue
+% deliberately retains enough green and brightness to remain distinct
+% from the near-black rectangular curve.
+solver_delta_colors = zeros(2,2,3);
+solver_delta_colors(1,1,:) = [0.50 0.50 0.50]; % rectangular, delta(1)
+solver_delta_colors(1,2,:) = [0.08 0.08 0.08]; % rectangular, delta(2)
+solver_delta_colors(2,1,:) = [0.42 0.72 0.90]; % symmetrized, delta(1)
+solver_delta_colors(2,2,:) = [0.08 0.52 0.78]; % symmetrized, delta(2)
+line_styles = {'--','-',':'};
+method_markers = {'o','s'};
 end
-legend(ax,'Location','best','Interpreter','latex');
+
+function label = legend_label(method_label,delta,N)
+method_label = strrep(method_label,' ','\ ');
+label = sprintf('$\\mathrm{%s},\\ \\delta=%.3g,\\ N=%d$', ...
+    method_label,delta,N);
 end

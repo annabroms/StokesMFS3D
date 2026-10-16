@@ -73,9 +73,13 @@ opt.iterate_RFD = iterate_RFD;
 N = size(rvec_in,1)/P;
 M = size(rvec_out,1)/P;
 w = (4*pi/M)*ones(P*M,1);
+n = repmat(rvec_out(1:M,:)-q(1,:),P,1);
 
 %% One-body preconditioning will be the same for everyone -- precompute!
-[Y,UU,LL,Kin,B] = oneBodyPrecondMobDLP(rvec_in(1:N,:),rvec_out(1:M,:),q(1,:));  
+opt_precond = opt;
+opt_precond.inner_only = true;
+[Y,UU,LL,Kin,B] = oneBodyPrecondMobDLP( ...
+    rvec_in(1:N,:),rvec_out(1:M,:),opt_precond,q(1,:),w(1:M),n(1:M,:));  
 
 % Build block-diagonal K/B only when needed (dense solve or dense RFD)
 need_dense_blocks = solve_dense || ~iterate_RFD;
@@ -99,7 +103,6 @@ end
 % end
 
 Tblock = stokes_DLP_mat(rvec_out(1:M,:),rvec_in(1:N,:),rvec_out(1:M,:)-q(1,:));
-n = repmat(rvec_out(1:M,:)-q(1,:),P,1);
 if use_dense_lanczos
     T = stokes_DLP_mat(rvec_out,rvec_in,n);
 end
@@ -226,7 +229,8 @@ for i = 1:tsteps
         end
         iter_hist(i) = iters;
       %% Solve mobility problem with modified boundary data
-        [U, iters, lambda_norm] = solve_brownian_mobility(q,rvec_in,rvec_out,Y,UU,LL,Kin,Tblock,Fvec,opt, noise);
+        [U, iters, lambda_norm] = solve_brownian_mobility( ...
+            q,rvec_in,rvec_out,n,w,Y,UU,LL,Kin,Tblock,Fvec,opt,noise);
     end
 
     %Update particle coordinates (take time step) (assuming for now scaling such
