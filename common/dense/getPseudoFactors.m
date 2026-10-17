@@ -39,7 +39,7 @@ if nargin < 3
     visualise = 0; 
 end
 
-[UU,S,V] = svd(N);
+[UU,S,V] = svd(N,'econ');
 S = diag(S);
 
 %use relative tolerance 

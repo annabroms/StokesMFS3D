@@ -31,6 +31,7 @@ projectDirectory = fileparts(experimentDirectory);
 originalPath = path;
 pathCleanup = onCleanup(@() path(originalPath));
 addpath(experimentDirectory);
+addpath(fullfile(projectDirectory,'images'));
 addpath(fullfile(projectDirectory,'geometry','ellipsoids'));
 addpath(fullfile(projectDirectory,'common','dense'));
 

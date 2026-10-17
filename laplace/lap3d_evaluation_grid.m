@@ -28,7 +28,7 @@ for body = 1:2
     metadata.fullCounts(body) = size(fullPoints,1);
     if opt.testPatchLayers > 0
         [patch,metadata.patchMetadata{body}] = ...
-            lap3d_collocation_patch(E,contacts{body},testOpt);
+            collocation_surface_patch(E,contacts{body},testOpt);
     end
     % Include the contact point itself in the independent error maximum,
     % even though this one point also belongs to the fitted patch.

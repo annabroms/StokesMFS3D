@@ -116,7 +116,7 @@ grid.columnScaling = opt.columnScaling;
 grid.surfaceElementPreconditioning = opt.surfaceElementPreconditioning;
 grid.collocationSurfaceElements = [];
 if opt.surfaceElementPreconditioning
-    grid.collocationSurfaceElements = lap3d_collocation_surface_elements( ...
+    grid.collocationSurfaceElements = collocation_patch_area( ...
         grid.collocation,grid.collocationBody,bodies);
 end
 grid.collocationPatchBlocks = {zeros(0,3),zeros(0,3)};
@@ -215,7 +215,7 @@ for body = 1:2
     end
 
     [collocationPatch,collocationPatchMetadata{body}] = ...
-        lap3d_collocation_patch(bodies{body},contacts{body},opt);
+        collocation_surface_patch(bodies{body},contacts{body},opt);
     collocationPatch = remove_near_duplicates(collocationPatch, ...
         basicGrid.collocationBlocks{body},1e-11*max(bodies{body}.axes));
     collocationPatchMetadata{body}.retainedCount = size(collocationPatch,1);
@@ -249,7 +249,7 @@ grid.surfaceElementPreconditioning = opt.surfaceElementPreconditioning;
 grid.collocationSurfaceElements = [];
 if opt.surfaceElementPreconditioning
     % Recompute on the MERGED grid; do not add separate overlapping grid areas.
-    grid.collocationSurfaceElements = lap3d_collocation_surface_elements( ...
+    grid.collocationSurfaceElements = collocation_patch_area( ...
         grid.collocation,grid.collocationBody,bodies);
 end
 

@@ -170,7 +170,7 @@ testPatchMask = false(size(basicGrid.testPoints,1),1);
 bodies = {pair.E1,pair.E2};
 contacts = {pair.p1,pair.p2};
 for body = 1:2
-    testPatch = lap3d_collocation_patch( ...
+    testPatch = collocation_surface_patch( ...
         bodies{body},contacts{body},testPatchOptions);
     testPatch = testPatch(2:end,:);
     basicGrid.testPoints = [basicGrid.testPoints;testPatch];
