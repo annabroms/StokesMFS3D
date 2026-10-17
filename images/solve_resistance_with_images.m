@@ -10,12 +10,13 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 %
 % Inputs: q is P-by-3 of unit-sphere centres; U is 6P-by-1 with each body
 % [vx;vy;vz;omega_x;omega_y;omega_z]. opt is a small flat control struct;
-% omitted fields receive the paper defaults below. Image families can be
+% omitted fields receive the shared image-solver defaults. Image families can be
 % any nonempty subset of SRTD; coarse proxy nodes always carry S.
 % Main controls: N (coarse proxy count), proxyRadius, nearThreshold,
 % N_image (nodes per close-contact image line; [] uses paper Eq. 39),
 % imageFamilies, capMode, capAngles, capUpsampling or exact capPointCounts,
-% capLayers, capExponent, rowWeightMode, svdCutoff, gmresTolerance and
+% capLayers, capExponent, rowWeightMode, useRowScaling (default true),
+% svdCutoff, gmresTolerance and
 % solverMode ("oneBody" by default, or "denseSVD").
 % Outputs: Fvec is 6P-by-1 [Fx;Fy;Fz;Tx;Ty;Tz] per body, using the same
 % source-strength sign as solve_resistance/Kin'*lambda. iters is the GMRES
@@ -47,81 +48,20 @@ if nargin == 0
     Fvec = []; iters = []; lambda_norm = []; err_res = []; details = struct();
     return
 end
-if nargin < 3 || isempty(opt)
+if nargin < 3
     opt = struct();
 end
-defaults = struct('proxyRadius',0.63,'N',686, ...
-    'collocationRatio',1.2,'nearThreshold',0.15,'N_image',[], ...
-    'imageOffsetFraction',0.05,'imageFamilies',"SRD",'useImages',true, ...
-    'capMode',"fibonacci",'capAngles',[pi/5,pi/60], ...
-    'capUpsampling',[6,6],'capPointCounts',[], ...
-    'capLayers',[18,18], ...
-    'capExponent',[3,3],'capMinAzimuth',8,'rowWeightMode',"", ...
-    'svdCutoff',5e-12,'gmresTolerance',1e-6,'maxIterations',800, ...
-    'solverMode',"oneBody", ...
-    'batchSize',128,'validationCount',1000,'validationGapCount',401);
-names = fieldnames(defaults);
-for index = 1:numel(names)
-    name = names{index};
-    if ~isfield(opt,name) || isempty(opt.(name))
-        opt.(name) = defaults.(name);
-    end
-end
-opt.capMode = string(opt.capMode);
-opt.rowWeightMode = string(opt.rowWeightMode);
-opt.imageFamilies = string(opt.imageFamilies);
-opt.solverMode = string(opt.solverMode);
-if opt.rowWeightMode == ""
-    if opt.capMode == "fibonacci"
-        opt.rowWeightMode = "paper";
-    else
-        opt.rowWeightMode = "local";
-    end
-end
-assert(ismember(opt.capMode,["fibonacci","exponential"]));
-assert(ismember(opt.rowWeightMode,["paper","local"]));
-assert(isscalar(opt.solverMode) && ...
-    ismember(opt.solverMode,["oneBody","denseSVD"]), ...
-    'solverMode must be "oneBody" or "denseSVD".');
-assert(opt.capMode ~= "exponential" || opt.rowWeightMode == "local", ...
-    'Exponentially clustered caps require local merged-grid row areas.');
-assert(isscalar(opt.imageFamilies) && strlength(opt.imageFamilies) > 0);
-assert(all(ismember(char(opt.imageFamilies),'SRTD')) && ...
-    numel(unique(char(opt.imageFamilies))) == strlength(opt.imageFamilies));
-assert(numel(opt.capAngles) == 2 && all(opt.capAngles > 0 & opt.capAngles < pi));
-assert(numel(opt.capUpsampling) == 2 && all(opt.capUpsampling > 0));
-% Exponential mode builds one cap, so it takes scalar cap options.
-nCaps = 2;
-if opt.capMode == "exponential"
-    nCaps = 1;
-end
-if ~isempty(opt.capPointCounts)
-    validateattributes(opt.capPointCounts,{'numeric'}, ...
-        {'vector','integer','>=',4});
-    assert(numel(opt.capPointCounts) == nCaps || ...
-        (nCaps == 1 && numel(opt.capPointCounts) == 2));
-end
-assert(numel(opt.capLayers) >= nCaps && all(opt.capLayers >= 1));
-assert(numel(opt.capExponent) >= nCaps && all(opt.capExponent > 0));
-validateattributes(opt.capMinAzimuth,{'numeric'}, ...
-    {'scalar','integer','>=',3});
-assert(islogical(opt.useImages) && isscalar(opt.useImages));
+opt = image_solver_options(opt);
 validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
 P = size(q,1);
 validateattributes(U,{'numeric'},{'real','finite','column','numel',6*P});
-validateattributes(opt.svdCutoff,{'numeric'},{'scalar','positive','<',1});
-validateattributes(opt.nearThreshold,{'numeric'},{'scalar','positive'});
-if ~isempty(opt.N_image)
-    validateattributes(opt.N_image,{'numeric'}, ...
-        {'scalar','integer','nonnegative'});
-end
 
 grid = build_image_discretization(q,opt);
 rhsBlocks = cell(P,1);
 for k = 1:P
     body = grid.body(k);
     physicalData = getKmat(body.collocation,q(k,:))*U(6*(k-1)+(1:6));
-    rhsBlocks{k} = repelem(sqrt(body.weights),3).*physicalData;
+    rhsBlocks{k} = repelem(body.rowScale,3).*physicalData;
 end
 rhs = vertcat(rhsBlocks{:});
 lambda = cell(P,1);
@@ -155,7 +95,7 @@ if opt.solverMode == "oneBody"
         [mu,iters,~,~] = helsing_gmres( ...
             @(x) image_resistance_matvec(x,grid,factors,opt.batchSize), ...
             rhs,numel(rhs),opt.maxIterations,opt.gmresTolerance,0,0,true);
-        fprintf('\ncompleted GMRES\n');
+        fprintf('completed GMRES\n');
         trueGmresResidual = norm(image_resistance_matvec( ...
             mu,grid,factors,opt.batchSize)-rhs)/norm(rhs);
     end
@@ -168,6 +108,11 @@ if opt.solverMode == "oneBody"
 else
     % Each target/source pair fills one weighted block of the global
     % rectangular matrix. Target batching bounds temporary kernel storage.
+    nRow = collocationOffsets(end);
+    nCol = N_offsets(end);
+    fprintf(['Dense resistance SVD matrix: %d rows x %d columns ', ...
+        '(%.1f MiB for one double copy)\n'], ...
+        nRow,nCol,8*double(nRow)*double(nCol)/2^20);
     matrix = zeros(collocationOffsets(end),N_offsets(end));
     for targetBody = 1:P
         target = grid.body(targetBody);
@@ -181,7 +126,7 @@ else
                 kernel = stokes_mfs_velocity_matrix( ...
                     grid.body(sourceBody).basis,target.collocation(nodes,:));
                 matrix(rows,columns) = ...
-                    repelem(sqrt(target.weights(nodes)),3).*kernel;
+                    repelem(target.rowScale(nodes),3).*kernel;
             end
         end
     end
@@ -225,56 +170,9 @@ for k = 1:P
     end
 end
 
-% Evaluate on a different design plus denser gap caps. All cap modes use
-% Fibonacci validation nodes with counts distinct from fitted cap counts.
-[fullCheck,~] = get_sphdesign(opt.validationCount);
-validationPoints = cell(P,1);
-validationVelocity = cell(P,1);
-validationRelative = cell(P,1);
-validationGap = cell(P,1);
-maxData = 0;
-for k = 1:P
-    points = q(k,:)+fullCheck;
-    gapMask = false(size(points,1),1);
-    for contact = 1:size(grid.body(k).contactDirections,1)
-        direction = grid.body(k).contactDirections(contact,:);
-        sphere = struct('axes',ones(3,1),'Q',eye(3),'c',q(k,:).');
-        capOpt = struct('collocationPatchMode',"fibonacci", ...
-            'collocationPatchPointCount',opt.validationGapCount, ...
-            'collocationPatchAngle',max(opt.capAngles));
-        [gapPoints,~] = collocation_surface_patch( ...
-            sphere,q(k,:).'+direction.',capOpt);
-        points = [points;gapPoints]; %#ok<AGROW>
-        gapMask = [gapMask;true(size(gapPoints,1),1)]; %#ok<AGROW>
-    end
-    validationPoints{k} = points;
-    validationGap{k} = gapMask;
-    desired = reshape(getKmat(points,q(k,:))* ...
-        U(6*(k-1)+(1:6)),3,[]).';
-    maxData = max(maxData,max(vecnorm(desired,2,2)));
-end
-denominator = max(maxData,eps);
-err_res = 0;
-for k = 1:P
-    points = validationPoints{k};
-    velocity = zeros(size(points));
-    for sourceBody = 1:P
-        for first = 1:opt.batchSize:size(points,1)
-            nodes = first:min(first+opt.batchSize-1,size(points,1));
-            G = stokes_mfs_velocity_matrix( ...
-                grid.body(sourceBody).basis,points(nodes,:));
-            velocity(nodes,:) = velocity(nodes,:)+ ...
-                reshape(G*lambda{sourceBody},3,[]).';
-        end
-    end
-    desired = reshape(getKmat(points,q(k,:))* ...
-        U(6*(k-1)+(1:6)),3,[]).';
-    validationVelocity{k} = velocity;
-    localDenominator = vecnorm(desired,2,2);
-    localDenominator(localDenominator < 1e-12*denominator) = denominator;
-    validationRelative{k} = vecnorm(velocity-desired,2,2)./localDenominator;
-    err_res = max(err_res,max(validationRelative{k}));
-end
+% Use the same independent full-sphere and gap-cap check as mobility.
+[err_res,validationPoints,validationVelocity,validationRelative, ...
+    validationGap] = image_surface_validation(q,grid,lambda,U,opt);
 details = struct('grid',grid,'lambda',{lambda}, ...
     'retainedRanks',retainedRanks, ...
     'trueGmresResidual',trueGmresResidual, ...

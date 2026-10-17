@@ -1,5 +1,8 @@
 # Image-enhanced rigid-sphere resistance MFS
 
+For prescribed forces and torques, see the separate [image mobility
+README](README_mobility.md).
+
 This folder implements the resistance formulation in Anna Broms, Alex H.
 Barnett, and Anna-Karin Tornberg, *Accurate close interactions of Stokes
 spheres using lubrication-adapted image systems*, *Journal of Computational
@@ -48,8 +51,12 @@ These positive areas sum to `4*pi` per unit
 sphere. The cap comparison applies `"local"` to both cap modes so that
 row-weight policy does not confound the node-placement comparison.
 
-The self matrix is `B_k = W_k*G_kk`, with `W_k` repeating `sqrt(area)` for
-all three velocity components. A relative singular-value cutoff of
+The self matrix is `B_k = W_k*G_kk`, with `W_k` repeating `body.rowScale`
+for all three velocity components. The default `opt.useRowScaling=true`
+sets `body.rowScale=sqrt(area)`; `false` uses ones and thus `W_k=I`.
+The grid retains its physical `body.weights` and cap geometry in both
+cases. `rowWeightMode` continues to select how those areas are calculated.
+A relative singular-value cutoff of
 `5e-12` is used by default (Appendix A). `one_body_image_preconditioner`
 stores the factored truncated pseudoinverse; the matvec applies
 `Y_k*(U_k'*mu_k)` in that order. The preconditioned operator has identity
@@ -59,11 +66,11 @@ matrix or any pair interaction matrix: `image_resistance_matvec` sums S/R/T/D
 velocities from source strengths in target batches and reuses pair distances
 for image families at the same nodes. It needs no FMM. For a reference solve,
 `solverMode="denseSVD"`
-assembles the complete weighted matrix and applies a truncated global SVD
+assembles the complete row-scaled matrix and applies a truncated global SVD
 using the same `svdCutoff`. It is substantially more costly in memory and
 time at the paper's production resolutions.
-The image solver prints `starting GMRES`, one dot per completed iteration,
-and `completed GMRES` around the iterative solve.
+The image solver prints `starting GMRES`, one dot per completed iteration
+(wrapping after 50 dots), and `completed GMRES` around the iterative solve.
 
 `solve_resistance_with_images(q,U,opt)` returns
 `[Fvec,iters,lambda_norm,err_res,details]`. `U` and `Fvec` have six entries
@@ -78,7 +85,7 @@ ranks, the true linear-system residual and independent surface residuals.
 corresponding `validationPoints` row for plotting and further checks.
 `iters` is zero for the noniterative dense SVD. Its `retainedRanks` is one
 global rank, and `trueGmresResidual` is `NaN`; `linearSystemResidual` is the
-true weighted least-squares residual. In one-body mode, `retainedRanks`
+true row-scaled least-squares residual. In one-body mode, `retainedRanks`
 contains one rank per sphere and `linearSystemResidual` is the true
 preconditioned GMRES residual.
 `err_res` follows the paper's pointwise relative velocity residual where

@@ -1,5 +1,5 @@
 function result = image_resistance_matvec(mu,grid,factors,batchSize)
-%IMAGE_RESISTANCE_MATVEC Apply the weighted one-body-preconditioned operator.
+%IMAGE_RESISTANCE_MATVEC Apply the row-scaled one-body-preconditioned operator.
 %   result = image_resistance_matvec(mu,grid,factors,batchSize)
 %   image_resistance_matvec() checks a tiny explicit two-body operator.
 %
@@ -7,7 +7,7 @@ function result = image_resistance_matvec(mu,grid,factors,batchSize)
 % block k of length 3*M(k). grid is from build_image_discretization and
 % factors(k) is from one_body_image_preconditioner. The diagonal action is
 % exactly identity; each off-diagonal contribution is W_k*G_kj*B_j^+*mu_j.
-% W_k repeats sqrt(local area) for x,y,z at each target. Each source-body
+% W_k repeats the effective rowScale for x,y,z at each target. Each source-body
 % interaction sums the S/R/T/D kernels directly in target batches, with
 % no 3M-by-3N interaction matrix, global matrix, or FMM approximation.
 % The source strengths and target velocities are interleaved by node.
@@ -32,15 +32,7 @@ for sourceBody = 1:P
     sourceStrength = factors(sourceBody).Y* ...
         (factors(sourceBody).U'*mu(sourceRows));
     basis = grid.body(sourceBody).basis;
-    coeff = cell(numel(basis),1);
-    col0 = 0;
-    for b = 1:numel(basis)
-        N = size(basis(b).points,1);
-        cols = col0+(1:3*N);
-        coeff{b} = basis(b).scale*reshape(sourceStrength(cols),3,[]).';
-        col0 = col0+3*N;
-    end
-    assert(col0 == numel(sourceStrength));
+    coeff = image_source_coefficients(basis,sourceStrength);
     for targetBody = 1:P
         if targetBody == sourceBody
             continue
@@ -52,7 +44,7 @@ for sourceBody = 1:P
                 reshape(3*nodes-2+(0:2).',[],1);
             velocity = direct_image_velocity( ...
                 basis,coeff,target.collocation(nodes,:));
-            velocity = sqrt(target.weights(nodes)).*velocity;
+            velocity = target.rowScale(nodes).*velocity;
             result(targetRows) = result(targetRows)+reshape(velocity.',[],1);
         end
     end
@@ -68,22 +60,34 @@ locations = [0,0,0;3,0,0];
 base = [1,0,0;0,1,0;0,0,1;-1,0,0];
 for k = 1:2
     body(k).collocation = base+locations(k,:); %#ok<AGROW>
-    body(k).weights = ones(4,1); %#ok<AGROW>
+    body(k).weights = (1:4).'; %#ok<AGROW>
     body(k).basis = struct('family',"S",'points',locations(k,:), ...
         'normalDirections',zeros(0,3),'scale',1); %#ok<AGROW>
-    factors(k) = one_body_image_preconditioner(body(k),1e-12); %#ok<AGROW>
 end
-grid.body = body;
 mu = (1:24).'/24;
-actual = image_resistance_matvec(mu,grid,factors,2);
 G12 = stokes_mfs_velocity_matrix(body(2).basis,body(1).collocation);
 G21 = stokes_mfs_velocity_matrix(body(1).basis,body(2).collocation);
-expected = mu;
-expected(1:12) = expected(1:12)+G12* ...
-    (factors(2).Y*(factors(2).U'*mu(13:24)));
-expected(13:24) = expected(13:24)+G21* ...
-    (factors(1).Y*(factors(1).U'*mu(1:12)));
-assert(norm(actual-expected,inf) < 1e-13);
+for scaled = [true,false]
+    for k = 1:2
+        if scaled
+            body(k).rowScale = sqrt(body(k).weights);
+        else
+            body(k).rowScale = ones(4,1);
+        end
+        factors(k) = one_body_image_preconditioner( ...
+            body(k),1e-12); %#ok<AGROW>
+    end
+    grid.body = body;
+    actual = image_resistance_matvec(mu,grid,factors,2);
+    expected = mu;
+    expected(1:12) = expected(1:12)+ ...
+        repelem(body(1).rowScale,3).*G12* ...
+        (factors(2).Y*(factors(2).U'*mu(13:24)));
+    expected(13:24) = expected(13:24)+ ...
+        repelem(body(2).rowScale,3).*G21* ...
+        (factors(1).Y*(factors(1).U'*mu(1:12)));
+    assert(norm(actual-expected,inf) < 1e-13);
+end
 % Check every direct kernel, source scaling, and reuse of image-node geometry.
 template = struct('family',"",'points',zeros(0,3), ...
     'normalDirections',zeros(0,3),'scale',1);

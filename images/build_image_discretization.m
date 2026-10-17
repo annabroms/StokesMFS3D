@@ -12,8 +12,9 @@ function grid = build_image_discretization(q,opt)
 % (empty selects the paper's gap rule), imageFamilies (subset of SRTD),
 % capMode, capAngles, capUpsampling or exact capPointCounts, capLayers,
 % capExponent, capMinAzimuth,
-% rowWeightMode, and useImages. grid.body(k) owns its basis blocks,
-% collocation nodes, physical area weights, image lines, and pair metadata.
+% rowWeightMode, useRowScaling, and useImages. grid.body(k) owns its basis
+% blocks, collocation nodes, physical area weights, effective row scales,
+% image lines, and pair metadata.
 % Every vector family has interleaved [x1;y1;z1;x2;...] coefficients.
 % The coarse design carries Stokeslets regardless of imageFamilies.
 %
@@ -27,6 +28,9 @@ if nargin == 0
     return
 end
 validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
+if ~isfield(opt,'useRowScaling')
+    opt.useRowScaling = true; % Also support direct callers with older opt structs.
+end
 assert(opt.capMode ~= "exponential" || opt.rowWeightMode == "local", ...
     'Exponentially clustered caps require local merged-grid row areas.');
 P = size(q,1);
@@ -37,6 +41,7 @@ template = struct('family',"",'points',zeros(0,3), ...
     'normalDirections',zeros(0,3),'scale',1);
 bodyTemplate = struct('basis',repmat(template,0,1), ...
     'collocation',zeros(0,3),'weights',zeros(0,1), ...
+    'rowScale',zeros(0,1), ...
     'imagePoints',zeros(0,3),'imageDirections',zeros(0,3), ...
     'capPoints',zeros(0,3),'contactDirections',zeros(0,3), ...
     'N',size(proxy,1),'N_image',0);
@@ -70,19 +75,17 @@ for k = 1:P-1
             end
             direction = (q(neighbor,:)-q(body,:))/norm(q(neighbor,:)-q(body,:));
             bodies(body).contactDirections(end+1,:) = direction;
-            if N_image == 0
+            if N_image == 0 || ~opt.useImages
                 % Keep gap metadata for independent validation, but leave
                 % the basic source and collocation grids untouched.
                 continue
             end
-            if opt.useImages
-                [line,~] = image_line_points(q(body,:),q(neighbor,:), ...
-                    1,opt.proxyRadius,N_image,opt.imageOffsetFraction);
-                bodies(body).imagePoints = [bodies(body).imagePoints;line];
-                bodies(body).imageDirections = [bodies(body).imageDirections; ...
-                    repmat(direction,N_image,1)];
-                bodies(body).N_image = bodies(body).N_image+N_image;
-            end
+            [line,~] = image_line_points(q(body,:),q(neighbor,:), ...
+                1,opt.proxyRadius,N_image,opt.imageOffsetFraction);
+            bodies(body).imagePoints = [bodies(body).imagePoints;line];
+            bodies(body).imageDirections = [bodies(body).imageDirections; ...
+                repmat(direction,N_image,1)];
+            bodies(body).N_image = bodies(body).N_image+N_image;
             sphere = struct('axes',ones(3,1),'Q',eye(3),'c',q(body,:).');
             % Exponential grading already refines toward contact, so one
             % cap holds the points of both fibonacci caps.
@@ -144,6 +147,11 @@ for k = 1:P
             bodies(k).collocation,ones(size(bodies(k).collocation,1),1), ...
             {sphere});
     end
+    if opt.useRowScaling
+        bodies(k).rowScale = sqrt(bodies(k).weights);
+    else
+        bodies(k).rowScale = ones(size(bodies(k).weights));
+    end
     block = template;
     block.family = "S";
     block.points = q(k,:)+proxy;
@@ -183,7 +191,8 @@ opt = struct('proxyRadius',0.63,'N',50,'collocationRatio',2, ...
     'capMode',"fibonacci",'capAngles',[pi/5,pi/60], ...
     'capUpsampling',[6,6],'capLayers',[4,4], ...
     'capExponent',[3,3],'capMinAzimuth',3, ...
-    'rowWeightMode',"local",'useImages',true,'imageOffsetFraction',0.05);
+    'rowWeightMode',"local",'useRowScaling',true, ...
+    'useImages',true,'imageOffsetFraction',0.05);
 q = [0,0,0;2.01,0,0;4.02,0,0];
 grid = build_image_discretization(q,opt);
 assert(isequal([grid.body.N_image],[3,6,3]));
@@ -192,7 +201,16 @@ assert(size(grid.body(2).collocation,1) > ...
 for k = 1:3
     assert(all(grid.body(k).weights > 0));
     assert(abs(sum(grid.body(k).weights)-4*pi) < 1e-9);
+    assert(norm(grid.body(k).rowScale-sqrt(grid.body(k).weights)) == 0);
 end
+opt.useRowScaling = false;
+plainGrid = build_image_discretization(q,opt);
+for k = 1:3
+    assert(isequal(plainGrid.body(k).collocation,grid.body(k).collocation));
+    assert(isequal(plainGrid.body(k).weights,grid.body(k).weights));
+    assert(all(plainGrid.body(k).rowScale == 1));
+end
+opt.useRowScaling = true;
 opt.imageFamilies = "SRTD";
 opt.capPointCounts = [24,16];
 stressletGrid = build_image_discretization(q,opt);
@@ -200,5 +218,11 @@ assert(numel(stressletGrid.body(1).basis) == 5);
 assert(size(stressletGrid.body(1).capPoints,1) == 40);
 assert(isequal(size(stressletGrid.body(1).basis(4).normalDirections), ...
     size(stressletGrid.body(1).imageDirections)));
+opt.useImages = false;
+basicGrid = build_image_discretization(q,opt);
+assert(all(arrayfun(@(body) numel(body.basis) == 1, basicGrid.body)));
+assert(all(arrayfun(@(body) isempty(body.capPoints), basicGrid.body)));
+assert(all(arrayfun(@(body) isempty(body.imagePoints), basicGrid.body)));
+assert(~isempty(basicGrid.pairs));
 fprintf('build_image_discretization self-test passed.\n');
 end

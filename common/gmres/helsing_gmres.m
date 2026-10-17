@@ -1,7 +1,7 @@
 function [x,it,resvec,trueres] = helsing_gmres( ...
     f,b,n,m,tol,debug,verbose,progressDots)
 % *** GMRES with low-threshold stagnation control taken from Johan Helsing's RCIP demo***
-% Optional progressDots prints one dot after each completed iteration.
+% Optional progressDots prints one dot per iteration, wrapping every 50 dots.
 if nargin < 6
     debug = 0;
     verbose = 0;
@@ -42,6 +42,9 @@ myerr=abs(s(it1))/bnrm2;
 resvec(it) = myerr;
     if progressDots
         fprintf('.');
+        if mod(it,50) == 0
+            fprintf('\n');
+        end
     end
     if debug
         it
@@ -49,6 +52,9 @@ resvec(it) = myerr;
     end
 
 if ((myerr<=tol)||(it==m))                  
+  if progressDots && mod(it,50) ~= 0
+    fprintf('\n');
+  end
   
   y=triu(H(1:it,1:it))\s(1:it);             
   x=fliplr(V(:,1:it))*flipud(y);
