@@ -67,7 +67,7 @@ tol = 1e-8;
 maxit = 500; 
 
 vars.fmm = fmm; 
-vars.eps = 1e-10; %for use in FMM 
+vars.fmm_tol = 1e-10; %for use in FMM
 tolvec = 1e-16;
 
 % Loop over different truncation levels of the eigvals to check the effect

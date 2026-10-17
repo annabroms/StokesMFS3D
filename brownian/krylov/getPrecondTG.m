@@ -1,4 +1,4 @@
-function res = getPrecondTG(x,P,rvec_in,rvec_out,nn,weights,Ci,vars,R)
+function res = getPrecondTG(x,P,rvec_in,rvec_out,nn,weights,Ci,vars,R,nin)
 % GETPRECONDTG - Apply action of preconditioned and symmetrized combined DLP SLP
 % operator (TG+(TG)')/2.
 %
@@ -13,6 +13,7 @@ function res = getPrecondTG(x,P,rvec_in,rvec_out,nn,weights,Ci,vars,R)
 % vars     - struct of parameters passed to flow/traction routines
 % R        - optional 1 x P cell array of body rotations. If supplied, the
 %            one-body preconditioner block is rotated into each body's local frame.
+% nin      - optional inner proxy normals for vars.add_rank1.
 %
 % Output arguments:
 % res      - preconditioned vector (same layout as x)
@@ -32,6 +33,31 @@ end
 
 if nargin < 9
     R = [];
+end
+if nargin < 10
+    nin = [];
+end
+if ~isempty(R) && ~iscell(R) && isnumeric(R) && size(R,2) == 3 && ...
+        size(R,1) == size(rvec_in,1)
+    nin = R;
+    R = [];
+end
+if ~isfield(vars,'add_rank1')
+    vars.add_rank1 = false;
+end
+if ~isfield(vars,'rank1_scale')
+    vars.rank1_scale = 1;
+end
+if vars.add_rank1 && isempty(nin)
+    if isfield(vars,'nin') && ~isempty(vars.nin)
+        nin = vars.nin;
+    elseif isfield(vars,'n_in') && ~isempty(vars.n_in)
+        nin = vars.n_in;
+    end
+end
+if vars.add_rank1 && isempty(nin)
+    error('getPrecondTG:missingInnerNormals', ...
+        'vars.add_rank1=true requires inner proxy normals.');
 end
 
 N = length(rvec_in)/P;
@@ -85,6 +111,9 @@ uST = getStokesletFlow(uT, rvec_out, rvec_in, vars);
 
 %% Symmetric combination of the two terms
 uAll = 0.5*(uTS+uST);
+if vars.add_rank1
+    uAll = uAll + apply_normal_rank1(mu,nin,vars.rank1_scale);
+end
 res = zeros(3*N*P,1);
 % Project result back to global basis, again using the 1 body
 % preconditioner
@@ -122,13 +151,15 @@ Rz = [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1];
 Ry = [cos(beta) 0 sin(beta); 0 1 0; -sin(beta) 0 cos(beta)];
 R{2} = Rz * Ry;
 
-[rvec_in,rvec_out,~,~,~,w,n_out] = getEllipsoidGrids(E0,P,delta,N1,N2,sep,R,qvec);
+[rvec_in,rvec_out,~,~,~,w,n_out,n_in] = getEllipsoidGrids(E0,P,delta,N1,N2,sep,R,qvec);
 
 M = size(rvec_out,1)/P;
 N = size(rvec_in,1)/P;
 
-C = getSymTWS(rvec_out,rvec_in,n_out,w);
-Ci_body = getSymTWS(rvec_out(1:M,:),rvec_in(1:N,:),n_out(1:M,:),w(1:M));
+opt_rank = struct('add_rank1',true,'rank1_scale',1);
+C = getSymTWS(rvec_out,rvec_in,n_out,w,n_in,opt_rank);
+Ci_body = getSymTWS(rvec_out(1:M,:),rvec_in(1:N,:), ...
+    n_out(1:M,:),w(1:M),n_in(1:N,:),opt_rank);
 
 [Vi,Di] = eig(Ci_body);
 di = diag(Di);
@@ -149,10 +180,12 @@ for k = 1:P
 end
 
 vars.fmm = 0;
-vars.eps = 1e-10;
+vars.fmm_tol = 1e-10;
+vars.add_rank1 = true;
+vars.rank1_scale = 1;
 x = randn(3*N*P,1);
 
-y_fast = getPrecondTG(x,P,rvec_in,rvec_out,n_out,w,Pi,vars,R);
+y_fast = getPrecondTG(x,P,rvec_in,rvec_out,n_out,w,Pi,vars,R,n_in);
 y_dense = Pglob * C * Pglob' * x;
 y_wrong = Pglob_wrong * C * Pglob_wrong' * x;
 

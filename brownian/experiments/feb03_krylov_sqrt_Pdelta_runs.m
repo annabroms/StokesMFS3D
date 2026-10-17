@@ -24,7 +24,7 @@ maxit = 500;
 err_target = 1e-4;
 
 vars.fmm = fmm;
-vars.eps = 1e-10; % for use in FMM
+vars.fmm_tol = 1e-10; % for use in FMM
 
 nP = numel(Pvec);
 nD = numel(deltavec);

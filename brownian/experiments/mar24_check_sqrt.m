@@ -4,18 +4,18 @@
 clear; close all;
 rng(5); 
 
-sphere = 1;
+sphere = 0;
 tdesign = 0; %uniform discretisation of sphere
 dense = 1; %build C densely? (sym(TG))
 fmm = 0;
 fast = 1;% different implementation of lanczos with reduced storage
 plot_eigs = 1; 
-use_sym = 0;
+use_sym = 1;
 
 
 %% Set and create geometry
-P = 1;
-delta = 5;
+P = 2;
+delta = 1;
 E0 = [.4 .6 1]; %Type T in the mobility paper
 sep = 0.125;
 %sep = 0.2;
@@ -51,7 +51,8 @@ N2 = a*Nv;
 if sphere && tdesign
     Nt = 336;
     q = cell2mat(cellfun(@transpose, qvec, 'UniformOutput', false).');
-    Rp = 0.5;
+    Rp = 0.7;
+  %  Rp = 0.3; 
     [rvec_in,rvec_out,opt] = init_spheres(q,Rp,Nt,a);
     M = length(rvec_out)/P;
     n_out = rvec_out - kron(q,ones(M,1));
@@ -131,6 +132,15 @@ Ci = getSymTWS(rvec_out(1:M,:),rvec_in(1:N,:),n_out(1:M,:),w(1:M));
 [Vi,Di] = eig(Ci);
 di = diag(Di); 
 
+Ei = Ci*Vi-Vi*Di; % should be the zero matrix. It is not...
+for k = 1:size(Ci,1)
+    eik = Ci*Vi(:,k)-Di(k,k)*Vi(:,k);
+    eik2 = Vi(:,k)'*Ci-Di(k,k)*Vi(:,k)';
+    enorm(k) = norm(eik);
+    enorm2(k) = norm(eik2);
+end
+
+
 m = {'+','d','.','s'};
 c = {'b','r','k','c','g'};
 
@@ -138,9 +148,9 @@ tol = 1e-12;
 maxit = 500; 
 
 vars.fmm = fmm; 
-vars.eps = 1e-10; %for use in FMM 
+vars.fmm_tol = 1e-10; %for use in FMM
 tolvec = [1e-16 0];
-tolvec = 1e-10;
+tolvec = 1e-6;
 
 dense_res1 = C_sqrt*dW2;
 dense_res2 = sqrtm(C)*dW2; %should be the same?
@@ -159,7 +169,9 @@ for i = 1:length(tolvec)
     diff_set = setdiff(1:length(di),ind);  
     dsqrt = sqrt(di);
     dsqrt_inv = 1./dsqrt;
+    D_inv = diag(1./dsqrt(ind));
     dsqrt_inv(diff_set) = 0;
+ 
     Pi = diag(dsqrt_inv)*Vi';
     dsqrt_plus  = dsqrt;
     dsqrt_plus(diff_set) = 0;
@@ -175,12 +187,23 @@ for i = 1:length(tolvec)
         Pglob = kron(eye(P),Pi);
         if use_sym
             C_precond = Pglob*C*Pglob';
+            C_precond = diag(dsqrt_inv)*(Vi'*C*Vi);
         else
             C_precond = Pglob*A*Pglob';
         end
 
+        CBC = @(x) diag(dsqrt_inv)*(Vi(:,ind)'*C*Vi(:,ind)*(diag(dsqrt_inv)*x));
+       % ek = zeros(size(dsqrt_inv,1),1);
         if plot_eigs
-            e_precond = eig(C_precond); 
+
+
+            for k = 1:length(dsqrt_inv)
+                k
+                ek(:) = 0;
+                ek(k) = 1;
+                C_precond_mat(:,k) = CBC(ek);
+            end
+            e_precond = eig(C_precond_mat); 
             e = eig(C); 
             %Eigenvalues are clustered at 1 with preconditioning! 
             figure(2)
@@ -188,7 +211,7 @@ for i = 1:length(tolvec)
             hold on 
             plot(real(e),imag(e),'o')
         end
-        CBC = @(x) C_precond*x;
+       
 
         a = rand(N*P*3,1);
         pre = apply_block_diag(a, Pi_plus', P, Rprecond);

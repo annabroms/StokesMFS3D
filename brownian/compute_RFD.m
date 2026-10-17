@@ -63,21 +63,29 @@ end
 [rinUp,routUp,transVec] = updateNodes(rvec_in,rvec_out,P,N,M,delta/2*RandVel);
 qUp = q+transVec;
 qDown = q-transVec;
+wout = (4*pi/M) * ones(P*M,1);
+nout = rvec_out(1:M,:) - q(1,:);
+nout = nout ./ vecnorm(nout,2,2);
+noutUp = routUp - kron(qUp,ones(M,1));
+noutUp = noutUp ./ vecnorm(noutUp,2,2);
+noutDown = routDown - kron(qDown,ones(M,1));
+noutDown = noutDown ./ vecnorm(noutDown,2,2);
 
 if iterate_RFD
     if isempty(precond) || ~all(isfield(precond,{'Y','UU','LL','Kin','Tblock'}))
         error('compute_RFD: precond.{Y,UU,LL,Kin,Tblock} required for iterate_RFD');
     end
-    [U2, ~, ~] = solve_brownian_mobility(qUp,rinUp,routUp, ...
+    [U2, ~, ~] = solve_brownian_mobility(qUp,rinUp,routUp,noutUp,wout, ...
         precond.Y,precond.UU,precond.LL,precond.Kin,precond.Tblock, ...
         RandVel,opt,[]);
-    [U1, ~, ~] = solve_brownian_mobility(qDown,rinDown,routDown, ...
+    [U1, ~, ~] = solve_brownian_mobility(qDown,rinDown,routDown,noutDown,wout, ...
         precond.Y,precond.UU,precond.LL,precond.Kin,precond.Tblock, ...
         RandVel,opt,[]);
 else
     if isempty(precond) || ~isfield(precond,'Ktot') || ~isfield(precond,'Btot')
         % Compute Ktot/Btot if not provided
-        [~,~,~,Kin,B] = oneBodyPrecondMobDLP(rvec_in(1:N,:), rvec_out(1:M,:), q(1,:));
+        [~,~,~,Kin,B] = oneBodyPrecondMobDLP( ...
+            rvec_in(1:N,:), rvec_out(1:M,:), struct(), q(1,:), wout(1:M), nout);
         precond.Ktot = kron(eye(P),Kin);
         precond.Btot = kron(eye(P),B);
     end
