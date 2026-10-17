@@ -25,7 +25,8 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 % maximum independent pointwise relative velocity error. At validation
 % nodes with zero prescribed velocity, the largest prescribed speed is
 % used as the denominator. details contains
-% the grids, source strengths, retained ranks, true linear-system residual,
+% the grids, normalized source coefficients, retained ranks, true
+% linear-system residual,
 % and independent validation locations, computed velocities, and relative
 % residuals. For the
 % dense solve, retainedRanks is the global truncated rank and
@@ -40,8 +41,11 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 % system and applies its truncated pseudoinverse through two SVD factors.
 % During one-body setup, progress reports give each body's SVD dimensions
 % and the storage needed for one double-precision copy of that matrix.
-% Viscosity and sphere radius are one. Forces and torques are sums of the
-% physical S and R source strengths, as in Eq. (28) of Broms et al. (2025).
+% The velocity solve uses unit-viscosity coefficients. For physical viscosity
+% opt.viscosity, S/R/T strengths and the returned force/torque scale by it;
+% D strengths do not. details.lambda and lambda_norm remain normalized
+% unit-viscosity coefficients, suitable for direct_image_velocity.
+% The sphere radius is one.
 
 if nargin == 0
     self_test();
@@ -77,6 +81,25 @@ if opt.solverMode == "oneBody"
     factors = repmat(struct('Y',[],'U',[],'rank',0, ...
         'singularValues',[],'N_total',0,'collocationCount',0),P,1);
     for k = 1:P
+        if k > 1 && ~opt.useImages && ...
+                isequal(size(grid.body(k).collocation), ...
+                    size(grid.body(1).collocation)) && ...
+                isscalar(grid.body(k).basis) && ...
+                isscalar(grid.body(1).basis) && ...
+                grid.body(k).basis(1).family == "S" && ...
+                grid.body(1).basis(1).family == "S" && ...
+                grid.body(k).basis(1).scale == ...
+                    grid.body(1).basis(1).scale && ...
+                isequal(grid.body(k).rowScale,grid.body(1).rowScale) && ...
+                max(abs(grid.body(k).collocation-q(k,:) - ...
+                    (grid.body(1).collocation-q(1,:))),[],'all') < 1e-14 && ...
+                max(abs(grid.body(k).basis(1).points-q(k,:) - ...
+                    (grid.body(1).basis(1).points-q(1,:))),[],'all') < 1e-14
+            % Translated identical proxy spheres have the same self block.
+            factors(k) = factors(1);
+            fprintf('reuse preconditioner for body %d from body 1\n',k);
+            continue
+        end
         nRow = 3*collocationCounts(k);
         nCol = 3*N_total(k);
         memMiB = 8*double(nRow)*double(nCol)/2^20;
@@ -169,6 +192,7 @@ for k = 1:P
         offset = offset+3*count;
     end
 end
+Fvec = opt.viscosity*Fvec;
 
 % Use the same independent full-sphere and gap-cap check as mobility.
 [err_res,validationPoints,validationVelocity,validationRelative, ...

@@ -8,7 +8,14 @@ Barnett, and Anna-Karin Tornberg, *Accurate close interactions of Stokes
 spheres using lubrication-adapted image systems*, *Journal of Computational
 Physics* **523** (2025), 113636. Prescribed
 rigid translations and rotations are inputs. Source strengths, forces and
-torques are outputs. Viscosity and sphere radius are one.
+torques are outputs. Sphere radius is one. `opt.viscosity` sets any positive
+physical viscosity (default one): the velocity solve retains unit-viscosity
+coefficients in `details.lambda`, while the reported force and torque scale
+with viscosity. `lambda_norm` is the normalized coefficient maximum.
+`image_pressure(grid,lambda,x,mu)` and
+`image_traction(grid,lambda,x,n,mu)` evaluate physical exterior pressure
+and traction from those coefficients; `n` points from each sphere into the
+fluid, and pressure tends to zero at infinity.
 
 ## Geometry and default discretisation
 
@@ -79,7 +86,7 @@ per sphere, `[translation;rotation]` and `[force;torque]` respectively.
 plus source-position moments and rotlet torques. It is the force/torque
 applied to the fluid or required to drive the sphere; fluid-on-sphere
 force/torque has the opposite sign. T and D carry no net force or torque.
-`details` includes body grids, physical source strengths, retained SVD
+`details` includes body grids, normalized velocity coefficients, retained SVD
 ranks, the true linear-system residual and independent surface residuals.
 `validationVelocity` gives the computed three-component velocity at each
 corresponding `validationPoints` row for plotting and further checks.

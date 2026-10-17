@@ -26,6 +26,10 @@ if nargin < 3
     opt = struct();
 end
 opt = image_solver_options(opt);
+if opt.viscosity ~= 1
+    error('solve_mobility_with_images:ViscosityUnsupported', ...
+        'This mobility solver currently requires viscosity = 1.');
+end
 validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
 P = size(q,1);
 validateattributes(Fvec,{'numeric'}, ...

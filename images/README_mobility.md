@@ -6,7 +6,9 @@ recompleted Stokes mobility formulation in [Broms, Barnett and Tornberg,
 §§3.2–3.3](https://arxiv.org/pdf/2409.04215) with the close-contact image
 discretisation and force extraction in [Broms, Barnett and Tornberg,
 §2.3 and Remark 4](https://doi.org/10.1016/j.jcp.2024.113636).
-Viscosity and sphere radius are one. `Fvec` has six entries per sphere,
+Viscosity and sphere radius are one. Nonunit `opt.viscosity` is rejected by
+this mobility solver; the resistance solver and its pressure/traction
+evaluators support positive viscosity. `Fvec` has six entries per sphere,
 `[Fx;Fy;Fz;Tx;Ty;Tz]`, in the source-strength (force-on-fluid) sign used by
 `solve_resistance_with_images`. The returned `U` has
 `[vx;vy;vz;omega_x;omega_y;omega_z]` per sphere. Fluid-on-body loads have
