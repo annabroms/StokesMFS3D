@@ -3,9 +3,14 @@
 
 StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies.
 
-This code demonstrates the basic algorithm using source points on proxy surfaces only. 
+Two discretisations are available:
 
-> **Note**: The more advanced image enhancement technique for spheres presented in [Broms et al. (2024)](#publications) is *not yet included* in this version. It is therefore recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
+- **Basic discretisation (proxy sources only):** used by `solve_resistance.m` and `solve_mobility.m`, and hence by `demo_spheres.m`, `demo_slip.m` and `ellipsoid_mobility_run.m`. It supports spheres and ellipsoids, FMM acceleration and prescribed slip.
+- **Image-enhanced discretisation (spheres, resistance only):** used by `solve_resistance_with_images.m` and the demos `demo_resistance_with_images.m` and `demo_cluster_resistance_with_images.m`. Image lines and extra collocation caps are added at each close contact, following [Broms et al. (2025)](#publications).
+
+> **Note** With images, the discretisation of a sphere depends on its neighbours (gaps, contact directions and image counts). In the basic discretisation all identical spheres share one one-body matrix, which is factorised once. With images, the one-body matrix must be recomputed and refactorised for every unique discretisation, i.e. typically for every sphere that has close neighbours. Cross-sphere interactions are also summed directly, without FMM. The image solver is therefore considerably more expensive per sphere and is intended for close interactions. See `images/README.md`.
+
+> **Note**: Without images, it is recommended to use a sufficiently large separation parameter `delta` between particles to ensure numerical accuracy.
 
 ## Features
 
@@ -52,6 +57,8 @@ In the demo folder, we demonstrate the method using minimal input:
 - Run `demo_spheres.m` to reproduce a basic simulation for spherical particles using the MFS.
 - Run `demo_slip.m` for force- and torque-free spherical particles with prescribed surface slip.
 - Run `ellipsoid_mobility_run.m` with no arguments for a mobility solve, followed by a resistance solve for a cluster of ellipsoidal particles.
+- Run `demo_resistance_with_images.m` for a two-sphere resistance problem with lubrication-adapted image systems (see `images/README.md`).
+- Run `demo_cluster_resistance_with_images.m` for a resistance problem with a cluster of close spheres using image systems.
 
 Several functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
 ## Publications
@@ -70,7 +77,6 @@ This work is based on the following research papers:
 
 Planned additions include:
 
-- Lubrication-based image enhancement (as in [1])
 - A symmetrized version of the MFS solver to enable Brownian motion (in progress, see dev_DLP folders)
 
 ![Clustered particles](cluster.png)
