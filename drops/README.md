@@ -1,5 +1,8 @@
 # Active-drop MFS operators
 
+For near-contact image sources and the new solver interface, see
+[README_images.md](README_images.md).
+
 This folder implements a Stokes MFS model for spherical drops with prescribed tangential traction jumps. The exterior fluid has viscosity 1; drop `i` has interior viscosity `mu_i`. Each drop translates but does not rotate. This guide defines the operators as they are implemented here; it is intended to be readable without another document.
 
 ## Fields and coefficient ordering

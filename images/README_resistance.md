@@ -30,7 +30,9 @@ default `N_image` is `ceil(-8.72*log10(delta)-6.15)`; otherwise it is zero.
 nodes lie between `1.05*Rp` and the interior accumulation point and cluster
 towards that point. The source families at each image node default to S/R/D
 (Stokeslet, rotlet and potential dipole). `imageFamilies` selects a subset of
-S/R/T/D; a selected stresslet uses the known line direction as its normal.
+S/R/T/D; a selected stresslet uses the known line direction as its normal
+unless `use_orth_dir_images=true`, which selects the unit cross product of
+the contact ray with its least-aligned Cartesian axis.
 Coarse proxy points always carry S. All coefficients are interleaved by
 node: `[x1;y1;z1;x2;y2;z2;...]`. Within each body, the order is coarse S
 followed by each selected image family in `imageFamilies` order.

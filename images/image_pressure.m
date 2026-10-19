@@ -35,7 +35,7 @@ for body = 1:numel(grid.body)
                 case "S"
                     p(rows) = p(rows)+getPressure( ...
                         reshape(c.',[],1),y,z);
-                case "T"
+                case {"T","T_n","T_t"}
                     q = basis(block).normalDirections;
                     if ~isequal(size(q),size(c))
                         error('image_pressure:BadDirection', ...
@@ -100,7 +100,11 @@ a = r*q.';
 b = r*f;
 rho = vecnorm(r,2,2);
 expected = 1.7*((q*f)./rho.^3-3*a.*b./rho.^5)/(2*pi);
-eT = max(abs(image_pressure(grid,{f},x,1.7)-expected));
+eT = 0;
+for family = ["T","T_n","T_t"]
+    grid.body.basis.family = family;
+    eT = max(eT,max(abs(image_pressure(grid,{f},x,1.7)-expected)));
+end
 
 % The normalized velocity and physical pressure satisfy Stokes' equation.
 coeff = image_source_coefficients(base,f);

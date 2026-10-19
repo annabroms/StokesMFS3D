@@ -14,7 +14,7 @@ useMobilityRowScaling = false;
 q = [0,0,0;2.001,0,0];
 Uref = [1;0;0;0;0;0;-1;0;0;0;0;0];
 N = 686;
-N_image = 20; % If empty: adaptive from image paper Eq. (39).
+N_image = []; % If empty: adaptive from image paper Eq. (39).
 capMode = "exponential"; % Switch to "fibonacci" for the paper's caps.
 capPointCounts = [];
 if capMode == "exponential"

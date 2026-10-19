@@ -34,6 +34,13 @@ else
     columnScales = ones(size(selfMatrix,2),1);
     matrixForSVD = selfMatrix;
 end
+[m,n] = size(matrixForSVD);
+storage = whos('matrixForSVD');
+r = min(m,n);
+factorMiB = (m+n+r)*r*(storage.bytes/numel(matrixForSVD))/2^20;
+fprintf(['basic drop one-body SVD: %d x %d, matrix %.2f MiB, ', ...
+    'economy factors %.2f MiB estimated\n'], ...
+    m,n,storage.bytes/2^20,factorMiB);
 [leftVectors, singularMatrix, rightVectors] = svd(matrixForSVD,'econ');
 singularValues = diag(singularMatrix);
 retained = singularValues > svdTolerance*singularValues(1);
@@ -47,6 +54,8 @@ factors.selfMatrix = selfMatrix;
 factors.tangentOne = tangentOne;
 factors.tangentTwo = tangentTwo;
 factors.rank = nnz(retained);
+fprintf('basic drop retained rank %d/%d at relative cutoff %.3e\n', ...
+    factors.rank,numel(singularValues),svdTolerance);
 factors.fullColumnCount = size(selfMatrix,2);
 factors.svdTolerance = svdTolerance;
 factors.scaleColumns = scaleColumns;

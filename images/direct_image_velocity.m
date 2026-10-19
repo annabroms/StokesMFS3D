@@ -6,19 +6,15 @@ function u = direct_image_velocity(basis,coeff,x)
 % holds the scaled N_b-by-3 strengths of block b, and x is M-by-3 targets.
 % For r=x-y and viscosity one, this applies the same 1/(8*pi) or 1/(4*pi)
 % prefactors as stokes_mfs_velocity_matrix. Repeated image-node blocks
-% share their M-by-N pair distances. The S family is evaluated by
-% getStokesletFlow (direct mode); R, T and D are summed here.
+% share their M-by-N pair distances; all families are summed directly.
+if nargin == 0
+    self_test(); u = []; return
+end
 u = zeros(size(x));
-vars = struct('fmm',false);
 cachedPoints = [];
 for b = 1:numel(basis)
     block = basis(b);
     c = coeff{b};
-    if block.family == "S"
-        flow = getStokesletFlow(reshape(c.',[],1),block.points,x,vars);
-        u = u+reshape(flow,3,[]).';
-        continue
-    end
     if ~isequal(block.points,cachedPoints)
         y = block.points;
         cachedPoints = y;
@@ -30,12 +26,17 @@ for b = 1:numel(basis)
         ir3 = ir./r2;
     end
     switch block.family
+        case "S"
+            rc = rx.*c(:,1).'+ry.*c(:,2).'+rz.*c(:,3).';
+            u(:,1) = u(:,1)+(ir*c(:,1)+sum(rx.*rc.*ir3,2))/(8*pi);
+            u(:,2) = u(:,2)+(ir*c(:,2)+sum(ry.*rc.*ir3,2))/(8*pi);
+            u(:,3) = u(:,3)+(ir*c(:,3)+sum(rz.*rc.*ir3,2))/(8*pi);
         case "R"
             v = ir3/(8*pi);
             u(:,1) = u(:,1)+sum(v.*(rz.*c(:,2).'-ry.*c(:,3).'),2);
             u(:,2) = u(:,2)+sum(v.*(rx.*c(:,3).'-rz.*c(:,1).'),2);
             u(:,3) = u(:,3)+sum(v.*(ry.*c(:,1).'-rx.*c(:,2).'),2);
-        case "T"
+        case {"T","T_n","T_t"}
             n = block.normalDirections;
             assert(isequal(size(n),size(c)));
             rn = rx.*n(:,1).'+ry.*n(:,2).'+rz.*n(:,3).';
@@ -55,4 +56,25 @@ for b = 1:numel(basis)
                 'Unknown fundamental-solution family "%s".',block.family);
     end
 end
+end
+
+function self_test()
+% Compare all direct family sums with the mixed dense velocity block.
+b = struct('family',"S",'points',[0 0 0], ...
+    'normalDirections',zeros(0,3),'scale',1);
+basis = repmat(b,6,1);
+families = ["S","R","T","D","T_n","T_t"];
+for k = 1:6
+    basis(k).family = string(families(k));
+    basis(k).points = [0.1*k,0.03*k,-0.02*k];
+    basis(k).scale = 0.6+0.2*k;
+    if ismember(k,[3 5 6]), basis(k).normalDirections = [0 1 0]; end
+end
+z = sin((1:18).');
+x = [1 0.2 0.3;0.3 1 -0.2];
+c = image_source_coefficients(basis,z);
+actual = direct_image_velocity(basis,c,x);
+expected = reshape(stokes_mfs_velocity_matrix(basis,x)*z,3,[]).';
+assert(norm(actual-expected,inf)<1e-12);
+fprintf('direct_image_velocity self-test passed.\n');
 end

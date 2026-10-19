@@ -34,7 +34,7 @@ for body = 1:numel(grid.body)
     for block = 1:numel(basis)
         y = basis(block).points;
         c = coeff{block};
-        if basis(block).family == "T" && ...
+        if ismember(basis(block).family,["T","T_n","T_t"]) && ...
                 ~isequal(size(basis(block).normalDirections),size(c))
             error('image_traction:BadDirection', ...
                 'Each stresslet needs one source direction.');
@@ -72,7 +72,7 @@ for body = 1:numel(grid.body)
                         t(rows,j) = t(rows,j)-3/(8*pi)*sum( ...
                             (w{j}.*rn+r{j}.*wn).*ir5,2);
                     end
-                case "T"
+                case {"T","T_n","T_t"}
                     q = basis(block).normalDirections;
                     a = r{1}.*q(:,1).'+r{2}.*q(:,2).'+ ...
                         r{3}.*q(:,3).';
@@ -117,7 +117,7 @@ addpath(fullfile(root,'common','eval'),fullfile(root,'common','dense'), ...
     fullfile(root,'drops'),fullfile(root,'images'));
 base = struct('family',"S",'points',[0,0,0], ...
     'normalDirections',zeros(0,3),'scale',1);
-families = ["S","R","T","D"];
+families = ["S","R","T","D","T_n","T_t"];
 x = [1.1,0.4,-0.3;0.5,-0.8,1.2];
 n = x./vecnorm(x,2,2);
 strength = [0.7;-0.2;0.4];
@@ -128,7 +128,7 @@ maxStokes = 0;
 for family = families
     block = base;
     block.family = family;
-    if family == "T"
+    if ismember(family,["T","T_n","T_t"])
         block.normalDirections = [0.3,0.4,sqrt(0.75)];
     end
     grid.body.basis = block;

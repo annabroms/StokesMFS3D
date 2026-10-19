@@ -5,16 +5,13 @@ function [patch,metadata] = collocation_surface_patch(E,contactPoint,opt)
 %
 % E has semi-axes axes (3-by-1), rotation Q (3-by-3), and centre c (3-by-1).
 % A sphere is the special case E.axes = radius*ones(3,1). CONTACTPOINT is
-% a 3-by-1 surface point. OPT supplies the five controls
-% collocationPatchAngle (radians), collocationPatchLayers, collocationExponent,
-% collocationMinAzimuth, and collocationAzimuthOversampling, as normalized
-% by lap3d_complete_grid_options. Optional collocationPatchMode is
+% a 3-by-1 surface point. OPT supplies collocationPatchAngle (radians),
+% collocationPatchLayers, collocationExponent, collocationMinAzimuth, and
+% collocationAzimuthOversampling. Optional collocationPatchMode is
 % "exponential" (default) or "fibonacci". Optional
-% collocationPatchPointCount requests an exact number of nodes. The default
-% exponential mode retains the original Laplace ring counts and locations.
-% With an exact count, each exponential ring still has at least
-% collocationMinAzimuth nodes; the caller must request enough points for
-% its chosen number of layers.
+% collocationPatchPointCount requests an exact number of nodes. Exponential
+% mode uses graded radial rings; with an exact count, each ring has at least
+% collocationMinAzimuth nodes, so request enough points for the chosen layers.
 % patch is N-by-3.  N = 1 + sum(metadata.azimuthCount), before the caller
 % removes near-duplicates against its basic collocation grid.
 

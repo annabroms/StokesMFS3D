@@ -1,4 +1,4 @@
-function grid = build_image_discretization(q,opt)
+function grid = build_image_discretization(q,opt,radii)
 %BUILD_IMAGE_DISCRETIZATION Assemble sphere-owned image MFS nodes and areas.
 %   grid = build_image_discretization(q,opt)
 %   build_image_discretization() runs a small unequal-contact self-test.
@@ -9,7 +9,7 @@ function grid = build_image_discretization(q,opt)
 % q is P-by-3 of nonoverlapping unit-sphere centres. opt is the completed
 % option set from solve_resistance_with_images; important controls are
 % proxyRadius, N, collocationRatio, nearThreshold, N_image
-% (empty selects the paper's gap rule), imageFamilies (subset of SRTD),
+% (empty selects the paper's gap rule), imageFamilies (S/R/D/T/T_n/T_t),
 % capMode, capAngles, capUpsampling or exact capPointCounts, capLayers,
 % capExponent, capMinAzimuth,
 % rowWeightMode, useRowScaling, and useImages. grid.body(k) owns its basis
@@ -28,12 +28,22 @@ if nargin == 0
     return
 end
 validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
+if nargin < 3 || isempty(radii)
+    radii = ones(size(q,1),1);
+end
+radii = radii(:);
+validateattributes(radii,{'numeric'}, ...
+    {'real','finite','positive','numel',size(q,1)});
 if ~isfield(opt,'useRowScaling')
     opt.useRowScaling = true; % Also support direct callers with older opt structs.
+end
+if ~isfield(opt,'use_orth_dir_images')
+    opt.use_orth_dir_images = false;
 end
 assert(opt.capMode ~= "exponential" || opt.rowWeightMode == "local", ...
     'Exponentially clustered caps require local merged-grid row areas.');
 P = size(q,1);
+families = image_family_list(opt.imageFamilies);
 assert(P >= 1,'At least one sphere is required.');
 [proxy,coarseCollocation] = getDesignGrid(opt.proxyRadius, ...
     struct('des_n',opt.N,'a_glob',opt.collocationRatio));
@@ -47,20 +57,21 @@ bodyTemplate = struct('basis',repmat(template,0,1), ...
     'N',size(proxy,1),'N_image',0);
 bodies = repmat(bodyTemplate,P,1);
 for k = 1:P
-    bodies(k).collocation = q(k,:)+coarseCollocation;
-    bodies(k).weights = (4*pi/size(coarseCollocation,1))* ...
+    bodies(k).collocation = q(k,:)+radii(k)*coarseCollocation;
+    bodies(k).weights = (4*pi*radii(k)^2/size(coarseCollocation,1))* ...
         ones(size(coarseCollocation,1),1);
 end
 pairs = zeros(0,4); % [first body, second body, gap, image nodes]
 for k = 1:P-1
     for j = k+1:P
-        gap = norm(q(j,:)-q(k,:))-2;
+        gap = norm(q(j,:)-q(k,:))-radii(k)-radii(j);
         assert(gap > 0,'Spheres must not overlap or touch.');
-        if gap >= opt.nearThreshold
+        relativeGap = gap/min(radii(k),radii(j));
+        if relativeGap >= opt.nearThreshold
             continue
         end
         if isempty(opt.N_image)
-            N_image = max(0,ceil(-8.72*log10(gap)-6.15));
+            N_image = max(0,ceil(-8.72*log10(relativeGap)-6.15));
         else
             N_image = opt.N_image;
         end
@@ -81,12 +92,14 @@ for k = 1:P-1
                 continue
             end
             [line,~] = image_line_points(q(body,:),q(neighbor,:), ...
-                1,opt.proxyRadius,N_image,opt.imageOffsetFraction);
+                radii(body),radii(body)*opt.proxyRadius,N_image, ...
+                opt.imageOffsetFraction,radii(neighbor));
             bodies(body).imagePoints = [bodies(body).imagePoints;line];
             bodies(body).imageDirections = [bodies(body).imageDirections; ...
                 repmat(direction,N_image,1)];
             bodies(body).N_image = bodies(body).N_image+N_image;
-            sphere = struct('axes',ones(3,1),'Q',eye(3),'c',q(body,:).');
+            sphere = struct('axes',radii(body)*ones(3,1), ...
+                'Q',eye(3),'c',q(body,:).');
             % Exponential grading already refines toward contact, so one
             % cap holds the points of both fibonacci caps.
             nCaps = 2;
@@ -123,8 +136,9 @@ for k = 1:P-1
                 capOptions.collocationMinAzimuth = opt.capMinAzimuth;
                 capOptions.collocationAzimuthOversampling = 1;
                 [capPoints,~] = collocation_surface_patch( ...
-                    sphere,q(body,:).'+direction.',capOptions);
-                capArea = 2*pi*(1-cos(opt.capAngles(cap)))/capCount;
+                    sphere,q(body,:).'+radii(body)*direction.',capOptions);
+                capArea = 2*pi*radii(body)^2* ...
+                    (1-cos(opt.capAngles(cap)))/capCount;
                 for node = 1:size(capPoints,1)
                     point = capPoints(node,:);
                     % Keep the first occurrence, including coarse design nodes.
@@ -142,7 +156,8 @@ end
 
 for k = 1:P
     if opt.rowWeightMode == "local"
-        sphere = struct('axes',ones(3,1),'Q',eye(3),'c',q(k,:).');
+        sphere = struct('axes',radii(k)*ones(3,1), ...
+            'Q',eye(3),'c',q(k,:).');
         bodies(k).weights = collocation_patch_area( ...
             bodies(k).collocation,ones(size(bodies(k).collocation,1),1), ...
             {sphere});
@@ -154,17 +169,18 @@ for k = 1:P
     end
     block = template;
     block.family = "S";
-    block.points = q(k,:)+proxy;
+    block.points = q(k,:)+radii(k)*proxy;
     bodies(k).basis = block;
-    for family = char(opt.imageFamilies)
+    for family = families
         if bodies(k).N_image == 0 || ~opt.useImages
             break
         end
         block = template;
         block.family = string(family);
         block.points = bodies(k).imagePoints;
-        if family == 'T'
-            block.normalDirections = bodies(k).imageDirections;
+        if ismember(family,["T","T_n","T_t"])
+            block.normalDirections = image_stresslet_directions( ...
+                bodies(k).imageDirections,opt.use_orth_dir_images,family);
         end
         bodies(k).basis(end+1,1) = block;
     end
@@ -175,6 +191,7 @@ for k = 1:P
 end
 grid.body = bodies;
 grid.centres = q;
+grid.radii = radii;
 grid.pairs = pairs;
 grid.N = size(proxy,1);
 grid.coarseCollocationCount = size(coarseCollocation,1);
@@ -218,9 +235,20 @@ assert(numel(stressletGrid.body(1).basis) == 5);
 assert(size(stressletGrid.body(1).capPoints,1) == 40);
 assert(isequal(size(stressletGrid.body(1).basis(4).normalDirections), ...
     size(stressletGrid.body(1).imageDirections)));
+assert(isequal(stressletGrid.body(1).basis(4).normalDirections, ...
+    stressletGrid.body(1).imageDirections));
+opt.use_orth_dir_images = true;
+orthogonalGrid = build_image_discretization(q,opt);
+for k = 1:3
+    ray = orthogonalGrid.body(k).imageDirections;
+    direction = orthogonalGrid.body(k).basis(4).normalDirections;
+    assert(max(abs(sum(ray.*direction,2)))<1e-14);
+    assert(isequal(orthogonalGrid.body(k).imagePoints, ...
+        stressletGrid.body(k).imagePoints));
+end
 opt.useImages = false;
 basicGrid = build_image_discretization(q,opt);
-assert(all(arrayfun(@(body) numel(body.basis) == 1, basicGrid.body)));
+assert(all(arrayfun(@(body) isscalar(body.basis), basicGrid.body)));
 assert(all(arrayfun(@(body) isempty(body.capPoints), basicGrid.body)));
 assert(all(arrayfun(@(body) isempty(body.imagePoints), basicGrid.body)));
 assert(~isempty(basicGrid.pairs));

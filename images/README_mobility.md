@@ -17,6 +17,8 @@ the opposite sign.
 ## Source ordering and moments
 
 The geometry and options are shared with `solve_resistance_with_images`.
+For stresslet images, `use_orth_dir_images=true` replaces the contact-ray
+source normal by a deterministic orthogonal direction.
 Every body starts with coarse proxy Stokeslets. Selected image families
 follow in `imageFamilies` order (default `SRD`), with all nodes of one
 family contiguous. Each block uses interleaved components

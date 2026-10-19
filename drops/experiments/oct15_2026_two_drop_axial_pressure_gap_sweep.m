@@ -1,290 +1,262 @@
 % OCT15_2026_TWO_DROP_AXIAL_PRESSURE_GAP_SWEEP
-% Two identical active drops have their common direction e along the line
-% of centres. Test whether BOTH translations point toward the other drop,
-% and measure exterior pressure at the midpoint. The fixed-sphere model
-% leaves interior pressure gauges undetermined, so the plane plot shows
-% exterior pressure only. Run this script to perform the gap sweep.
-
+% Verify exterior pressure with/without images at delta=0.1, then sweep
+% two proxy resolutions with images enabled for near pairs. Pressure uses
+% p_0 -> 0 at infinity; interior pressure gauges never enter these plots.
+% Write one final MAT file after the sweep and pressure-field evaluation.
+% Replot later with plot_drop_pressure_sweep(outputFile).
 clear; close all
 
-%% Physical and numerical parameters
-dropRadius = 1;
-innerProxyRadius = 0.6;
+%% Physical problem and the two proxy resolutions
+radius = 1;
+innerProxyRadius = 0.63;
 outerProxyRadius = 2;
-S1 = 2;                           % same active-stress strength on both drops
-interiorViscosity = 10;            % ratio to exterior viscosity mu_0 = 1
-activeDirection = [1 0 0];       % same e_i, along the centre-to-centre axis
-gapList = [1 0.5 0.2 0.1 0.05 0.02 0.01 0.001];
+S1 = 2;
+interiorViscosity = 10;
+e = repmat([1 0 0],2,1);          % Active directions along the line of centres.
+gapList = [1 0.5 0.2 0.1 0.05 0.02 0.01 0.005 0.002 0.001];
 representativeGap = 0.01;
-requestedN = 600;                 % sources per proxy surface and per drop
-collocationToSourceRatio = 1.2;
-validationResolution = 1000;     % minimum independent points per drop
-oneBodySvdTolerance = 1e-13;
-krylovTolerance = 1e-10;
-maxIterations = 150;              % unrestarted GMRES iteration limit
-tractionRowWeight = 1;
-scale_columns = false;
-interactionBatchSize = 128;       % targets per temporary GMRES kernel block
-validationBatchSize = 128;        % targets per temporary validation block
-pressureBatchSize = 128;          % targets per temporary pressure kernel block
-planeGridResolution = [401 241]; % [x,z] points for pressure cross-section
-planePaddingRadii = 1.5;
+requestedN = [700 1000];            % Requested nodes per proxy, per drop.
+collocationToSourceRatio = 2;
+
+%% Image and cap controls, using the two-drop demo's source mixture
+N_image = 30;                     % [] selects the shared adaptive gap rule.
+imageFamilies = "SDRT_nT_t";
+mirror_ext = true;
+nearThreshold = 0.15;             % Images only for delta/radius below this value.
+outerImageOffsetFraction = 0.001;
+capMode = "exponential";          % Or two overlapping "fibonacci" caps.
+capAngles = [pi/5 pi/60];
+capPointCounts = [800 200];        % Exponential mode combines the two counts.
+capExponent = 3;
+capLayers = 18;
+useRowScaling = true;
+plot_grid = false;                % If true, show one drop before every solve.
+
+%% Accuracy controls and independent validation
+svdCutoff = 1e-12;
+gmresTolerance = 1e-10;
+maxIterations = 350;
+validationResolution = 4000;
+validationGapCounts = [4001 1001]; % Wide and narrow independent Fibonacci caps.
+checkGap = 0.1;
+pressureCheckTolerance = 1e-3;     % Relative infinity-norm agreement, not equality.
+pressureReferenceN = 1000;         % Additional no-image refinement at checkGap.
+batchSize = 128;
+planeGridResolution = [401 401];   % [x,z] nodes in the zoomed pressure window.
+gapZoomFactor = 3;                % Vertical half-width in sqrt(radius*delta).
 view_solution = true;
 
-%% Paths and spherical-design grids
+%% Paths, physical scales, and common solver options
 experimentDirectory = fileparts(mfilename('fullpath'));
-dropsDirectory = fileparts(experimentDirectory);
-repositoryDirectory = fileparts(dropsDirectory);
-addpath(dropsDirectory,fullfile(repositoryDirectory,'common','dense'), ...
-    fullfile(repositoryDirectory,'common','eval'), ...
-    fullfile(repositoryDirectory,'common','gmres'), ...
-    fullfile(repositoryDirectory,'geometry','spheres'));
+repositoryDirectory = fileparts(fileparts(experimentDirectory));
+addpath(genpath(repositoryDirectory));
+outputDirectory = fullfile(experimentDirectory,'results','oct19_2026_axial_pressure_images');
+gapList = sort(gapList,'descend');
+if numel(requestedN)~=2 || ~ismember(representativeGap,gapList)
+    error('Choose two resolutions and include representativeGap in gapList.');
+end
+a = radius*ones(2,1);
+S = S1*ones(2,1);
+e = e./vecnorm(e,2,2);
+velocityScale = max(abs(S1)*radius,realmin);
+tractionScale = max(abs(S1),realmin);
+residualScale = [velocityScale velocityScale tractionScale];
+base = struct('N',max(requestedN),'proxyRadius',innerProxyRadius/radius, ...
+    'outerProxyRatio',outerProxyRadius/radius,'collocationRatio',collocationToSourceRatio, ...
+    'useImages',true,'N_image',N_image,'imageFamilies',imageFamilies, ...
+    'mirror_ext',mirror_ext,'nearThreshold',nearThreshold, ...
+    'outerImageOffsetFraction',outerImageOffsetFraction, ...
+    'capMode',capMode,'capAngles',capAngles,'capPointCounts',capPointCounts, ...
+    'capExponent',[capExponent capExponent],'capLayers',[capLayers capLayers], ...
+    'useRowScaling',useRowScaling,'rowWeightMode',"local", ...
+    'interiorViscosity',interiorViscosity,'completionScale',1/(8*pi*radius), ...
+    'velocityScale',velocityScale,'tractionScale',tractionScale, ...
+    'tractionRowWeight',1,'scale_columns',false,'svdCutoff',svdCutoff, ...
+    'gmresTolerance',gmresTolerance,'maxIterations',maxIterations, ...
+    'batchSize',batchSize,'solverMode',"oneBody",'plot_grid',plot_grid);
+base = drop_image_options(base,2,a);
 
-gapList = sort(gapList);
-if ~ismember(representativeGap,gapList)
-    error('The representative gap must appear in gapList.');
+%% First verify the pressure field at delta=0.1 on identical exterior targets
+q = [-(radius+checkGap/2) 0 0;radius+checkGap/2 0 0];
+checkGrid = drop_image_discretization(q,a,base);
+[checkPoints,checkNormals] = drop_image_validation_grid( ...
+    checkGrid,validationResolution,validationGapCounts,capAngles);
+% Check the whole exterior cross-section, a finer gap patch, and both axes.
+[x,z] = meshgrid(linspace(-3*radius,3*radius,61),linspace(-2*radius,2*radius,61));
+[xg,zg] = meshgrid(linspace(-2*checkGap,2*checkGap,61), ...
+    linspace(-sqrt(radius*checkGap),sqrt(radius*checkGap),81));
+axialX = linspace(-0.49*checkGap,0.49*checkGap,101).';
+transverseZ = linspace(-radius,radius,201).';
+checkTargets = [x(:),zeros(numel(x),1),z(:);xg(:),zeros(numel(xg),1),zg(:); ...
+    axialX,zeros(numel(axialX),2);zeros(numel(transverseZ),2),transverseZ];
+outside = true(size(checkTargets,1),1);
+for i = 1:2
+    outside = outside & sum((checkTargets-q(i,:)).^2,2)>radius^2;
 end
-catalogueFile = fullfile(repositoryDirectory,'geometry','spheres', ...
-    'spherical_designs','filelist.txt');
-catalogueID = fopen(catalogueFile,'r');
-if catalogueID < 0
-    error('Cannot read the spherical-design catalogue.');
+checkTargets = checkTargets(outside,:);
+checkN = [base.N;base.N;pressureReferenceN];
+checkImages = [false;true;false];
+checkActualN = zeros(3,1);
+checkPressure = zeros(size(checkTargets,1),3);
+checkMidpoint = zeros(3,1);
+checkResiduals = zeros(3,3);
+checkIterations = zeros(3,1);
+checkOriginal = zeros(3,1);
+for k = 1:3
+    opt = base; opt.useImages = checkImages(k); opt.N = checkN(k);
+    fprintf('\nPressure verification at delta=%.3g, N=%d, useImages=%d\n', ...
+        checkGap,opt.N,opt.useImages);
+    [U,lambda,gamma,g,info] = solve_drops_with_images(q,a,S,e,opt);
+    % grid.body.basis contains every exterior-flow family, including both T's.
+    % Outer sources affect this pressure through the solve, not by direct summation.
+    checkPressure(:,k) = image_pressure(g,lambda,checkTargets,1);
+    checkMidpoint(k) = image_pressure(g,lambda,[0 0 0],1);
+    maxima = drop_image_validate_surface_conditions( ...
+        g,lambda,gamma,U,S,e,info.options,checkPoints,checkNormals);
+    checkResiduals(k,:) = max(maxima,[],1)./residualScale;
+    checkIterations(k) = info.iterations;
+    checkOriginal(k) = info.originalResidual;
+    checkActualN(k) = g.N;
+    if k==2
+        % Reuse the pressure-check image solution when the sweep reaches this case.
+        cachedGrid = g; cachedLambda = lambda; cachedGamma = gamma;
+        cachedU = U; cachedInfo = info; cachedMaxima = maxima;
+    end
 end
-catalogueData = textscan(catalogueID,'%*[^.].%d');
-fclose(catalogueID);
-availableCounts = catalogueData{1};
-[sourceDirections,~] = get_sphdesign(requestedN);
-N = size(sourceDirections,1);
-minimumM = ceil(collocationToSourceRatio*N);
-collocationIndex = find(availableCounts>=minimumM,1);
-if isempty(collocationIndex)
-    error('No spherical design supplies the required collocation nodes.');
-end
-[collocationDirections,~] = get_sphdesign(availableCounts(collocationIndex));
-M = size(collocationDirections,1);
-validationIndex = find(availableCounts>=max(validationResolution,M+1),1);
-if isempty(validationIndex)
-    error('No spherical design supplies the independent validation nodes.');
-end
-[validationDirections,~] = get_sphdesign(availableCounts(validationIndex));
-% Rotate the independent design so that it has no collocation points.
-azimuth = 0.37;
-elevation = 0.23;
-rotationZ = [cos(azimuth) -sin(azimuth) 0; ...
-             sin(azimuth) cos(azimuth) 0;0 0 1];
-rotationY = [cos(elevation) 0 sin(elevation); ...
-             0 1 0;-sin(elevation) 0 cos(elevation)];
-validationDirections = (rotationZ*rotationY*validationDirections.').';
-validationCount = size(validationDirections,1);
-fprintf('Per drop: requested N=%d, actual N=%d; required M>=%d, actual M=%d (M/N=%.3f).\n', ...
-    requestedN,N,minimumM,M,M/N);
-fprintf('Independent validation: requested >=%d, actual %d points per drop.\n', ...
-    validationResolution,validationCount);
-
-%% Solve settings and physical residual scales
-activeDirection = activeDirection/norm(activeDirection);
-activeDirections = repmat(activeDirection,2,1);
-S1ByDrop = [S1;S1];
-if S1 == 0
-    velocityScale = 1;
-    tractionScale = 1;
-    residualScaleLabel = 'unit-scaled';
+pressureDifference = norm(checkPressure(:,2)-checkPressure(:,1),inf);
+pressureRelative = pressureDifference/max(norm(checkPressure(:,1),inf),realmin);
+midpointRelative = abs(checkMidpoint(2)-checkMidpoint(1))/max(abs(checkMidpoint(1)),realmin);
+refinedRelative = norm(checkPressure(:,3)-checkPressure(:,2),inf)/ ...
+    max(norm(checkPressure(:,2),inf),realmin);
+pressureCheckPassed = pressureRelative<=pressureCheckTolerance && ...
+    midpointRelative<=pressureCheckTolerance;
+checkTable = table(checkN,checkActualN,checkImages,checkMidpoint,checkIterations,checkOriginal, ...
+    checkResiduals(:,1),checkResiduals(:,2),checkResiduals(:,3), ...
+    'VariableNames',{'NRequested','NActual','Images','MidpointPressure','GMRESIterations', ...
+    'OriginalResidual','ContinuityRel','NormalRel','TractionRel'});
+disp(checkTable);
+fprintf('Pressure difference: absolute max %.3e; relative field %.3e; relative midpoint %.3e; tolerance %.3e\n', ...
+    pressureDifference,pressureRelative,midpointRelative,pressureCheckTolerance);
+fprintf('Refined no-image field versus image field: relative difference %.3e.\n',refinedRelative);
+if ~pressureCheckPassed
+    warning('axial_pressure_gap_sweep:PressureCheck', ...
+        ['The no-image and image pressures do not agree at the requested tolerance. ', ...
+        'Retain this failed check when interpreting the image sweep.']);
 else
-    velocityScale = abs(S1)*dropRadius; % mu_0 = 1
-    tractionScale = abs(S1);
-    residualScaleLabel = 'relative';
+    fprintf('Pressure verification passed at the requested tolerance.\n');
 end
-solverOpt.interiorViscosity = interiorViscosity;
-solverOpt.completionScale = 1/(8*pi*dropRadius);
-solverOpt.velocityScale = velocityScale;
-solverOpt.tractionScale = tractionScale;
-solverOpt.tractionRowWeight = tractionRowWeight;
-solverOpt.oneBodySvdTolerance = oneBodySvdTolerance;
-solverOpt.krylovTolerance = krylovTolerance;
-solverOpt.maxIterations = maxIterations;
-solverOpt.interactionBatchSize = interactionBatchSize;
-solverOpt.scale_columns = scale_columns;
+fprintf('Starting the two-resolution image sweep; independent residuals are reported for every case.\n');
 
-%% Gap sweep: motion, midpoint pressure, and independent-grid residuals
-caseCount = numel(gapList);
-translationX = zeros(caseCount,2);
-transverseSpeed = zeros(caseCount,1);
-gapRate = zeros(caseCount,1);
-midpointPressure = zeros(caseCount,1);
-relativeBoundaryMaxima = zeros(caseCount,3);
-gmresIterations = zeros(caseCount,1);
-gmresResiduals = zeros(caseCount,1);
-originalResiduals = zeros(caseCount,1);
-setupTimes = zeros(caseCount,1);
-solveTimes = zeros(caseCount,1);
-oneBodyRanks = zeros(caseCount,1);
-newFactorCounts = zeros(caseCount,1);
-factorBank = {};
-
-for caseIndex = 1:caseCount
-    delta = gapList(caseIndex);
-    centreDistance = 2*dropRadius+delta;
-    centres = [-centreDistance/2 0 0;centreDistance/2 0 0];
-    innerSources = cell(1,2);
-    outerSources = cell(1,2);
-    surfacePoints = cell(1,2);
-    normals = cell(1,2);
-    validationPoints = cell(1,2);
-    validationNormals = cell(1,2);
-    for body = 1:2
-        innerSources{body} = centres(body,:)+ ...
-            innerProxyRadius*sourceDirections;
-        outerSources{body} = centres(body,:)+ ...
-            outerProxyRadius*sourceDirections;
-        surfacePoints{body} = centres(body,:)+ ...
-            dropRadius*collocationDirections;
-        normals{body} = collocationDirections;
-        validationPoints{body} = centres(body,:)+ ...
-            dropRadius*validationDirections;
-        validationNormals{body} = validationDirections;
-    end
-
-    % Each body has [alpha(3N);gamma(3N)] coefficients. The recovered
-    % exterior strengths lambda=P*alpha are force free, and U comes from
-    % alpha's completion. Identical translated drops reuse one SVD factor.
-    [translations,~,gamma,lambda,diagnostics,factorBank] = ...
-        solve_drops_preconditioned(innerSources,outerSources, ...
-        surfacePoints,normals,S1ByDrop,activeDirections, ...
-        solverOpt,factorBank);
-    translationX(caseIndex,:) = translations(:,1).';
-    transverseSpeed(caseIndex) = max(vecnorm(translations(:,2:3),2,2));
-    gapRate(caseIndex) = translations(2,1)-translations(1,1);
-
-    % The midpoint is x=(0,0,0), strictly in the exterior for delta>0.
-    % p_0 tends to zero at infinity; no interior pressure gauge enters.
-    midpointPressure(caseIndex) = drop_exterior_pressure( ...
-        [0 0 0],innerSources,lambda,pressureBatchSize);
-
-    maximumPhysicalErrors = drop_validate_surface_conditions( ...
-        lambda,gamma,translations,innerSources,outerSources, ...
-        validationPoints,validationNormals,activeDirections, ...
-        S1ByDrop,interiorViscosity,validationBatchSize);
-    relativeBoundaryMaxima(caseIndex,:) = max( ...
-        maximumPhysicalErrors./[velocityScale velocityScale tractionScale], ...
-        [],1);
-    gmresIterations(caseIndex) = diagnostics.iterations;
-    gmresResiduals(caseIndex) = diagnostics.regularizedResidual;
-    originalResiduals(caseIndex) = diagnostics.originalResidual;
-    setupTimes(caseIndex) = diagnostics.setupTime;
-    solveTimes(caseIndex) = diagnostics.solveTime;
-    oneBodyRanks(caseIndex) = diagnostics.retainedRanks(1);
-    newFactorCounts(caseIndex) = diagnostics.newFactorCount;
-
-    fprintf('delta=%7.4g: U1x=% .5e, U2x=% .5e, d(delta)/dt=% .5e, p_mid=% .5e; GMRES %d, rel BC [%.2e %.2e %.2e].\n', ...
-        delta,translationX(caseIndex,1),translationX(caseIndex,2), ...
-        gapRate(caseIndex),midpointPressure(caseIndex), ...
-        gmresIterations(caseIndex),relativeBoundaryMaxima(caseIndex,:));
-
-    if delta == representativeGap
-        representativeCentres = centres;
-        representativeSources = innerSources;
-        representativeStrengths = lambda;
-    end
-end
-
-%% Signed motion test and pressure summary
-% With c_1 to the left of c_2, both drops move toward one another exactly
-% when U_1x>0 and U_2x<0. A negative d(delta)/dt means the gap closes.
-leftTowardSpeed = translationX(:,1);
-rightTowardSpeed = -translationX(:,2);
-bothPointToward = leftTowardSpeed>0 & rightTowardSpeed>0;
-fprintf('\nMotion toward one another at %d of %d gaps; gap closes at %d of %d gaps.\n', ...
-    nnz(bothPointToward),caseCount,nnz(gapRate<0),caseCount);
-fprintf('Boundary residuals are %s: velocity scale %.3g, traction scale %.3g.\n', ...
-    residualScaleLabel,velocityScale,tractionScale);
-fprintf('Pressure is physical exterior pressure with p_0 -> 0 at infinity; midpoint magnitude is |p_mid|.\n');
-disp(table(gapList(:),leftTowardSpeed,rightTowardSpeed,gapRate, ...
-    midpointPressure,abs(midpointPressure),bothPointToward, ...
-    transverseSpeed,gmresIterations,gmresResiduals,originalResiduals, ...
-    relativeBoundaryMaxima(:,1),relativeBoundaryMaxima(:,2), ...
-    relativeBoundaryMaxima(:,3),oneBodyRanks,newFactorCounts, ...
-    setupTimes,solveTimes, ...
-    'VariableNames',{'Gap','U1Toward','U2Toward','GapRate', ...
-    'MidpointPressure','PressureMagnitude','BothPointToward', ...
-    'MaxTransverseSpeed','GMRESIterations','GMRESResidual', ...
-    'OriginalResidual','ContinuityRel','NormalRel','TractionRel', ...
-    'OneBodyRank','NewFactors','SetupSeconds','SolveSeconds'}));
-
-%% Gap plots and exterior pressure in the x-z plane
+% A transverse gap profile makes any pressure disagreement visible.
 if view_solution
-    figure('Name','Axial drop motion and midpoint pressure versus gap', ...
-        'Color','w');
-    tiledlayout(1,2);
-    nexttile;
-    plot(gapList,leftTowardSpeed,'o-','LineWidth',1.3); hold on;
-    plot(gapList,rightTowardSpeed,'s-','LineWidth',1.3);
-    yline(0,'k:');
-    set(gca,'XScale','log');
-    axis tight; grid on;
-    xlabel('$\delta$','Interpreter','latex');
-    ylabel('Speed toward the other drop','Interpreter','latex');
-    title('Positive values mean approach','Interpreter','latex');
-    legend({'$U_{1x}$','$-U_{2x}$'}, ...
-        'Interpreter','latex','Location','best');
-
-    nexttile;
-    plot(gapList,abs(midpointPressure),'o-','LineWidth',1.3);
-    set(gca,'XScale','log');
-    axis tight; grid on;
-    xlabel('$\delta$','Interpreter','latex');
-    ylabel('$|p_0(0,0,0)|$','Interpreter','latex');
-    title('Exterior midpoint pressure magnitude','Interpreter','latex');
-
-    centreDistance = 2*dropRadius+representativeGap;
-    xExtent = centreDistance/2+dropRadius+ ...
-        planePaddingRadii*dropRadius;
-    zExtent = (1+planePaddingRadii)*dropRadius;
-    xGrid = linspace(-xExtent,xExtent,planeGridResolution(1));
-    zGrid = linspace(-zExtent,zExtent,planeGridResolution(2));
-    [gridX,gridZ] = meshgrid(xGrid,zGrid);
-    planeTargets = [gridX(:),zeros(numel(gridX),1),gridZ(:)];
-    exterior = true(size(planeTargets,1),1);
-    for body = 1:2
-        exterior = exterior & ...
-            sum((planeTargets-representativeCentres(body,:)).^2,2) > ...
-            dropRadius^2;
+    rows = find(abs(checkTargets(:,1))<eps & abs(checkTargets(:,3))<=radius);
+    [~,order] = sort(checkTargets(rows,3)); rows = rows(order);
+    figure('Name','Pressure verification at delta=0.1','Color','w');
+    hold on
+    labels = ["without images","with images","without images"];
+    for k = 1:3
+        plot(checkTargets(rows,3),checkPressure(rows,k),'LineWidth',1.3, ...
+            'DisplayName',sprintf('N=%d, %s',checkActualN(k),labels(k)));
     end
-    planePressure = nan(size(planeTargets,1),1);
-    planePressure(exterior) = drop_exterior_pressure( ...
-        planeTargets(exterior,:),representativeSources, ...
-        representativeStrengths,pressureBatchSize);
+    xlabel('z at x=y=0'); ylabel('Exterior pressure p_0');
+    title(sprintf('Pressure comparison at delta=%.3g',checkGap));
+    grid on; legend('Location','best');
+end
 
-    figure('Name','Signed exterior pressure through two active drops', ...
-        'Color','w');
-    pressureImage = imagesc(xGrid,zGrid,reshape(planePressure,size(gridX)));
-    set(pressureImage,'AlphaData',reshape(exterior,size(gridX)));
-    set(gca,'YDir','normal');
-    hold on;
-    theta = linspace(0,2*pi,301);
-    for body = 1:2
-        plot(representativeCentres(body,1)+dropRadius*cos(theta), ...
-            dropRadius*sin(theta),'k-','LineWidth',1.4);
+%% Sweep gaps with a common independent grid at each separation
+names = {'NRequested','NActual','Gap','ImagesPerLine','CollocationPerDrop', ...
+    'U1Toward','U2Toward','GapRate','MidpointPressure','PressureMagnitude', ...
+    'MaxTransverseSpeed','GMRESIterations','GMRESResidual','OriginalResidual', ...
+    'ContinuityRel','NormalRel','TractionRel','Rank1','Rank2', ...
+    'SetupSeconds','SolveSeconds','ForceSumNorm'};
+sweep = array2table(nan(2*numel(gapList),numel(names)),'VariableNames',names);
+representativeGrids = cell(2,1);
+representativeStrengths = cell(2,1);
+row = 0;
+for resolution = 1:2
+    opt = base; opt.N = requestedN(resolution);
+    for delta = gapList
+        row = row+1;
+        q = [-(radius+delta/2) 0 0;radius+delta/2 0 0];
+        fprintf('\nSweep %d/%d: requested N=%d, delta=%.4g\n', ...
+            row,height(sweep),opt.N,delta);
+        if opt.N==base.N && delta==checkGap
+            U = cachedU; lambda = cachedLambda; gamma = cachedGamma;
+            g = cachedGrid; info = cachedInfo; maxima = cachedMaxima;
+            fprintf('Reusing the pressure-check image solution at delta=0.1.\n');
+        else
+            [U,lambda,gamma,g,info] = solve_drops_with_images(q,a,S,e,opt);
+            [points,normals] = drop_image_validation_grid( ...
+                g,validationResolution,validationGapCounts,capAngles);
+            maxima = drop_image_validate_surface_conditions( ...
+                g,lambda,gamma,U,S,e,info.options,points,normals);
+        end
+        pMid = image_pressure(g,lambda,[0 0 0],1);
+        boundaryMaxima = max(maxima,[],1)./residualScale;
+        sweep{row,:} = [opt.N,g.N,delta,g.body(1).N_image, ...
+            size(g.body(1).collocation,1),U(1,1),-U(2,1),U(2,1)-U(1,1), ...
+            pMid,abs(pMid),max(vecnorm(U(:,2:3),2,2)),info.iterations, ...
+            info.regularizedResidual,info.originalResidual,boundaryMaxima, ...
+            info.retainedRanks(:).',info.setupTime,info.solveTime,max(info.forceSumNorm)];
+        fprintf('U1x=% .5e, U2x=% .5e, gap rate=% .5e, p_mid=% .5e; GMRES %d, BC [%.2e %.2e %.2e]\n', ...
+            U(1,1),U(2,1),U(2,1)-U(1,1),pMid,info.iterations,boundaryMaxima);
+        if ~info.converged
+            warning('axial_pressure_gap_sweep:GMRES', ...
+                'GMRES missed its tolerance at N=%d, delta=%.4g.',opt.N,delta);
+        end
+        if delta==representativeGap
+            representativeGrids{resolution} = g;
+            representativeStrengths{resolution} = lambda;
+        end
     end
-    plot(0,0,'ko','MarkerFaceColor','k','MarkerSize',4);
-    maximumPressure = max(abs(planePressure(exterior)));
-    if maximumPressure > 0
-        clim([-maximumPressure maximumPressure]);
-    end
-    % A gray zero distinguishes near-zero exterior pressure from the white
-    % masked drop interiors; blue and red retain the pressure sign.
-    colourPositions = linspace(0,1,257).';
-    pressureColours = interp1([0 0.5 1], ...
-        [0.10 0.27 0.60;0.70 0.70 0.70;0.65 0.07 0.12], ...
-        colourPositions);
-    colormap(pressureColours);
-    pressureColourbar = colorbar;
-    pressureColourbar.Label.String = '$p_0$';
-    pressureColourbar.Label.Interpreter = 'latex';
-    axis equal tight;
-    xlim([-xExtent xExtent]);
-    ylim([-zExtent zExtent]);
-    xlabel('$x$','Interpreter','latex');
-    ylabel('$z$','Interpreter','latex');
-    title(sprintf('Exterior pressure at $\\delta=%.3g$; interiors masked', ...
-        representativeGap),'Interpreter','latex');
+end
+sweep.GMRESConverged = sweep.GMRESResidual<=gmresTolerance;
+sweep.IterationLimitReached = sweep.GMRESIterations>=maxIterations;
+fprintf('\nExterior pressure has p_0 -> 0 at infinity. Images activate for delta/a < %.3g.\n',nearThreshold);
+disp(sweep);
+% Resolution differences are diagnostics, not an extrapolated error estimate.
+coarse = sweep(sweep.NRequested==requestedN(1),:);
+fine = sweep(sweep.NRequested==requestedN(2),:);
+pressureChange = abs(fine.MidpointPressure-coarse.MidpointPressure)./ ...
+    max(abs(fine.MidpointPressure),realmin);
+resolutionTable = table(fine.Gap,coarse.MidpointPressure,fine.MidpointPressure, ...
+    pressureChange,'VariableNames',{'Gap','PressureCoarse','PressureFine','RelativeChange'});
+disp(resolutionTable);
+
+%% Zoomed exterior pressure: common colour limits and exactly white at zero
+zExtent = min(0.8*radius,gapZoomFactor*sqrt(radius*representativeGap));
+xExtent = 1.25*(radius+representativeGap/2-sqrt(radius^2-zExtent^2));
+xGrid = linspace(-xExtent,xExtent,planeGridResolution(1));
+zGrid = linspace(-zExtent,zExtent,planeGridResolution(2));
+[gridX,gridZ] = meshgrid(xGrid,zGrid);
+planeTargets = [gridX(:),zeros(numel(gridX),1),gridZ(:)];
+q = representativeGrids{1}.centres;
+exterior = true(size(planeTargets,1),1);
+for i = 1:2
+    exterior = exterior & sum((planeTargets-q(i,:)).^2,2)>radius^2;
+end
+planePressure = nan(size(planeTargets,1),2);
+for resolution = 1:2
+    planePressure(exterior,resolution) = image_pressure( ...
+        representativeGrids{resolution},representativeStrengths{resolution}, ...
+        planeTargets(exterior,:),1);
+end
+pressureLimit = max(max(abs(planePressure(exterior,:)),[],'all'),eps);
+pressureColours = interp1([0 0.5 1], ...
+    [0.10 0.27 0.60;1 1 1;0.65 0.07 0.12],linspace(0,1,257).');
+
+%% Save the completed sweep, checks, and representative pressure field once
+if ~isfolder(outputDirectory), mkdir(outputDirectory); end
+outputFile = fullfile(outputDirectory,'gap_sweep.mat');
+save(outputFile,'sweep','resolutionTable','requestedN','gapList','base', ...
+    'radius','S','e','validationResolution','validationGapCounts', ...
+    'checkTable','checkGap','pressureDifference','pressureRelative', ...
+    'midpointRelative','refinedRelative','pressureCheckPassed','pressureCheckTolerance', ...
+    'representativeGap','representativeGrids','representativeStrengths', ...
+    'xGrid','zGrid','planePressure','exterior','pressureLimit','pressureColours','q');
+fprintf('Final results saved in %s\n',outputFile);
+
+% Use the same plotter for live results and later inspection of the saved file.
+if view_solution
+    plot_drop_pressure_sweep(outputFile);
 end

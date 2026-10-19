@@ -1,5 +1,5 @@
 function [points,metadata] = image_line_points( ...
-    centre,neighborCentre,radius,proxyRadius,N_image,offsetFraction)
+    centre,neighborCentre,radius,proxyRadius,N_image,offsetFraction,neighborRadius)
 %IMAGE_LINE_POINTS Place lubrication-adapted sources inside one sphere.
 %   [points,metadata] = image_line_points(c1,c2,R,Rp,N_image,offsetFraction)
 %   image_line_points() runs a small geometry check and illustration.
@@ -23,19 +23,24 @@ end
 if nargin < 6 || isempty(offsetFraction)
     offsetFraction = 0.05;
 end
+if nargin < 7 || isempty(neighborRadius)
+    neighborRadius = radius;
+end
 validateattributes(centre,{'numeric'},{'real','finite','size',[1,3]});
 validateattributes(neighborCentre,{'numeric'},{'real','finite','size',[1,3]});
 validateattributes(radius,{'numeric'},{'scalar','positive','finite'});
+validateattributes(neighborRadius,{'numeric'},{'scalar','positive','finite'});
 validateattributes(proxyRadius,{'numeric'},{'scalar','positive','<',radius});
 validateattributes(N_image,{'numeric'},{'scalar','integer','nonnegative'});
 validateattributes(offsetFraction,{'numeric'},{'scalar','nonnegative','finite'});
 separation = norm(neighborCentre-centre);
-gap = separation-2*radius;
+gap = separation-radius-neighborRadius;
 assert(gap > 0,'image_line_points:OverlappingSpheres');
 direction = (neighborCentre-centre)/separation;
-relativeGap = gap/radius;
-accumulationRadius = radius*(1+relativeGap/2- ...
-    sqrt(relativeGap+relativeGap^2/4));
+midpoint = (separation^2+radius^2-neighborRadius^2)/(2*separation);
+focus = sqrt((separation^2-(radius+neighborRadius)^2)* ...
+    (separation^2-(radius-neighborRadius)^2))/(2*separation);
+accumulationRadius = midpoint-focus;
 if N_image > 0
     innerRadius = proxyRadius*(1+offsetFraction);
     assert(innerRadius < accumulationRadius, ...
@@ -62,6 +67,10 @@ assert(size(points,1) == 20);
 assert(abs(points(1,1)-info.accumulationRadius) < 1e-14);
 assert(all(diff(info.radialCoordinates) < 0));
 assert(all(vecnorm(points-centre,2,2) < 1));
+[unequal,meta] = image_line_points(centre,[3.1,0,0],1,0.63,8,0.05,2);
+assert(all(vecnorm(unequal-centre,2,2)<1));
+assert(abs(meta.accumulationRadius-(1.0661290322580645- ...
+    sqrt((3.1^2-3^2)*(3.1^2-1))/(2*3.1)))<1e-12);
 [rotated,~] = image_line_points(centre,[0,2.01,0],1,0.63,20,0.05);
 assert(norm(rotated(:,2)-points(:,1),inf) < 1e-14);
 figure('Name','Image line geometry self-test');
