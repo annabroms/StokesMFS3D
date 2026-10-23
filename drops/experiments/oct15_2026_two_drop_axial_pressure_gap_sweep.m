@@ -12,14 +12,19 @@ innerProxyRadius = 0.63;
 outerProxyRadius = 2;
 S1 = 2;
 interiorViscosity = 10;
-e = repmat([1 0 0],2,1);          % Active directions along the line of centres.
+e = repmat([0 0 1],2,1);          % Active directions along the line of centres. z direction gives much larger errors than x direction
+e = repmat([1 0 0],2,1);
 gapList = [1 0.5 0.2 0.1 0.05 0.02 0.01 0.005 0.002 0.001];
-representativeGap = 0.01;
+gapList = [0.1];
+representativeGap = 0.1;
 requestedN = [700 1000];            % Requested nodes per proxy, per drop.
 collocationToSourceRatio = 2;
 
 %% Image and cap controls, using the two-drop demo's source mixture
 N_image = 30;                     % [] selects the shared adaptive gap rule.
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
 imageFamilies = "SDRT_nT_t";
 mirror_ext = true;
 nearThreshold = 0.15;             % Images only for delta/radius below this value.
@@ -63,7 +68,7 @@ tractionScale = max(abs(S1),realmin);
 residualScale = [velocityScale velocityScale tractionScale];
 base = struct('N',max(requestedN),'proxyRadius',innerProxyRadius/radius, ...
     'outerProxyRatio',outerProxyRadius/radius,'collocationRatio',collocationToSourceRatio, ...
-    'useImages',true,'N_image',N_image,'imageFamilies',imageFamilies, ...
+    'useImages',true,'N_image',N_image,'imageFamilies',imageFamilies, ... % See token legend above.
     'mirror_ext',mirror_ext,'nearThreshold',nearThreshold, ...
     'outerImageOffsetFraction',outerImageOffsetFraction, ...
     'capMode',capMode,'capAngles',capAngles,'capPointCounts',capPointCounts, ...

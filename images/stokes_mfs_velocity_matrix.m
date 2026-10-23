@@ -6,7 +6,7 @@ function A = stokes_mfs_velocity_matrix(basis,targets)
 % [ux1;uy1;uz1;ux2;...], [cx1;cy1;cz1;cx2;...].  Blocks are concatenated.
 % S is a Stokeslet, R a rotlet, T a stresslet with the specified source
 % normal, and D a potential dipole.  All existing kernels use viscosity 1.
-% T_n and T_t label independent stresslet blocks with supplied normals.
+% T_n, T_n2, T_t label stresslet directions; Q_s uses the image-line axis.
 
 if nargin == 0
     self_test(); A = []; return
@@ -25,7 +25,7 @@ for k = 1:numel(basis)
         case "R"
             [K,~,~] = stokes_singularity_matrices( ...
                 block.points,targets,eye(3),logical([1,0,0]));
-        case {"T","T_n","T_t"}
+        case {"T","T_n","T_n2","T_t"}
             % Assemble the per-source normal contraction directly, keeping
             % one 3N-column block rather than three Cartesian blocks.
             assert(isequal(size(block.normalDirections),[ns,3]));
@@ -35,6 +35,9 @@ for k = 1:numel(basis)
         case "D"
             [~,~,K] = stokes_singularity_matrices( ...
                 block.points,targets,eye(3),logical([0,0,1]));
+        case "Q_s"
+            K = stokes_axial_quadrupole_matrix( ...
+                block.points,targets,block.normalDirections,"velocity");
         otherwise
             error('stokes_mfs_velocity_matrix:BadFamily', ...
                 'Unknown fundamental-solution family "%s".',block.family);
@@ -45,23 +48,40 @@ end
 end
 
 function self_test()
-% Verify both directional blocks and their exact shared stresslet mode.
-b = struct('family',"T_n",'points',[0.1 0.2 0.3], ...
-    'normalDirections',[0 0 1],'scale',1);
-c = b; c.family = "T_t"; c.normalDirections = [1 0 0];
-x = [1.2 -0.2 0.8;0.4 1.1 -0.6];
+% Verify three exact skew-strength modes and the six physical tensor modes.
+b = struct('family',"T_t",'points',[0.1 0.2 0.3], ...
+    'normalDirections',[1 0 0],'scale',1);
+basis = repmat(b,3,1);
+basis(2).family = "T_n";
+basis(2).normalDirections = [0 1 0];
+basis(3).family = "T_n2";
+basis(3).normalDirections = [0 0 1];
+x = [1.2 -0.2 0.8;0.4 1.1 -0.6;-0.8 0.3 1.1; ...
+    0.7 -0.9 -0.5;1.1 0.9 0.4;-0.5 -1.3 0.8];
 n = x./vecnorm(x,2,2);
-basis = [b;c];
 A = stokes_mfs_velocity_matrix(basis,x);
-z = [c.normalDirections.';-b.normalDirections.'];
 grid.body.basis = basis;
-if norm(A*z)>1e-14 || norm(image_pressure(grid,{z},x,1))>1e-14 || ...
-        norm(image_traction(grid,{z},x,n,1),'fro')>1e-14
-    error('stokes_mfs_velocity_matrix:SelfTest','Shared stresslet mode is not null.');
+for i = 1:2
+    for j = i+1:3
+        z = zeros(9,1);
+        z(3*i-2:3*i) = basis(j).normalDirections.';
+        z(3*j-2:3*j) = -basis(i).normalDirections.';
+        if norm(A*z)>1e-14 || norm(image_pressure(grid,{z},x,1))>1e-14 || ...
+                norm(image_traction(grid,{z},x,n,1),'fro')>1e-14
+            error('stokes_mfs_velocity_matrix:SelfTest', ...
+                'A skew-strength stresslet mode is not null.');
+        end
+    end
 end
-basis(1).family = "T"; basis(2).family = "T";
-if norm(A-stokes_mfs_velocity_matrix(basis,x),'fro')>1e-14
+singularValues = svd(A);
+if nnz(singularValues>1e-11*singularValues(1))~=6
+    error('stokes_mfs_velocity_matrix:SelfTest', ...
+        'The three-direction stresslet does not have rank six.');
+end
+legacy = basis;
+legacy(1).family = "T"; legacy(2).family = "T"; legacy(3).family = "T";
+if norm(A-stokes_mfs_velocity_matrix(legacy,x),'fro')>1e-14
     error('stokes_mfs_velocity_matrix:SelfTest','Directional labels changed the kernel.');
 end
-fprintf('stokes_mfs_velocity_matrix self-test passed (joint stresslet null mode).\n');
+fprintf('stokes_mfs_velocity_matrix self-test passed (three stresslet null modes).\n');
 end

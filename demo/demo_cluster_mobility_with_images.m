@@ -25,6 +25,9 @@ else
 end
 N = 686;
 N_image = [];
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
 opt = struct('N',N,'proxyRadius',0.63, ...
     'N_image',N_image,'imageFamilies',"SRDT", ...
     'capMode',capMode,'capAngles',[pi/5,pi/60], ...

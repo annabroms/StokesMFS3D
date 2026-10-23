@@ -1,7 +1,7 @@
 function t = image_traction(grid,lambda,x,n,mu)
 %IMAGE_TRACTION Exterior stress times supplied target normals for image MFS.
 %   t = image_traction(grid,lambda,x,n,mu)
-%   image_traction() checks all four families against velocity derivatives.
+%   image_traction() checks every supported image family against derivatives.
 %
 % grid and lambda are details.grid and details.lambda from an image solve.
 % lambda contains unit-viscosity velocity coefficients, interleaved by node.
@@ -34,10 +34,10 @@ for body = 1:numel(grid.body)
     for block = 1:numel(basis)
         y = basis(block).points;
         c = coeff{block};
-        if ismember(basis(block).family,["T","T_n","T_t"]) && ...
+        if ismember(basis(block).family,["T","T_n","T_n2","T_t","Q_s"]) && ...
                 ~isequal(size(basis(block).normalDirections),size(c))
             error('image_traction:BadDirection', ...
-                'Each stresslet needs one source direction.');
+                'Each directional image block needs one source direction.');
         end
         for first = 1:batchSize:size(x,1)
             rows = first:min(first+batchSize-1,size(x,1));
@@ -72,7 +72,7 @@ for body = 1:numel(grid.body)
                         t(rows,j) = t(rows,j)-3/(8*pi)*sum( ...
                             (w{j}.*rn+r{j}.*wn).*ir5,2);
                     end
-                case {"T","T_n","T_t"}
+                case {"T","T_n","T_n2","T_t"}
                     q = basis(block).normalDirections;
                     a = r{1}.*q(:,1).'+r{2}.*q(:,2).'+ ...
                         r{3}.*q(:,3).';
@@ -99,6 +99,9 @@ for body = 1:numel(grid.body)
                             -15*rc.*r{j}.*rn.*ir7/(2*pi);
                         t(rows,j) = t(rows,j)+sum(value,2);
                     end
+                case "Q_s"
+                    t(rows,:) = t(rows,:)+stokes_axial_quadrupole_field( ...
+                        y,z,basis(block).normalDirections,c,"traction",nn);
                 otherwise
                     error('image_traction:BadFamily', ...
                         'Unknown source family "%s".',basis(block).family);
@@ -117,7 +120,7 @@ addpath(fullfile(root,'common','eval'),fullfile(root,'common','dense'), ...
     fullfile(root,'drops'),fullfile(root,'images'));
 base = struct('family',"S",'points',[0,0,0], ...
     'normalDirections',zeros(0,3),'scale',1);
-families = ["S","R","T","D","T_n","T_t"];
+families = ["S","R","T","D","T_n","T_t","T_n2","Q_s"];
 x = [1.1,0.4,-0.3;0.5,-0.8,1.2];
 n = x./vecnorm(x,2,2);
 strength = [0.7;-0.2;0.4];
@@ -128,7 +131,7 @@ maxStokes = 0;
 for family = families
     block = base;
     block.family = family;
-    if ismember(family,["T","T_n","T_t"])
+    if ismember(family,["T","T_n","T_t","T_n2","Q_s"])
         block.normalDirections = [0.3,0.4,sqrt(0.75)];
     end
     grid.body.basis = block;

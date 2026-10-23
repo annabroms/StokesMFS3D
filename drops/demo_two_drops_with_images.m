@@ -11,7 +11,9 @@ capAngles = [pi/5 pi/60];        % Wide/narrow angular radii (36 and 3 degrees).
 capPointCounts = [800 200];      % Wide/narrow counts; 1,000 points in total.
 capExponent = 3;                % Exponential only: larger clusters nearer contact.
 capLayers = 18;                 % Exponential only: number of polar rings.
-% imageFamilies="SDRT_nT_t" adds both transverse and line-parallel stresslets.
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
 root = fileparts(fileparts(mfilename('fullpath')));
 addpath(genpath(root));
 q = [-1.005 0 0;1.005 0 0];

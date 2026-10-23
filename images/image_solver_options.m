@@ -10,6 +10,10 @@ end
 if isempty(opt)
     opt = struct();
 end
+% imageFamilies: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second
+% transverse stresslet, Q_s trace-free axial Stokeslet quadrupole.
+% T cannot be combined with any explicit T_* token; token order is block order.
 defaults = struct('proxyRadius',0.63,'N',686, ...
     'viscosity',1, ...
     'collocationRatio',1.2,'nearThreshold',0.15,'N_image',[], ...

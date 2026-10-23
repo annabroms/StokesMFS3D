@@ -46,10 +46,14 @@ dipole.points = [0.2,0,0];
 stresslet = dipole;
 stresslet.family = "T";
 body.basis = [base;rotlet;dipole;stresslet];
+quadrupole = dipole;
+quadrupole.family = "Q_s";
+quadrupole.normalDirections = [1 0 0];
+body.basis(end+1) = quadrupole;
 [H,C] = image_mobility_maps(body,q);
-assert(isequal(size(H),[6,21]) && isequal(size(C),[21,6]));
-assert(all(H(:,16:21) == 0,'all'));
-z = zeros(21,1);
+assert(isequal(size(H),[6,24]) && isequal(size(C),[24,6]));
+assert(all(H(:,16:24) == 0,'all'));
+z = zeros(24,1);
 z(2) = 1; z(5) = -1; z(15) = -1; % R has scale two.
 assert(norm(H*z) < 1e-14);
 f = [1;2;3;4;5;6];

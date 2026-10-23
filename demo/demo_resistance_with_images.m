@@ -18,6 +18,10 @@ q = [0,0,0;2.05,0,0];
 U = [1;0;0;0;0;0;-1;0;0;0;0;0];
 N = 686;
 N_image = []; % Adaptive from the sphere gap by paper Eq. (39).
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
+imageFamilies = "SRD";
 capMode = "exponential"; % Change to "fibonacci" for the paper's caps.
 capPointCounts = [];
 if capMode == "exponential"
@@ -26,7 +30,8 @@ if capMode == "exponential"
     % 18 exponentially graded rings.
     capPointCounts = 1078;
 end
-opt = struct('N',N,'N_image',[], ...
+opt = struct('N',N,'N_image',N_image, ...
+    'imageFamilies',imageFamilies, ... % See token legend above.
     'capMode',capMode,'capPointCounts',capPointCounts, ...
     'capLayers',[18,18],'capExponent',[3,3],'capMinAzimuth',8, ...
     'validationCount',1000, ...

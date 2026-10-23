@@ -7,7 +7,7 @@
 clear;
 close all;
 %% Configure geometry and image discretisation
-useSVD = false; % Dense SVD for both resistance and mobility when true.
+useSVD = true; % Dense SVD for both resistance and mobility when true.
 % Set either flag false to use identity rows in that solver.
 useResistanceRowScaling = true;
 useMobilityRowScaling = false;
@@ -15,6 +15,10 @@ q = [0,0,0;2.001,0,0];
 Uref = [1;0;0;0;0;0;-1;0;0;0;0;0];
 N = 686;
 N_image = []; % If empty: adaptive from image paper Eq. (39).
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
+imageFamilies = "SRDQ_s";
 capMode = "exponential"; % Switch to "fibonacci" for the paper's caps.
 capPointCounts = [];
 if capMode == "exponential"
@@ -24,10 +28,12 @@ else
     rowWeightMode = "paper";
 end
 opt = struct('N',N,'N_image',N_image, ...
+    'imageFamilies',imageFamilies, ... % See token legend above.
     'capMode',capMode,'capPointCounts',capPointCounts, ...
     'rowWeightMode',rowWeightMode, ...
     'capLayers',[18,18],'capExponent',[3,3],'capMinAzimuth',8, ...
     'validationCount',1000,'validationGapCount',401);
+% Both solvers and the refined mobility check use this one family selection.
 resOpt = opt;
 resOpt.useRowScaling = useResistanceRowScaling;
 mobOpt = opt;

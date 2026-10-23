@@ -75,6 +75,11 @@ body.basis(4).family = "T_n";
 body.basis(6) = body.basis(4);
 body.basis(6).family = "T_t";
 body.basis(6).normalDirections = [0 1 0];
+body.basis(7) = body.basis(4);
+body.basis(7).family = "T_n2";
+body.basis(7).normalDirections = [0 0 1];
+body.basis(8) = body.basis(4);
+body.basis(8).family = "Q_s";
 [~,H] = drop_image_self_block(body,2,1/(8*pi));
 if any(H(:,22:end),'all')
     error('drop_image_self_block:SelfTest','Only Stokeslets may enter the force map.');

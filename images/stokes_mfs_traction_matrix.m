@@ -1,5 +1,5 @@
 function A = stokes_mfs_traction_matrix(basis,x,n)
-%STOKES_MFS_TRACTION_MATRIX Mixed S/R/T/D physical traction at unit strength.
+%STOKES_MFS_TRACTION_MATRIX Mixed image-source traction at unit strength.
 % Rows and each basis block use node-interleaved Cartesian components.
 if nargin == 0
     self_test(); A = []; return
@@ -25,7 +25,14 @@ for b = 1:numel(basis)
     ir5 = ir3./r2;
     ir7 = ir5./r2;
     rn = r{1}.*n(:,1)+r{2}.*n(:,2)+r{3}.*n(:,3);
-    if ismember(block.family,["T","T_n","T_t"])
+    if block.family=="Q_s"
+        cols = col0+(1:3*N);
+        A(:,cols) = block.scale*stokes_axial_quadrupole_matrix( ...
+            y,x,block.normalDirections,"traction",n);
+        col0 = col0+3*N;
+        continue
+    end
+    if ismember(block.family,["T","T_n","T_n2","T_t"])
         q = block.normalDirections;
         if ~isequal(size(q),[N,3])
             error('stokes_mfs_traction_matrix:BadDirection', ...
@@ -48,7 +55,7 @@ for b = 1:numel(basis)
                         if h == j, w = v; end
                     end
                     value = -3/(8*pi)*(w.*rn+r{j}.*wn).*ir5;
-                case {"T","T_n","T_t"}
+                case {"T","T_n","T_n2","T_t"}
                     value = -q(:,k).'.*n(:,j).*ir3/(2*pi) ...
                         -3/(4*pi)*(r{j}.*(qn.*r{k}+n(:,k).*a) + ...
                         (q(:,j).'.*r{k}+(j==k)*a).*rn).*ir5 ...
@@ -80,15 +87,15 @@ end
 end
 
 function self_test()
-% Compare every column of all four families with direct physical traction.
+% Compare every column of the selected families with direct physical traction.
 base = struct('family',"S",'points',[0.1 0.2 -0.1], ...
     'normalDirections',zeros(0,3),'scale',1.3);
-basis = repmat(base,6,1);
-families = ["S","R","T","D","T_n","T_t"];
-for k = 1:6
+basis = repmat(base,8,1);
+families = ["S","R","T","D","T_n","T_t","T_n2","Q_s"];
+for k = 1:numel(families)
     basis(k).family = string(families(k));
     basis(k).points = [0.1*k 0.2 -0.1];
-    if ismember(k,[3 5 6]), basis(k).normalDirections = [0 1 0]; end
+    if ismember(k,[3 5 6 7 8]), basis(k).normalDirections = [0 1 0]; end
 end
 x = [1.1 0.2 0.3;0.5 1.2 0.4];
 n = x./vecnorm(x,2,2);

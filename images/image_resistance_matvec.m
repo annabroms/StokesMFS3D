@@ -8,7 +8,7 @@ function result = image_resistance_matvec(mu,grid,factors,batchSize)
 % factors(k) is from one_body_image_preconditioner. The diagonal action is
 % exactly identity; each off-diagonal contribution is W_k*G_kj*B_j^+*mu_j.
 % W_k repeats the effective rowScale for x,y,z at each target. Each source-body
-% interaction sums the S/R/T/D kernels directly in target batches, with
+% interaction sums the selected image kernels directly in target batches, with
 % no 3M-by-3N interaction matrix, global matrix, or FMM approximation.
 % The source strengths and target velocities are interleaved by node.
 % batchSize defaults to 128 target nodes.

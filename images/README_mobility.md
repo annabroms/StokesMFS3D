@@ -21,7 +21,13 @@ For stresslet images, `use_orth_dir_images=true` replaces the contact-ray
 source normal by a deterministic orthogonal direction.
 Every body starts with coarse proxy Stokeslets. Selected image families
 follow in `imageFamilies` order (default `SRD`), with all nodes of one
-family contiguous. Each block uses interleaved components
+family contiguous. The distinct options are `S` Stokeslet, `R` rotlet,
+`D` potential dipole, `T` legacy stresslet, `T_t` line-parallel stresslet,
+`T_n` first transverse stresslet, `T_n2` second transverse stresslet, and
+`Q_s` trace-free axial Stokeslet quadrupole. `T` cannot mix with explicit
+`T_*` tokens. The three-direction stresslet has three zero-field modes per
+node, truncated by the SVD at relative `svdCutoff`. Each block uses
+interleaved components
 `[x1;y1;z1;x2;y2;z2;...]`. If body `k` has `I_k` image nodes in total and
 `b_k` selected families, its vector has `n_k=3(N_proxy+b_k I_k)` entries.
 Its `M_k` collocation points give `m_k=3M_k` velocity rows. `useImages=false`
@@ -31,7 +37,8 @@ contacts for validation.
 Let `H_k` be the `6-by-n_k` map from raw coefficients to total force and
 torque. It includes each basis block's `scale`. For physical Stokeslet force
 `f` at `y`, its contribution is `[f;(y-q_k)×f]`; for a rotlet torque `t`, it
-is `[0;t]`. Stresslets and potential dipoles have zero columns. The rotlet
+is `[0;t]`. Stresslets, potential dipoles, and `Q_s` quadrupoles have zero
+columns. The rotlet
 kernel is `t×(x-y)/(8*pi*|x-y|^3)` and contributes positive torque in this
 convention. This is the image paper's Eq. (28), extended to the ordered
 source vector. In particular, the torque constraint combines Stokeslet

@@ -12,6 +12,9 @@ root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(genpath(root));
 q = [-1.05 0 0;1.05 0 0]; a = ones(2,1);
 S1 = ones(2,1); e = repmat([0 0 1],2,1);
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
 opt = struct('N',100,'collocationRatio',2,'N_image',4, ...
     'imageFamilies',"SDRT_nT_t",'mirror_ext',true, ...
     'nearThreshold',0.15,'proxyRadius',0.63,'outerProxyRatio',2, ...
@@ -43,7 +46,7 @@ translations = zeros(2,3,nr);
 pointErrors = cell(nr,1);
 scale = [max(abs(S1).*a),max(abs(S1).*a),max(abs(S1))];
 for k = 1:nr
-    opt.imageFamilies = mixes(k); opt.mirror_ext = mirrors(k);
+    opt.imageFamilies = mixes(k); opt.mirror_ext = mirrors(k); % See token legend above.
     opt.outerImageOffsetFraction = offsets(k);
     fprintf('\n%s\n',labels(k));
     geometry = drop_image_discretization(q,a,opt);
@@ -92,7 +95,7 @@ disp(array2table([proxy(:,2),outerImages], ...
 
 %% Compare the iterative method on exactly the fourth dense discretisation
 if runIterative
-    opt.imageFamilies = mixes(4); opt.mirror_ext = mirrors(4);
+    opt.imageFamilies = mixes(4); opt.mirror_ext = mirrors(4); % See token legend above.
     opt.outerImageOffsetFraction = offsets(4); opt.solverMode = "oneBody";
     [U,lambda,gamma,g,info] = solve_drops_with_images(q,a,S1,e,opt);
     maxError = drop_image_validate_surface_conditions( ...
@@ -113,7 +116,7 @@ for k = 1:2
     index = [1 4]; index = index(k);
     checkOpt = opt;
     checkOpt.solverMode = "denseSVD";
-    checkOpt.imageFamilies = mixes(index); checkOpt.mirror_ext = true;
+    checkOpt.imageFamilies = mixes(index); checkOpt.mirror_ext = true; % See token legend above.
     checkOpt.outerImageOffsetFraction = 0.01;
     checkOpt.capPointCounts = capCounts(2); checkOpt.capLayers = capLayers(2);
     fprintf('\nCap refinement: %s, requested cap count %d\n',mixes(index),capCounts(2));

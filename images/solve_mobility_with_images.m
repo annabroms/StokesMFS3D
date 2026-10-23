@@ -12,6 +12,10 @@ function [U,iters,lambda_norm,uerr,details] = ...
 % solverMode is "oneBody" (default) or "denseSVD". details.grid and
 % details.lambda contain the complete basis and physical strengths for
 % evaluating the flow with direct_image_velocity or the dense kernel.
+% imageFamilies accepts ordered distinct tokens: S Stokeslet, R rotlet,
+% D potential dipole, T legacy stresslet, T_t line-parallel stresslet,
+% T_n and T_n2 first and second transverse stresslets, and Q_s trace-free
+% axial Stokeslet quadrupole. T cannot mix with explicit T_* tokens.
 %
 % The unprojected unknown z stores rigid motion through U_k=-H_k*z_k.
 % Its projected part has zero total force and torque across all families;

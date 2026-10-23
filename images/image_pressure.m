@@ -5,7 +5,7 @@ function p = image_pressure(grid,lambda,x,mu)
 %
 % grid and lambda are details.grid and details.lambda from an image solve.
 % lambda contains unit-viscosity velocity coefficients, interleaved by node.
-% S/R/T physical strengths are mu times these coefficients; D is unchanged.
+% S/R/T/Q_s physical strengths are mu times these coefficients; D is unchanged.
 % The pressure gauge is p -> 0 at infinity. R and D have zero pressure.
 
 if nargin == 0
@@ -35,7 +35,7 @@ for body = 1:numel(grid.body)
                 case "S"
                     p(rows) = p(rows)+getPressure( ...
                         reshape(c.',[],1),y,z);
-                case {"T","T_n","T_t"}
+                case {"T","T_n","T_n2","T_t"}
                     q = basis(block).normalDirections;
                     if ~isequal(size(q),size(c))
                         error('image_pressure:BadDirection', ...
@@ -54,6 +54,9 @@ for body = 1:numel(grid.body)
                     qc = sum(q.*c,2).';
                     p(rows) = p(rows)+sum( ...
                         (qc./r2.^(3/2)-3*a.*b./r2.^(5/2))/(2*pi),2);
+                case "Q_s"
+                    p(rows) = p(rows)+stokes_axial_quadrupole_field( ...
+                        y,z,basis(block).normalDirections,c,"pressure");
                 case {"R","D"}
                     % Both velocity fields are harmonic outside their sources.
                     if any((z(:,1)-y(:,1).').^2+ ...
@@ -101,10 +104,23 @@ b = r*f;
 rho = vecnorm(r,2,2);
 expected = 1.7*((q*f)./rho.^3-3*a.*b./rho.^5)/(2*pi);
 eT = 0;
-for family = ["T","T_n","T_t"]
+for family = ["T","T_n","T_t","T_n2"]
     grid.body.basis.family = family;
     eT = max(eT,max(abs(image_pressure(grid,{f},x,1.7)-expected)));
 end
+base.family = "Q_s";
+base.normalDirections = [1 0 0];
+grid.body.basis = base;
+step = 1e-3;
+shift = step*base.normalDirections;
+pPlus = getPressure(f,base.points+shift,x);
+pMinus = getPressure(f,base.points-shift,x);
+pZero = getPressure(f,base.points,x);
+qExpected = 1.7*(pPlus-2*pZero+pMinus)/step^2;
+eQ = max(abs(image_pressure(grid,{f},x,1.7)-qExpected));
+base.family = "T";
+base.normalDirections = q;
+grid.body.basis = base;
 
 % The normalized velocity and physical pressure satisfy Stokes' equation.
 coeff = image_source_coefficients(base,f);
@@ -147,11 +163,12 @@ end
 eMix = max(abs(actual-separate));
 eMu = max(abs(image_pressure(grid,lambda,x,0.6)-0.6/1.7*actual));
 fprintf(['image_pressure self-test: S %.3e, R %.3e, D %.3e, ', ...
-    'T %.3e, mixture %.3e, viscosity %.3e, PDE %.3e; ', ...
+    'T %.3e, Q_s %.3e, mixture %.3e, viscosity %.3e, PDE %.3e; ', ...
     'pressure scale %.3e\n'], ...
-    eS,eR,eD,eT,eMix,eMu,ePde,max(abs(expected)));
+    eS,eR,eD,eT,eQ,eMix,eMu,ePde,max(abs(expected)));
 if max([eS,eR,eD,eT,eMix,eMu]) > ...
         1e-12*max(1,max(abs(expected))) || ...
+        eQ > 1e-5*max(1,max(abs(qExpected))) || ...
         ePde > 1e-6*max(1,norm(gp))
     error('image_pressure:SelfTestFailed','Pressure self-test failed.');
 end

@@ -3,6 +3,11 @@ function [U,lambda,gamma,grid,info] = solve_drops_with_images(q,a,S1,e,opt)
 % [U,lambda,gamma,grid,info] = solve_drops_with_images(q,a,S1,e,opt)
 % Rows are body-major [continuity;normal velocity;tangential traction].
 % Columns per body are [exterior-flow coefficients;interior-flow coefficients].
+% imageFamilies is an ordered string of distinct tokens: S Stokeslet,
+% R rotlet, D potential dipole, T legacy stresslet, T_t line-parallel,
+% T_n first transverse, T_n2 second transverse stresslet, and Q_s
+% trace-free axial Stokeslet quadrupole. T cannot mix with explicit T_*.
+% T_n2 uses s cross n1 for every image ray s, independent of active e.
 if nargin == 0
     self_test(); U=[]; lambda={}; gamma={}; grid=struct(); info=struct(); return
 end

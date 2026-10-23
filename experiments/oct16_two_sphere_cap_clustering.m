@@ -86,6 +86,10 @@ for modeIndex = 1:2
                 opt = basicOpt;
                 opt.N_image = 20;
                 opt.useImages = true;
+                % imageFamilies tokens: S Stokeslet, R rotlet, D potential
+                % dipole, T legacy stresslet, T_t line-parallel, T_n first
+                % transverse, T_n2 second transverse stresslet, Q_s trace-free
+                % axial Stokeslet quadrupole. T excludes T_*.
                 opt.imageFamilies = "SRD";
                 opt.capMode = mode;
                 opt.capAngles = angleScale*[pi/5,pi/60];

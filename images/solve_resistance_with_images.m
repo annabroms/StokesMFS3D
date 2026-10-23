@@ -11,7 +11,11 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 % Inputs: q is P-by-3 of unit-sphere centres; U is 6P-by-1 with each body
 % [vx;vy;vz;omega_x;omega_y;omega_z]. opt is a small flat control struct;
 % omitted fields receive the shared image-solver defaults. Image families can be
-% any nonempty subset of SRTD; coarse proxy nodes always carry S.
+% an ordered string of distinct tokens: S Stokeslet, R rotlet, D potential
+% dipole, T legacy stresslet, T_t line-parallel, T_n first transverse,
+% T_n2 second transverse stresslet, Q_s trace-free axial Stokeslet
+% quadrupole. T cannot be combined with explicit T_* tokens. Coarse proxy
+% nodes always carry S.
 % Main controls: N (coarse proxy count), proxyRadius, nearThreshold,
 % N_image (nodes per close-contact image line; [] uses paper Eq. 39),
 % imageFamilies, capMode, capAngles, capUpsampling or exact capPointCounts,
@@ -42,7 +46,7 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 % During one-body setup, progress reports give each body's SVD dimensions
 % and the storage needed for one double-precision copy of that matrix.
 % The velocity solve uses unit-viscosity coefficients. For physical viscosity
-% opt.viscosity, S/R/T strengths and the returned force/torque scale by it;
+% opt.viscosity, S/R/T/Q_s strengths and the returned force/torque scale by it;
 % D strengths do not. details.lambda and lambda_norm remain normalized
 % unit-viscosity coefficients, suitable for direct_image_velocity.
 % The sphere radius is one.

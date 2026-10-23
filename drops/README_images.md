@@ -8,8 +8,14 @@ contains the sources **inside** drop i that represent exterior flow.
 `grid.body(i).interiorBasis` contains sources **outside** drop i that represent
 its interior flow. `lambda{i}` and `gamma{i}` are their physical strengths,
 with `[x;y;z]` interleaved at each node. Every basis begins with a coarse
-Stokeslet proxy, followed by selected S/R/T/D image blocks in
+Stokeslet proxy, followed by selected image blocks in
 `opt.imageFamilies` order. `mirror_ext=false` leaves the outer proxy alone.
+The distinct tokens are `S` Stokeslet, `R` rotlet, `D` potential dipole,
+`T` legacy stresslet, `T_t` line-parallel stresslet, `T_n` first transverse
+stresslet, `T_n2` second transverse stresslet, and `Q_s` trace-free axial
+Stokeslet quadrupole. For example, `"SDRT_tT_nT_n2Q_s"` selects all explicit
+directions and the quadrupole. `T` cannot mix with explicit `T_*` tokens.
+Token order determines coefficient block order.
 Stresslet (`T`) image directions default to the centre-to-neighbour contact
 ray. Set `opt.use_orth_dir_images=true` to use a unit direction orthogonal
 to that ray: cross it with the Cartesian axis having its smallest absolute
@@ -17,24 +23,37 @@ component, then normalise. Opposite contact rays receive opposite directions.
 The same choice is used on interior and mirrored exterior image lines;
 their point locations are unchanged.
 
-To include both stresslet directions simultaneously, set
+To include the line-parallel and first transverse stresslet directions, set
 `opt.imageFamilies="SDRT_nT_t"` (or `["S","D","R","T_n","T_t"]`).
 Here `T_n` is **perpendicular to the image line**, using the deterministic
 cross-product rule above; `T_t` is **parallel to the image line**. These
 explicit labels ignore `use_orth_dir_images`, which continues to control
-plain `T`. In three dimensions the perpendicular plane has two directions;
-`T_n` selects one of them, not a full transverse tensor basis.
-Both blocks have independent three-component strengths at each image node,
+plain `T`. In three dimensions the perpendicular plane has two directions.
+`T_n2` uses `s cross n1`, where `s` is the image ray and `n1` is the `T_n`
+direction; this construction works for any active direction `e`.
+Each block has independent three-component strengths at each image node,
 on both source lines when mirrored images are enabled. All kernel evaluators,
 force maps, grid arrows, and source-magnitude panels preserve these labels.
 
-The kernel is symmetric in its direction and strength:
-`T(r;n)*t = T(r;t)*n`. Thus two perpendicular directional blocks have one
-exact shared mode per image node: strengths `[t;-n]` produce zero velocity,
-pressure and traction. The six columns span at most five independent fields.
-The SVD truncates this null mode; no extra physical projection is introduced.
+The stresslet kernel is symmetric in its direction and strength:
+`T(r;n)*t = T(r;t)*n`. With all three directions `d1=s`, `d2=n1`, and
+`d3=n2` at one node, the nine columns contain exactly three zero-field modes:
+for each pair `i<j`, set `f_i=d_j`, `f_j=-d_i`, and the third strength to
+zero. They give zero velocity, pressure, and traction away from the pole.
+The six independent fields form a symmetric tensor. One could encode that
+tensor with six coefficients; the solver keeps the established three-vector
+block layout and its SVD truncates the three null modes at the configured
+relative `svdCutoff`.
 Individual stresslet coefficient magnitudes therefore depend on the chosen
 minimum-norm representation, and cannot alone establish solution accuracy.
+
+`Q_s=[(s·∇_y)^2-Δ_y/3]G` applies a trace-free source derivative to the
+Stokeslet; its pressure and traction use the same derivative. `T_n2` and
+`Q_s` solve homogeneous incompressible Stokes flow wherever evaluated,
+because their poles lie across the represented interface. They provide
+additional fitted fields, not an exact spherical-drop image. `Q_s` uses
+`a^2` column scaling to keep its coefficient units comparable to the
+existing image families.
 
 For a pair with physical gap `delta`, the near-contact and adaptive resolution
 rules use `delta/min(a_i,a_j)`. `image_line_points` locates the unequal-radius
@@ -91,7 +110,7 @@ and symmetry of stress. Consequently `gamma` is unprojected. Stokeslets and
 rotlets themselves can carry force and torque when enclosed: with this
 code's outward target normals, an enclosed Stokeslet gives integrated force
 `-f` and torque `-(y-q) cross f`; an enclosed rotlet gives torque `-c`.
-The T, T_n, T_t and D kernels have zero integrated force and torque.
+The T, T_n, T_n2, T_t, D and Q_s kernels have zero integrated force and torque.
 `stokes_mfs_traction_matrix()` verifies these facts by sphere quadrature,
 including sources outside the integration sphere.
 
@@ -131,6 +150,23 @@ distance from the boundary.
 
 Results from the default small run are recorded in
 [`experiments/oct19_2026_two_drop_image_basis_results.md`](experiments/oct19_2026_two_drop_image_basis_results.md).
+
+`experiments/compare_drop_image_source_families.m` compares the existing
+`SDRT_nT_t` basis with `T_n2`, `Q_s`, and both at gap `0.1`. Its default
+requested proxy counts are 700 and 1,000; it uses 30 mirrored image nodes,
+the 1,000-point exponential cap, viscosity ratio 10, and relative SVD cutoff
+`1e-12`. Independent surface and off-surface points cover the exterior and
+both interiors. Each interior pressure is aligned by one constant estimated
+from its off-surface targets; traction is shifted by the matching normal
+pressure term. The report scales velocity by `max|S1|*a` and pressure and
+traction by `max|S1|`, and prints the separate field differences, interface
+residuals, retained ranks, source magnitudes, and GMRES iterations. The
+comparison target is `1e-3`; a larger value is measured basis sensitivity,
+not automatically a kernel defect. The function accepts a struct of smaller
+counts for a smoke check and `directions` as two independent row vectors.
+Pass its returned struct to `plot_drop_image_source_family_comparison` to
+plot the maximum physical strength of every selected image family and the
+coarse proxy, with inner and mirrored outer sources in separate panels.
 
 ## Boundary matrix and projection
 
@@ -205,6 +241,6 @@ local one-body SVDs.
 geometry, solver settings, and independent validation grid fixed while
 sweeping `N_image`. It plots the three maximum scaled surface residuals and
 the maximum source-strength norms at inner and outer locations. Proxy
-strengths and each S/R/T/D image family are reported separately. The sweep
+strengths and each selected image family are reported separately. The sweep
 starts at one image node and fixes `capPointCounts` so its collocation grid
 is identical for every case; the zero-image solver would remove those caps.

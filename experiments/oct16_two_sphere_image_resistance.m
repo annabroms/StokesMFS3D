@@ -69,6 +69,10 @@ for motionIndex = 1:3
         end
         for index = 1:numel(N_image_values)
             N_image = N_image_values(index);
+            % imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole,
+            % T legacy stresslet, T_t line-parallel, T_n first transverse,
+            % T_n2 second transverse stresslet, Q_s trace-free axial
+            % Stokeslet quadrupole. T excludes T_*.
             opt = struct('N',686,'proxyRadius',0.63, ...
                 'N_image',N_image,'imageFamilies',"SRD", ...
                 'capMode',"fibonacci",'capAngles',[pi/5,pi/60], ...

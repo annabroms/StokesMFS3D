@@ -25,17 +25,18 @@ x = body.interiorBasis(1).points;
 h(4) = scatter3(ax,x(:,1),x(:,2),x(:,3),18,[0 0.6 0.45]);
 x = body.exteriorImagePoints;
 h(5) = scatter3(ax,x(:,1),x(:,2),x(:,3),28,[0.7 0.15 0.7],'filled');
-% Each stresslet block has its own coefficients and source directions.
+% Directional stresslet and quadrupole blocks show their source axes.
 names = {'collocation','inner proxy','inner image','outer proxy','outer image'};
 arrowLength = 0.13*dropGrid.radii(i);
 bases = {body.basis,body.interiorBasis};
 sides = ["inner","outer"];
-colors = [0.65 0 0;0 0.35 0.85;0.2 0.55 0.1];
+colors = [0.65 0 0;0 0.35 0.85;0.2 0.55 0.1; ...
+    0.7 0.3 0.7;0.9 0.5 0.1];
 for side = 1:2
     basis = bases{side};
     for b = 2:numel(basis)
         family = basis(b).family;
-        colorIndex = find(["T","T_n","T_t"]==family,1);
+        colorIndex = find(["T","T_n","T_t","T_n2","Q_s"]==family,1);
         if isempty(colorIndex), continue; end
         x = basis(b).points;
         d = arrowLength*basis(b).normalDirections;
@@ -73,6 +74,11 @@ f = drop_image_plot_grid(g,'off');
 if numel(findall(f,'Type','Quiver'))~=4
     error('drop_image_plot_grid:SelfTest','Both directions must appear on both lines.');
 end
+close(f);
+opt.imageFamilies = "SDRT_nT_n2T_tQ_s";
+g = drop_image_discretization(q,a,opt);
+f = drop_image_plot_grid(g,'off');
+assert(numel(findall(f,'Type','Quiver'))==8);
 close(f);
 opt.useImages = false;
 g = drop_image_discretization(q,a,opt);

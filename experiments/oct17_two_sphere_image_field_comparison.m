@@ -13,7 +13,10 @@ run(fullfile(root,'setpath.m'));
 mu = 1.7;
 q = [0,0,0;2.1,0,0];
 U = [1;0.4;0;0;0;0.25; -1;-0.4;0;0;0;-0.25];
-imageFamilies = "SRD";       % Any supported subset of SRTD.
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
+imageFamilies = "SRD";
 imageCounts = [3,6,10];       % Eq. (39) selects 3 at this gap.
 svdCutoff = 5e-12;
 tightTolerance = 1e-9;
@@ -47,7 +50,7 @@ for j = 1:numel(imageCounts)
     opt.N = 686;
     opt.proxyRadius = 0.63;
     opt.useImages = true;
-    opt.imageFamilies = imageFamilies;
+    opt.imageFamilies = imageFamilies; % See token legend above.
     opt.N_image = imageCounts(j);
     opt.capMode = "fibonacci";
     opt.capAngles = [pi/5,pi/60];

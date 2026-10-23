@@ -46,9 +46,12 @@ for body = 1:P
             b = template;
             b.family = string(family);
             b.points = outerPoints{body};
-            if ismember(family,["T","T_n","T_t"])
+            if ismember(family,["T","T_n","T_n2","T_t"])
                 b.normalDirections = image_stresslet_directions( ...
                     outerDirections{body},opt.use_orth_dir_images,family);
+            elseif family=="Q_s"
+                b.normalDirections = outerDirections{body};
+                b.scale = a(body)^2;
             end
             basis(end+1,1) = b; %#ok<AGROW>
         end
@@ -111,6 +114,22 @@ for k = 1:2
                 norm(basis(6).normalDirections-ray,'fro')>1e-14
             error('drop_image_discretization:SelfTest','Joint stresslet directions failed.');
         end
+    end
+end
+opt.imageFamilies = "SDRT_tT_nT_n2Q_s";
+full = drop_image_discretization(q,a,opt);
+for k = 1:2
+    bases = {full.body(k).basis,full.body(k).interiorBasis};
+    ray = full.body(k).imageDirections;
+    for side = 1:2
+        basis = bases{side};
+        first = basis(5).normalDirections;
+        second = basis(6).normalDirections;
+        assert(max(abs(sum(first.*second,2)))<1e-14);
+        assert(max(abs(sum(second.*ray,2)))<1e-14);
+        assert(norm(basis(7).normalDirections-cross(ray,second,2),'fro')<1e-14);
+        assert(norm(basis(8).normalDirections-ray,'fro')<1e-14);
+        assert(basis(8).scale==a(k)^2);
     end
 end
 opt.use_orth_dir_images = true;

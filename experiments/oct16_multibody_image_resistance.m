@@ -30,6 +30,9 @@ for body = 1:3
     direction = direction/norm(direction);
     triangleVelocity(6*(body-1)+(1:3)) = direction.';
 end
+% imageFamilies tokens: S Stokeslet, R rotlet, D potential dipole, T legacy
+% stresslet, T_t line-parallel, T_n first transverse, T_n2 second transverse
+% stresslet, Q_s trace-free axial Stokeslet quadrupole. T excludes T_*.
 baseOpt = struct('N',686,'proxyRadius',0.63, ...
     'N_image',[],'imageFamilies',"SRD",'capMode',"fibonacci", ...
     'capAngles',[pi/5,pi/60],'capUpsampling',[6,6], ...

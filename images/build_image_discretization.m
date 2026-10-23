@@ -9,7 +9,8 @@ function grid = build_image_discretization(q,opt,radii)
 % q is P-by-3 of nonoverlapping unit-sphere centres. opt is the completed
 % option set from solve_resistance_with_images; important controls are
 % proxyRadius, N, collocationRatio, nearThreshold, N_image
-% (empty selects the paper's gap rule), imageFamilies (S/R/D/T/T_n/T_t),
+% (empty selects the paper's gap rule), imageFamilies
+% (S/R/D/T/T_t/T_n/T_n2/Q_s),
 % capMode, capAngles, capUpsampling or exact capPointCounts, capLayers,
 % capExponent, capMinAzimuth,
 % rowWeightMode, useRowScaling, and useImages. grid.body(k) owns its basis
@@ -178,9 +179,12 @@ for k = 1:P
         block = template;
         block.family = string(family);
         block.points = bodies(k).imagePoints;
-        if ismember(family,["T","T_n","T_t"])
+        if ismember(family,["T","T_n","T_n2","T_t"])
             block.normalDirections = image_stresslet_directions( ...
                 bodies(k).imageDirections,opt.use_orth_dir_images,family);
+        elseif family=="Q_s"
+            block.normalDirections = bodies(k).imageDirections;
+            block.scale = radii(k)^2;
         end
         bodies(k).basis(end+1,1) = block;
     end

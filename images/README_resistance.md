@@ -29,10 +29,16 @@ default `N_image` is `ceil(-8.72*log10(delta)-6.15)`; otherwise it is zero.
 `geometry/spheres/image_line_points.m` implements Eqs. (24), (26), and (27):
 nodes lie between `1.05*Rp` and the interior accumulation point and cluster
 towards that point. The source families at each image node default to S/R/D
-(Stokeslet, rotlet and potential dipole). `imageFamilies` selects a subset of
-S/R/T/D; a selected stresslet uses the known line direction as its normal
-unless `use_orth_dir_images=true`, which selects the unit cross product of
-the contact ray with its least-aligned Cartesian axis.
+(Stokeslet, rotlet and potential dipole). `imageFamilies` accepts ordered
+distinct tokens: `S` Stokeslet, `R` rotlet, `D` potential dipole, `T` legacy
+stresslet, `T_t` line-parallel stresslet, `T_n` first transverse stresslet,
+`T_n2` second transverse stresslet, and `Q_s` trace-free axial Stokeslet
+quadrupole. `T` cannot mix with explicit `T_*` tokens. Plain `T` uses the
+line direction unless `use_orth_dir_images=true`, which selects the unit
+cross product of the contact ray with its least-aligned Cartesian axis.
+`T_n2` uses `s cross n1`, where `n1` is the `T_n` direction, for any ray.
+With `T_t`, `T_n`, and `T_n2`, three exact stresslet null modes per node are
+truncated by the SVD at relative `svdCutoff`.
 Coarse proxy points always carry S. All coefficients are interleaved by
 node: `[x1;y1;z1;x2;y2;z2;...]`. Within each body, the order is coarse S
 followed by each selected image family in `imageFamilies` order.
@@ -71,7 +77,7 @@ stores the factored truncated pseudoinverse; the matvec applies
 `Y_k*(U_k'*mu_k)` in that order. The preconditioned operator has identity
 self blocks and direct-summed off-diagonal interactions, matching Section
 2.2. This default `solverMode="oneBody"` path does not assemble the global
-matrix or any pair interaction matrix: `image_resistance_matvec` sums S/R/T/D
+matrix or any pair interaction matrix: `image_resistance_matvec` sums the selected
 velocities from source strengths in target batches and reuses pair distances
 for image families at the same nodes. It needs no FMM. For a reference solve,
 `solverMode="denseSVD"`
