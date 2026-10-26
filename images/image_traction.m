@@ -34,7 +34,7 @@ for body = 1:numel(grid.body)
     for block = 1:numel(basis)
         y = basis(block).points;
         c = coeff{block};
-        if ismember(basis(block).family,["T","T_n","T_n2","T_t","Q_s"]) && ...
+        if ismember(basis(block).family,["T","T_n","T_n2","T_t","Q_s","S_y"]) && ...
                 ~isequal(size(basis(block).normalDirections),size(c))
             error('image_traction:BadDirection', ...
                 'Each directional image block needs one source direction.');
@@ -62,6 +62,12 @@ for body = 1:numel(grid.body)
                     for j = 1:3
                         t(rows,j) = t(rows,j)+sum(scalar.*r{j},2);
                     end
+                case "S_y"
+                    K = stokes_directional_stokeslet_matrix( ...
+                        y,z,basis(block).normalDirections, ...
+                        basis(block).derivativeDistances,"traction",nn);
+                    t(rows,:) = t(rows,:)+reshape( ...
+                        K*reshape(c.',[],1),3,[]).';
                 case "R"
                     w = {c(:,2).'.*r{3}-c(:,3).'.*r{2}, ...
                         c(:,3).'.*r{1}-c(:,1).'.*r{3}, ...
@@ -203,4 +209,15 @@ if max([maxError,eMix,eS,maxPde]) > 1e-7*max(1,max(abs(actual),[],'all')) || ...
         maxStokes > 1e-6*max(1,max(abs(actual),[],'all'))
     error('image_traction:SelfTestFailed','Traction self-test failed.');
 end
+derivative = base;
+derivative.family = "S_y";
+derivative.points = [0.1 0 0];
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.2;
+one.body.basis = derivative;
+actual = image_traction(one,{strength},x,n,1.7);
+expected = reshape(1.7*stokes_directional_stokeslet_matrix( ...
+    derivative.points,x,derivative.normalDirections, ...
+    derivative.derivativeDistances,"traction",n)*strength,3,[]).';
+assert(norm(actual-expected,inf)<1e-13);
 end

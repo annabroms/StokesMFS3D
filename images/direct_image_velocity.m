@@ -31,6 +31,21 @@ for b = 1:numel(basis)
             u(:,1) = u(:,1)+(ir*c(:,1)+sum(rx.*rc.*ir3,2))/(8*pi);
             u(:,2) = u(:,2)+(ir*c(:,2)+sum(ry.*rc.*ir3,2))/(8*pi);
             u(:,3) = u(:,3)+(ir*c(:,3)+sum(rz.*rc.*ir3,2))/(8*pi);
+        case "S_y"
+            q = block.normalDirections;
+            assert(isequal(size(q),size(c)) && ...
+                isequal(size(block.derivativeDistances),[size(c,1) 1]));
+            scaled = c.*block.derivativeDistances;
+            rq = rx.*q(:,1).'+ry.*q(:,2).'+rz.*q(:,3).';
+            rc = rx.*scaled(:,1).'+ry.*scaled(:,2).'+ ...
+                rz.*scaled(:,3).';
+            qc = sum(q.*scaled,2).';
+            rr = {rx,ry,rz};
+            for j = 1:3
+                value = scaled(:,j)'.*rq-q(:,j)'.*rc-rr{j}.*qc ...
+                    +3*rr{j}.*rq.*rc./r2;
+                u(:,j) = u(:,j)+sum(value.*ir3,2)/(8*pi);
+            end
         case "R"
             v = ir3/(8*pi);
             u(:,1) = u(:,1)+sum(v.*(rz.*c(:,2).'-ry.*c(:,3).'),2);
@@ -79,5 +94,15 @@ c = image_source_coefficients(basis,z);
 actual = direct_image_velocity(basis,c,x);
 expected = reshape(stokes_mfs_velocity_matrix(basis,x)*z,3,[]).';
 assert(norm(actual-expected,inf)<1e-12);
+derivative = b;
+derivative.family = "S_y";
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.2;
+derivative.scale = 1.3;
+raw = [0.3;-0.6;0.2];
+scaled = image_source_coefficients(derivative,raw);
+actual = direct_image_velocity(derivative,scaled,x);
+expected = reshape(stokes_mfs_velocity_matrix(derivative,x)*raw,3,[]).';
+assert(norm(actual-expected,inf)<1e-13);
 fprintf('direct_image_velocity self-test passed.\n');
 end

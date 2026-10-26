@@ -5,7 +5,8 @@ function p = image_pressure(grid,lambda,x,mu)
 %
 % grid and lambda are details.grid and details.lambda from an image solve.
 % lambda contains unit-viscosity velocity coefficients, interleaved by node.
-% S/R/T/Q_s physical strengths are mu times these coefficients; D is unchanged.
+% S/R/T/Q_s/S_y physical strengths are mu times these coefficients;
+% D is unchanged.
 % The pressure gauge is p -> 0 at infinity. R and D have zero pressure.
 
 if nargin == 0
@@ -35,6 +36,11 @@ for body = 1:numel(grid.body)
                 case "S"
                     p(rows) = p(rows)+getPressure( ...
                         reshape(c.',[],1),y,z);
+                case "S_y"
+                    K = stokes_directional_stokeslet_matrix( ...
+                        y,z,basis(block).normalDirections, ...
+                        basis(block).derivativeDistances,"pressure");
+                    p(rows) = p(rows)+K*reshape(c.',[],1);
                 case {"T","T_n","T_n2","T_t"}
                     q = basis(block).normalDirections;
                     if ~isequal(size(q),size(c))
@@ -172,4 +178,15 @@ if max([eS,eR,eD,eT,eMix,eMu]) > ...
         ePde > 1e-6*max(1,norm(gp))
     error('image_pressure:SelfTestFailed','Pressure self-test failed.');
 end
+derivative = base;
+derivative.family = "S_y";
+derivative.points = [0.1 0 0];
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.2;
+grid.body = struct('basis',derivative);
+actual = image_pressure(grid,{f},x,1.7);
+expected = 1.7*stokes_directional_stokeslet_matrix( ...
+    derivative.points,x,derivative.normalDirections, ...
+    derivative.derivativeDistances,"pressure")*f;
+assert(norm(actual-expected,inf)<1e-13);
 end

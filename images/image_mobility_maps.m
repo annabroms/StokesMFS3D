@@ -3,7 +3,8 @@ function [H,C] = image_mobility_maps(body,q)
 %   [H,C] = image_mobility_maps(body,q)
 %   image_mobility_maps() checks mixed Stokeslet/rotlet moments.
 %
-% H is 6-by-n and C = H'/(H*H') is n-by-6. A coefficient vector z has
+% H is 6-by-n and C = H'/(H*H') is n-by-6. S_y columns have zero force
+% and source torque d*(q cross b). A coefficient vector z has
 % force/torque H*z; C*F is its minimum-norm completion. The total-moment
 % projector is L*z = C*(H*z). Blocks follow body.basis order and each block
 % has interleaved [x1;y1;z1;x2;...] components. Viscosity is one.
@@ -24,6 +25,16 @@ for b = 1:numel(body.basis)
         H(:,cols) = block.scale*getKmat(block.points,q).';
     elseif block.family == "R"
         H(4:6,cols) = block.scale*repmat(eye(3),1,count);
+    elseif block.family == "S_y"
+        assert(isequal(size(block.normalDirections),[count 3]) && ...
+            isequal(size(block.derivativeDistances),[count 1]));
+        for j = 1:count
+            qj = block.normalDirections(j,:);
+            crossMatrix = [0,-qj(3),qj(2);qj(3),0,-qj(1); ...
+                -qj(2),qj(1),0];
+            H(4:6,offset+3*j-2:offset+3*j) = ...
+                block.scale*block.derivativeDistances(j)*crossMatrix;
+        end
     end
     offset = offset+3*count;
 end
@@ -61,5 +72,17 @@ assert(norm(H*(C*f)-f) < 1e-13);
 L = C*H;
 assert(norm(L*L-L,'fro') < 1e-12);
 assert(norm(H*(z-L*z)) < 1e-13);
+base.derivativeDistances = zeros(0,1);
+derivative = base;
+derivative.family = "S_y";
+derivative.points = [0.2 0 0];
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.3;
+body.basis = [base(1);derivative];
+[Hd,~] = image_mobility_maps(body,q);
+probe = zeros(size(Hd,2),1);
+probe(end) = 2;
+assert(norm(Hd(1:3,:)*probe)<1e-14 && ...
+    norm(Hd(4:6,:)*probe-[0.6;0;0])<1e-14);
 fprintf('image_mobility_maps self-test passed.\n');
 end

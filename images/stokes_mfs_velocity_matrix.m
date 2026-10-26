@@ -6,7 +6,8 @@ function A = stokes_mfs_velocity_matrix(basis,targets)
 % [ux1;uy1;uz1;ux2;...], [cx1;cy1;cz1;cx2;...].  Blocks are concatenated.
 % S is a Stokeslet, R a rotlet, T a stresslet with the specified source
 % normal, and D a potential dipole.  All existing kernels use viscosity 1.
-% T_n, T_n2, T_t label stresslet directions; Q_s uses the image-line axis.
+% S_y is a distance-scaled source derivative of S. T_n, T_n2, T_t label
+% stresslet directions; Q_s uses the image-line axis.
 
 if nargin == 0
     self_test(); A = []; return
@@ -22,6 +23,10 @@ for k = 1:numel(basis)
     switch block.family
         case "S"
             K = stokes_SLP_mat(block.points,targets);
+        case "S_y"
+            K = stokes_directional_stokeslet_matrix( ...
+                block.points,targets,block.normalDirections, ...
+                block.derivativeDistances,"velocity");
         case "R"
             [K,~,~] = stokes_singularity_matrices( ...
                 block.points,targets,eye(3),logical([1,0,0]));
@@ -83,5 +88,13 @@ legacy(1).family = "T"; legacy(2).family = "T"; legacy(3).family = "T";
 if norm(A-stokes_mfs_velocity_matrix(legacy,x),'fro')>1e-14
     error('stokes_mfs_velocity_matrix:SelfTest','Directional labels changed the kernel.');
 end
+derivative = b;
+derivative.family = "S_y";
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.2;
+assert(norm(stokes_mfs_velocity_matrix(derivative,x)- ...
+    stokes_directional_stokeslet_matrix(derivative.points,x, ...
+    derivative.normalDirections,derivative.derivativeDistances, ...
+    "velocity"),'fro')<1e-14);
 fprintf('stokes_mfs_velocity_matrix self-test passed (three stresslet null modes).\n');
 end

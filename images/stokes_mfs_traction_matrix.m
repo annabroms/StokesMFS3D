@@ -25,6 +25,14 @@ for b = 1:numel(basis)
     ir5 = ir3./r2;
     ir7 = ir5./r2;
     rn = r{1}.*n(:,1)+r{2}.*n(:,2)+r{3}.*n(:,3);
+    if block.family=="S_y"
+        cols = col0+(1:3*N);
+        A(:,cols) = block.scale*stokes_directional_stokeslet_matrix( ...
+            y,x,block.normalDirections,block.derivativeDistances, ...
+            "traction",n);
+        col0 = col0+3*N;
+        continue
+    end
     if block.family=="Q_s"
         cols = col0+(1:3*N);
         A(:,cols) = block.scale*stokes_axial_quadrupole_matrix( ...
@@ -139,5 +147,25 @@ end
 if maxMoment>5e-10
     error('stokes_mfs_traction_matrix:SelfTest','Kernel force/torque balance failed.');
 end
+derivativeMoment = basis(1);
+derivativeMoment.family = "S_y";
+derivativeMoment.points = [0.2 0 0];
+derivativeMoment.normalDirections = [0 1 0];
+derivativeMoment.derivativeDistances = 0.1;
+derivativeMoment.scale = 1;
+t = reshape(stokes_mfs_traction_matrix(derivativeMoment,x,x)* ...
+    [0;0;1],3,[]).';
+assert(norm(sum(w.*t,1))<5e-10);
+assert(norm(sum(w.*cross(x,t,2),1)-[-0.1 0 0])<5e-10);
+derivative = basis(1);
+derivative.family = "S_y";
+derivative.points = [0.2 0 0];
+derivative.normalDirections = [0 1 0];
+derivative.derivativeDistances = 0.1;
+targets = [1 0 0;0 1 0];
+assert(norm(stokes_mfs_traction_matrix(derivative,targets,targets)- ...
+    derivative.scale*stokes_directional_stokeslet_matrix(derivative.points,targets, ...
+    derivative.normalDirections,derivative.derivativeDistances, ...
+    "traction",targets),'fro')<1e-14);
 fprintf('stokes_mfs_traction_matrix self-test passed; moment error %.3e.\n',maxMoment);
 end
