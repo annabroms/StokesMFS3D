@@ -36,6 +36,8 @@ function [U, iters, lambda_norm, uerr, lambda] = solve_mobility(q,rvec_in,rvec_o
 %                     for flow evaluation, including the projected GMRES
 %                     source and completion source. The layout is
 %                     [lambda_x1; lambda_y1; lambda_z1; lambda_x2; ...].
+%                   opt.precond may contain a prepared one-body mobility
+%                   factorization in the body's reference frame.
 %
 %   METHOD OVERVIEW:
 %       - Builds MFS representation from proxy and collocation surfaces.
@@ -107,18 +109,49 @@ end
 if opt.ellipsoid
     rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
     rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
-    opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
 else
-    opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+    rin_block = rvec_in(1:N,:) - q(1,:);
+    rout_block = rvec_out(1:M,:) - q(1,:);
+end
+has_precond = isfield(opt,'precond') && ~isempty(opt.precond);
+if has_precond
+    precond = opt.precond;
+    assert(strcmp(precond.mode,'mobility') && ...
+        isequal(size(precond.Y),[3*N,size(precond.UU,1)]) && ...
+        size(precond.UU,2)==3*M && ...
+        isequal(size(precond.LL),[3*N,3*N]) && ...
+        isequal(size(precond.Kin),[3*N,6]) && ...
+        isequal(size(precond.Sblock),[3*M,3*N]), ...
+        'solve_mobility:BadPreconditioner');
+    assert(isequal(size(precond.rin0),size(rin_block)) && ...
+        isequal(size(precond.rout0),size(rout_block)) && ...
+        norm(precond.rin0-rin_block,inf)<1e-11 && ...
+        norm(precond.rout0-rout_block,inf)<1e-11, ...
+        'solve_mobility:PreconditionerGeometryMismatch');
+    for body = 2:P
+        source = rvec_in((body-1)*N+(1:N),:)-q(body,:);
+        target = rvec_out((body-1)*M+(1:M),:)-q(body,:);
+        if opt.ellipsoid
+            source = (R{body}'*source.').';
+            target = (R{body}'*target.').';
+        end
+        assert(norm(precond.rin0-source,inf)<1e-11 && ...
+            norm(precond.rout0-target,inf)<1e-11, ...
+            'solve_mobility:PreconditionerGeometryMismatch');
+    end
+    opt.Sblock = precond.Sblock;
+else
+    opt.Sblock = stokes_SLP_mat(rin_block,rout_block);
 end
 
 %Create pseudoinverse of self-interaction matrix,
-if opt.ellipsoid
-    [Y,UU,LL,Kin,~] = oneBodyPrecondMob((R{1}'*rvec_in(1:N,:)')',...
-        (R{1}'*rvec_out(1:M,:)')',q(1,:));
+if has_precond
+    Y = precond.Y;
+    UU = precond.UU;
+    LL = precond.LL;
+    Kin = precond.Kin;
 else
-    [Y,UU,LL,Kin,~] = oneBodyPrecondMob(rvec_in(1:N,:),...
-        rvec_out(1:M,:),q(1,:));
+    [Y,UU,LL,Kin,~] = oneBodyPrecondMob(rin_block,rout_block,[0,0,0]);
 end
 
 %The format is used to prepare for the case when different shapes are is

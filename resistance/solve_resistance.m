@@ -1,7 +1,7 @@
-function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec_out, U, opt, R, E0)
+function [Fvec, iters, lambda_norm, err_res, lambda] = solve_resistance(q, rvec_in, rvec_out, U, opt, R, E0)
 %SOLVE_RESISTANCE Solve a Stokes resistance problem for a configuration of ellipsoidal particles using MFS.
 %
-%   [Fvec, iters, lambda_norm, err_res] = SOLVE_RESISTANCE(q, rvec_in, rvec_out, U, opt, R, E0)
+%   [Fvec, iters, lambda_norm, err_res, lambda] = SOLVE_RESISTANCE(q, rvec_in, rvec_out, U, opt, R, E0)
 %
 %   Given prescribed translational and angular velocities, the function computes the resulting hydrodynamic forces 
 %   and torques acting on each particle.
@@ -20,6 +20,9 @@ function [Fvec, iters, lambda_norm, err_res] = solve_resistance(q, rvec_in, rvec
 %       iters       - Number of GMRES iterations until convergence.
 %       lambda_norm - Infinity norm of the final source density vector (for diagnostic use).
 %       err_res     - Maximum relative residual in velocity on the particle surfaces.
+%       lambda      - Physical Stokeslet strengths, interleaved by source
+%                     and grouped by body. opt.precond may contain a
+%                     prepared one-body resistance factorization.
 %
 %   METHOD OVERVIEW:
 %       - Builds MFS representation from collocation and proxy surfaces.
@@ -68,9 +71,37 @@ opt.P = P;
 if opt.ellipsoid
     rin_block = (R{1}' * (rvec_in(1:N,:) - q(1,:))')';
     rout_block = (R{1}' * (rvec_out(1:M,:) - q(1,:))')';
-    opt.Sblock = stokes_SLP_mat(rin_block, rout_block);
 else
-    opt.Sblock = stokes_SLP_mat(rvec_in(1:N,:), rvec_out(1:M,:));
+    rin_block = rvec_in(1:N,:) - q(1,:);
+    rout_block = rvec_out(1:M,:) - q(1,:);
+end
+has_precond = isfield(opt,'precond') && ~isempty(opt.precond);
+if has_precond
+    precond = opt.precond;
+    assert(strcmp(precond.mode,'resistance') && ...
+        isequal(size(precond.Y),[3*N,size(precond.UU,1)]) && ...
+        size(precond.UU,2)==3*M && ...
+        isequal(size(precond.Sblock),[3*M,3*N]), ...
+        'solve_resistance:BadPreconditioner');
+    assert(isequal(size(precond.rin0),size(rin_block)) && ...
+        isequal(size(precond.rout0),size(rout_block)) && ...
+        norm(precond.rin0-rin_block,inf)<1e-11 && ...
+        norm(precond.rout0-rout_block,inf)<1e-11, ...
+        'solve_resistance:PreconditionerGeometryMismatch');
+    for body = 2:P
+        source = rvec_in((body-1)*N+(1:N),:)-q(body,:);
+        target = rvec_out((body-1)*M+(1:M),:)-q(body,:);
+        if opt.ellipsoid
+            source = (R{body}'*source.').';
+            target = (R{body}'*target.').';
+        end
+        assert(norm(precond.rin0-source,inf)<1e-11 && ...
+            norm(precond.rout0-target,inf)<1e-11, ...
+            'solve_resistance:PreconditionerGeometryMismatch');
+    end
+    opt.Sblock = precond.Sblock;
+else
+    opt.Sblock = stokes_SLP_mat(rin_block,rout_block);
 end
 
 
@@ -97,29 +128,34 @@ end
 
 %% Assign RHS in resistance problem    
 
-Kout = getKmat(rvec_out(1:M,:),[0,0,0]);
 %For each particle, get data at surface, given rigid body motion
+u_bndry = zeros(1,3*M*P);
 for k = 1:P
-    if opt.ellipsoid
-        Kout = getKmat(rvec_out(M*(k-1)+1:k*M,:),q(k,:)); %If spheres, this will be the same matrix for every one.
-    end
+    Kout = getKmat(rvec_out(M*(k-1)+1:k*M,:),q(k,:));
     u_bndry((k-1)*3*M+1:3*k*M) = Kout*U((k-1)*6+1:k*6);
 end
 
 %% Compute preconditioning. It's enough to do this for a single particle 
 %as it's assumed that everyone has the same shape.
-if opt.ellipsoid
-    [Yk,UUk,Si] = oneBodyPrecondRes((R{1}'*rvec_in(1:N,:)')',...
-    (R{1}'*rvec_out(1:M,:)')');
+if has_precond
+    Yk = precond.Y;
+    UUk = precond.UU;
+    Si = precond.singularValues;
 else
-    [Yk,UUk,Si] = oneBodyPrecondRes(rvec_in(1:N,:),rvec_out(1:M,:));
+    [Yk,UUk,Si] = oneBodyPrecondRes(rin_block,rout_block);
 end
 
 %The format is used to prepare for the case when different shapes are is
 %use
 Y{1} = Yk;
 UU{1} = UUk; 
-disp('Done preconditioning')
+if opt.gmres_verbose
+    if has_precond
+        disp('Using cached one-body preconditioner')
+    else
+        disp('Done preconditioning')
+    end
+end
 
 if opt.profile
     memorygraph('label','start matvec resistance');
@@ -161,9 +197,13 @@ if opt.lr
     end
     opt.db = db; 
     tau_coarse = getCoarseSource(u_bndry,Rinv,Zi,Yi,R,opt);
-    disp('Done coarse projection')
+    if opt.gmres_verbose
+        disp('Done coarse projection')
+    end
 else
-    disp('No deflation preconditioning')
+    if opt.gmres_verbose
+        disp('No deflation preconditioning')
+    end
 end
 
 
@@ -184,20 +224,18 @@ end
 % lambda <- mu. Then, determine forces and torques on particles, given lambda
 
 Fvec = zeros(6*P,1);
-Kin = getKmat(rvec_in(1:N,:),[0,0,0]);
+lambda_gmres = zeros(3*N*P,1);
 for i = 1:P
     if opt.ellipsoid
         temp_i = Y{1}*(UU{1}*(rotate_vector(mu_gmres((i-1)*3*M+1:i*3*M),R{i}')));
         lambda_i = rotate_vector(temp_i,R{i});
-        if ~opt.lr
-            Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
-        end
     else
         lambda_i = Y{1}*(UU{1}*(mu_gmres((i-1)*3*M+1:i*3*M)));
     end
     lambda_gmres(3*(i-1)*N+1:i*3*N) = lambda_i;
 
     if ~opt.lr
+        Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
         Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
     end
 end
@@ -208,10 +246,7 @@ if opt.lr
     lambda_gmres = tau_stokes+tau_coarse; 
 
     for i = 1:P
-        if opt.ellipsoid
-            Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
-        end
-
+        Kin = getKmat(rvec_in(N*(i-1)+1:N*i,:),q(i,:));
         lambda_i = lambda_gmres(3*(i-1)*N+1:i*3*N);
         Fvec(6*(i-1)+1:6*i) = Kin'*lambda_i; 
 
@@ -223,6 +258,7 @@ end
 % lambda_norm gives a sanity check on the source distribution. If large,
 % the representation for the problem is not optimal.
 lambda_norm = norm(lambda_gmres, inf);
+lambda = lambda_gmres;
 
 %% Estimate surface residual
 % Evaluate how well the flow generated by the sources matches the prescribed boundary velocity (from bc).
