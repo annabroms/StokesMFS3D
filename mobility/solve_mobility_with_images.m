@@ -30,7 +30,12 @@ validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
 P = size(q,1);
 validateattributes(Fvec,{'numeric'}, ...
     {'real','finite','column','numel',6*P});
-grid = build_image_discretization(q,opt);
+hasPrepared = isfield(opt,'prepared') && ~isempty(opt.prepared);
+if hasPrepared
+    grid = validate_prepared_image_problem(q,opt,"mobility");
+else
+    grid = build_image_discretization(q,opt);
+end
 counts = arrayfun(@(body) size(body.collocation,1),grid.body);
 counts = counts(:).';
 offsets = [0,cumsum(3*counts)];
@@ -47,11 +52,15 @@ lambda0 = cell(P,1);
 coeff0 = cell(P,1);
 for k = 1:P
     if opt.solverMode == "oneBody"
-        memoryMiB = 8*double(3*counts(k))*double(sourceCounts(k))/2^20;
-        fprintf('mobility body %d: SVD %d x %d (%.1f MiB)\n', ...
-            k,3*counts(k),sourceCounts(k),memoryMiB);
-        factors(k) = one_body_image_mobility_preconditioner( ...
-            grid.body(k),q(k,:),opt.svdCutoff);
+        if hasPrepared
+            factors(k) = opt.prepared.mobilityFactors(k);
+        else
+            memoryMiB = 8*double(3*counts(k))*double(sourceCounts(k))/2^20;
+            fprintf('mobility body %d: SVD %d x %d (%.1f MiB)\n', ...
+                k,3*counts(k),sourceCounts(k),memoryMiB);
+            factors(k) = one_body_image_mobility_preconditioner( ...
+                grid.body(k),q(k,:),opt.svdCutoff);
+        end
         H{k} = factors(k).H;
         C{k} = factors(k).C;
     else
@@ -172,10 +181,10 @@ oldPath = path; cleanup = onCleanup(@() path(oldPath));
 addpath(genpath(root));
 q = [0,0,0;2.08,0,0];
 Uref = [1;0.2;0;0;0;0.3;-0.7;0;0.1;0;0.2;0];
-opt = struct('N',50,'collocationRatio',2,'N_image',4, ...
+opt = struct('N',700,'collocationRatio',2,'N_image',4, ...
     'capLayers',[5,5],'capMinAzimuth',4, ...
     'validationCount',100,'validationGapCount',61, ...
-    'gmresTolerance',1e-8,'maxIterations',150,'svdCutoff',1e-11);
+    'gmresTolerance',1e-8,'maxIterations',150,'svdCutoff',1e-11,'viscosity',1);
 [F,~,~,~,~] = solve_resistance_with_images(q,Uref,opt);
 [U,~,~,err,details] = solve_mobility_with_images(q,F,opt);
 assert(norm(details.realisedForceTorque-F,inf) < ...
