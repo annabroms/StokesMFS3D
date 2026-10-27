@@ -1,4 +1,4 @@
-function results = okt26_brownian_stress_divergence()
+function results = oct26_brownian_stress_divergence()
 %OKT26_BROWNIAN_STRESS_DIVERGENCE Two-sphere image-free MFS stresslet sweep.
 % Run deliberately: the complete sweep, refinements and reference solves
 % are substantial. The plotted quantity is D, not k_B*T*D. With the

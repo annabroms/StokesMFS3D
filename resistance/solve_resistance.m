@@ -1,4 +1,4 @@
-function [Fvec, iters, lambda_norm, err_res, lambda] = solve_resistance(q, rvec_in, rvec_out, U, opt, R, E0)
+function [Fvec, iters, lambda_norm, err_res, lambda, details] = solve_resistance(q, rvec_in, rvec_out, U, opt, R, E0)
 %SOLVE_RESISTANCE Solve a Stokes resistance problem for a configuration of ellipsoidal particles using MFS.
 %
 %   [Fvec, iters, lambda_norm, err_res, lambda] = SOLVE_RESISTANCE(q, rvec_in, rvec_out, U, opt, R, E0)
@@ -24,6 +24,9 @@ function [Fvec, iters, lambda_norm, err_res, lambda] = solve_resistance(q, rvec_
 %                     and grouped by body. opt.precond may contain a
 %                     prepared one-body resistance factorization.
 %
+%   An optional sixth output contains diagnostics for opt.kernel="blake";
+%   see wall/README.md. Legacy free-space calls return an empty struct.
+%
 %   METHOD OVERVIEW:
 %       - Builds MFS representation from collocation and proxy surfaces.
 %       - Enforces rigid body velocity boundary conditions on the true particle surfaces.
@@ -47,6 +50,14 @@ function [Fvec, iters, lambda_norm, err_res, lambda] = solve_resistance(q, rvec_
 if nargin==0, test_solve; 
     return; end
 
+
+% Preserve legacy free-space behavior and route Blake solves to the wall solver.
+if isfield(opt,'kernel') && strcmp(opt.kernel,'blake')
+    [Fvec,iters,lambda_norm,err_res,lambda,details] = ...
+        solve_resistance_wall(q,rvec_in,rvec_out,U,opt);
+    return
+end
+details = struct();
 
 P = size(q,1); %number of spheres
 

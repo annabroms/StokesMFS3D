@@ -1,6 +1,6 @@
 function [q,B] = grow_cluster(P,delta,dim)
 %GROW_CLUSTER(P,delta,dim) grows a cluster of P spheres with each sphere
-%delta away from at least one neighbour. dim can be set to 2 or 3 for 2D or 3D
+%delta away from at least one neighbour. dim can be set to 2 or 3 for 2D or 3D.
 % Anna Broms 4/12/24
 
 if nargin <1
@@ -9,6 +9,15 @@ if nargin <1
 elseif nargin<3
     dim = 3;
     c = 0;
+end
+
+validateattributes(P,{'double'},{'scalar','integer','positive'});
+validateattributes(delta,{'double'},{'scalar','positive','finite'});
+assert(ismember(dim,[2,3]));
+if P == 1
+    q = zeros(1,dim); B = [];
+    if dim == 2, q = complex(0); end
+    return
 end
 
 %set position of first sphere;
@@ -136,7 +145,7 @@ end
 
 
 function self_test()
-
+% Visualize the legacy three-dimensional cluster construction.
 %Visualise a cluster with P=10 spheres in 3D.
 
 % Parameters
@@ -170,7 +179,3 @@ view(3);
 grid on;
 
 end
-
-
-
-

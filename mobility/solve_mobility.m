@@ -1,4 +1,4 @@
-function [U, iters, lambda_norm, uerr, lambda] = solve_mobility(q,rvec_in,rvec_out,Fvec,u_slip,opt,R,E0)
+function [U, iters, lambda_norm, uerr, lambda, details] = solve_mobility(q,rvec_in,rvec_out,Fvec,u_slip,opt,R,E0)
 %SOLVE_MOBILITY Solve a Stokes mobility problem for a configuration of ellipsoidal particles using MFS.
 %
 %   [U, iters, lambda_norm, uerr, lambda] = SOLVE_MOBILITY( ...
@@ -39,6 +39,9 @@ function [U, iters, lambda_norm, uerr, lambda] = solve_mobility(q,rvec_in,rvec_o
 %                   opt.precond may contain a prepared one-body mobility
 %                   factorization in the body's reference frame.
 %
+%   An optional sixth output contains diagnostics for opt.kernel="blake";
+%   see wall/README.md. Legacy free-space calls return an empty struct.
+%
 %   METHOD OVERVIEW:
 %       - Builds MFS representation from proxy and collocation surfaces.
 %       - Uses a "completion source" to represent force and torque.
@@ -72,6 +75,15 @@ if nargin < 7
 elseif nargin < 8
     E0 = [1 1 1];
 end
+
+% Kernel selection is explicit; the legacy free-space path stays unchanged.
+if isfield(opt,'kernel') && strcmp(opt.kernel,'blake')
+    assert(isempty(u_slip),'wall:SlipUnsupported','Wall solvers currently require zero slip.');
+    [U,iters,lambda_norm,uerr,lambda,details] = ...
+        solve_mobility_wall(q,rvec_in,rvec_out,Fvec,opt);
+    return
+end
+details = struct();
 
 P = size(q,1);
 
