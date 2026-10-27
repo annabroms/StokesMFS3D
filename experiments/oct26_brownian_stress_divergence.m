@@ -6,6 +6,7 @@ function results = oct26_brownian_stress_divergence()
 % -(k_B*T/V)*sum_p D_p.
 
 %% User controls
+% Geometry and discretization.
 radius = 1;
 viscosity = 1;                 % Basic solvers use unit viscosity.
 requestedSources = 686;
@@ -13,6 +14,8 @@ spatialSources = [302,686,1000];
 proxyRadius = 0.68;
 collocationRatio = 1.2;
 gapRatios = logspace(-2,0,9);
+
+% Solver tolerances and finite-difference settings.
 gmresTolerance = 1e-8;
 maxIterations = 400;
 surfaceTolerance = 1e-3;
@@ -20,6 +23,8 @@ stressletTolerance = 1e-2;
 divergenceTolerance = 0.05;
 angleStep = 0.01;
 stepLevels = 4;
+
+% Optional validation work and representative gaps.
 runRotationalStudy = true;
 runFullMatrixReference = true;
 runSpatialCheckAtEveryGap = true;
@@ -56,6 +61,7 @@ opt.gmres_tol = gmresTolerance;
 opt.maxit = maxIterations;
 
 %% One-body work, once per spatial resolution
+% Cache body-frame grids and one-body preconditioners for each unique grid.
 levels = unique(spatialSources,'stable');
 setups = cell(numel(levels),1);
 for level = 1:numel(levels)
@@ -94,6 +100,8 @@ stepStudies = cell(numel(studyIndices),1);
 selectedSteps = NaN(numel(studyIndices),1);
 
 %% Establish finite-difference steps before the production sweep
+% At representative gaps, halve the translation step and select the first
+% finer level whose change is below tolerance; fall back to the finest level.
 for t = 1:numel(studyIndices)
     k = studyIndices(t);
     gap = gapRatios(k)*radius;
@@ -131,6 +139,8 @@ for t = 1:numel(studyIndices)
 end
 
 %% Main sweep: raw maps and complete-product finite differences
+% At each gap, measure the maps, estimate step and spatial errors, apply the
+% acceptance checks, then save a checkpoint so completed gaps are retained.
 for k = 1:nGaps
     gap = gapRatios(k)*radius;
     q = pair_centres(radius,gap);
@@ -234,6 +244,8 @@ for k = 1:nGaps
 end
 
 %% Selected full-product and orientation checks
+% More expensive cross-checks run only at representative gaps that passed
+% the production checks above.
 for t = 1:numel(studyIndices)
     k = studyIndices(t);
     if ~results{k}.valid
@@ -279,6 +291,7 @@ for t = 1:numel(studyIndices)
 end
 
 %% Signed plot of the measured, summed translational divergence
+% Failed gaps remain NaN and are omitted from the plotted curves.
 figureHandle = figure('Name','Two-sphere stresslet divergence');
 ax = axes(figureHandle);
 hold(ax,'on'); grid(ax,'on');
@@ -408,6 +421,7 @@ end
 
 function div = centered_divergence(q,Q,setup,opt,h,hAngle,includeRotation)
 %CENTERED_DIVERGENCE differences stresslets from unit-force mobility solves.
+% Translation and optional rotation perturbations are evaluated at -step/+step.
 P = size(q,1);
 d = 6*P;
 Dtrans = zeros(3,3,P);
@@ -426,18 +440,19 @@ for j = 1:d
     if component>3
         step = hAngle;
     end
-    signedStress = cell(2,1);
-    for side = 1:2
-        signValue = 2*side-3;
+    stressMinus = [];
+    stressPlus = [];
+    for perturbationSign = [-1,1]
         shiftedQ = q;
         shiftedR = Q;
         if component<=3
-            shiftedQ(body,component) = shiftedQ(body,component)+signValue*step;
+            shiftedQ(body,component) = shiftedQ(body,component)+ ...
+                perturbationSign*step;
         else
             axis = zeros(3,1); axis(component-3) = 1;
             crossMatrix = [0,-axis(3),axis(2); ...
                 axis(3),0,-axis(1);-axis(2),axis(1),0];
-            shiftedR{body} = expm(signValue*step*crossMatrix)*Q{body};
+            shiftedR{body} = expm(perturbationSign*step*crossMatrix)*Q{body};
         end
         assert(norm(shiftedQ(2,:)-shiftedQ(1,:))>2, ...
             'Perturbation would overlap the spheres.');
@@ -451,9 +466,14 @@ for j = 1:d
         solveTimes(count) = toc(timer);
         iterations(count) = it;
         residuals(count) = err;
-        [signedStress{side},~] = apply_KS_transpose(rin,shiftedQ,lambda);
+        stress = apply_KS_transpose(rin,shiftedQ,lambda);
+        if perturbationSign < 0
+            stressMinus = stress;
+        else
+            stressPlus = stress;
+        end
     end
-    derivative = (signedStress{2}-signedStress{1})/(2*step);
+    derivative = (stressPlus-stressMinus)/(2*step);
     if component<=3
         Dtrans = Dtrans+derivative;
     else

@@ -1,7 +1,7 @@
 
 # StokesMFS3D
 
-StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies.
+StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies. Equal spheres can also be solved above a planar no-slip wall using the Blake half-space Green function; see [wall-bounded Stokes](wall/README.md).
 
 Two discretisations are available:
 
@@ -16,6 +16,7 @@ Two discretisations are available:
 
 ## Features
 
+- **Wall-bounded problems:** equal spheres above an infinite no-slip plane, using the Blake tensor and either wall-aware or free-space one-body preconditioning. See [wall-bounded Stokes](wall/README.md).
 - **Resistance problem:** prescribe rigid-body velocities and compute forces and torques.
 - **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with prescribed surface slip.
   * Large scale suspensions of spheres or ellipsoidals simulated at low cost.
@@ -42,6 +43,9 @@ To run simulations, ensure the following dependencies are available:
 - **[FMM3D](https://github.com/flatironinstitute/FMM3D)**  
   Recommended for accelerating calculations with many particles (typically >70 with default settings)
 
+- **StokesHalfspaceFMM** (required for wall-bounded Stokes solves)  
+  The sibling repository `../StokesHalfspaceFMM` provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
+
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for direct evaluation of fundamental solutions.  
   Only `SE0P_Stokeslet_direct.c` needs to be compiled in the standard setting. A precompiled binary is included in the `Stokes_Direct` repository.
@@ -63,6 +67,7 @@ In the demo folder, we demonstrate the method using minimal input:
 - Run `demo_cluster_resistance_with_images.m` for a resistance problem with a cluster of close spheres using image systems.
 - Run `demo_mobility_with_images.m` for the matching two-sphere resistance-to-mobility check.
 - Run `demo_cluster_mobility_with_images.m` for the matching five-sphere cluster check.
+- Run `demo_wall_mobility.m` for a wall-bounded mobility/resistance round trip, or `demo_random_wall_torque.m` for a random wall cluster under unit torques.
 
 Several functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
 ## Publications
@@ -77,10 +82,11 @@ This work is based on the following research papers:
    *A. Broms, A.H. Barnett, A.-K. Tornberg*, *Adv. Comput. Math.* (2025)  
    [https://doi.org/10.1007/s10444-025-10258-4](https://doi.org/10.1007/s10444-025-10258-4) 
 
+
+![Clustered particles](cluster.png)
+
 ## Roadmap
 
 Planned additions include:
 
 - A symmetrized version of the MFS solver to enable Brownian motion (in progress, see dev_DLP folders)
-
-![Clustered particles](cluster.png)
