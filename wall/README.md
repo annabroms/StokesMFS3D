@@ -5,6 +5,80 @@ stationary, no-slip plane. They use standard interior proxy Stokeslets and
 the complete Blake Green function. No contact image lines or enhanced
 source families are added. Background flow and prescribed slip are zero.
 
+## Sphere–wall image-line experiment
+
+[oct27_sphere_wall_image_combinations.m](../experiments/oct27_sphere_wall_image_combinations.m)
+adds independently fitted source families **inside one sphere** using the
+complete wall kernels in StokesHalfspaceFMM. The ordinary wall solver APIs
+remain proxy-only. The experiment fixes exactly **700** proxy Stokeslets,
+gap/a=1e-3, proxy radius/a=0.63 and rigid motion `[1;0;-1;0;0;0]`.
+Because the design loader rounds a request of 700 down to 686, the experiment
+reuses the existing full-sphere Fibonacci patch routine for exactly 700 proxy
+locations. Fitting and independent cap-refined validation targets are fixed.
+
+All controls are at the beginning of the script. `stressletCombinationMode`
+selects the comparisons:
+
+- `"split"` (default): all 31 subsets of S, R, T_nT_n2, T_t and D.
+- `"grouped"`: the original 15 subsets of S, R, T and D.
+- `"custom"`: use `customCombinationStrings`, for example
+  `["T_t","T_nT_n2","ST_tD","ST_nT_n2D","SRTD"]`.
+
+T means all three stresslet orientations; T_n and T_n2 are transverse to
+the line and tangent to the wall, while T_t points along the line toward the
+wall. The combination parser also accepts `+` separators. S denotes added
+line Stokeslets: proxy Stokeslets remain present even without an S token.
+The zero-image baseline is solved once. The split sweep has 187 production
+SVD factorizations, the grouped sweep 91; two fitting-resolution checks are
+additional. The largest matrix has 7662 rows and 2640 columns. Each solve
+prints dimensions, storage estimate and numerical rank.
+
+The adapters preserve the existing MFS free-space conventions: package
+stresslets receive `-q` and package potential dipoles receive `-2*d`.
+Source orientations are passed through `options.normals`. These source
+families currently use the package's direct `method="blake"` evaluation;
+no optional-family FMM acceleration is claimed. All prescribed wall images
+are included by the package and are never fitted independently.
+
+Results, coefficient blocks, unknown-count tables, wall checks, resolution
+checks and two semilog-y panels are saved with the `oct27_` prefix under
+[visuals/](../visuals/). The source-strength panel uses radius-scaled vector
+magnitudes in the repository convention; package-normalized maxima are
+saved separately. See the [implementation plan](../experiments/oct27_sphere_wall_image_combinations_plan.md)
+for the reflection/inversion derivation, metrics and output definitions.
+
+Both result panels plot against **scalar unknowns on the image nodes**,
+excluding the fixed 2100 proxy coefficients. Thus T_t adds three unknowns
+per point and T_nT_n2 adds six. The experiment finishes with a second figure
+showing proxy, image-line and collocation nodes, including a wall-facing
+close-up. The node figure shows the largest image count; its geometry is
+shared by all combinations at that count.
+
+Replot saved results without any kernel evaluations or solves:
+
+```matlab
+addpath('experiments');
+plot_oct27_sphere_wall_image_combinations('visuals/oct27_sphere_wall_image_combinations.mat');
+```
+
+An optional second argument such as `'visuals/oct27_sphere_wall'` exports
+both figures to FIG, PNG and PDF; the node exports have the `_nodes` suffix.
+The plotting function also reads files saved by the previous experiment
+version. It leaves the saved numerical data unchanged.
+
+`runResolutionChecks` controls the extra resolution comparisons. The
+validation check evaluates fixed coefficients on a denser independent grid;
+the fitting check solves selected cases on a denser collocation grid and
+compares their surface errors. These checks test whether the reported
+errors are resolved. They keep N, gap, motion and source locations fixed.
+
+Run the small dedicated regressions without executing the experiment:
+
+```matlab
+setpath;
+report = test_oct27_sphere_wall_images;
+```
+
 The half-space evaluation is provided by the independent sibling repository
 `../StokesHalfspaceFMM`. Its fast representation is due to **Z. Gimbutas,
 L. Greengard and S. Veerapaneni**, *Simple and efficient representations for
