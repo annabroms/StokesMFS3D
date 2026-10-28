@@ -9,8 +9,10 @@ P = 5;
 a = 1;
 mu = 1;
 [q,~] = grow_cluster_wall(P,a,1,0.5,20261026,"equalHeight");
-[rin,rout,opt] = init_spheres_wall(q,a,struct( ...
-    'N',500,'mu',mu,'backend',"blake",'preconditioner',"wall"));
+opt = wall_solver_options(struct( ...
+    'N',500,'mu',mu,'backend',"blake",'preconditioner',"wall")); opt.radius = a;
+[rin,rout] = init_spheres(q,opt.proxyRadius, ...
+    opt.N,opt.collocationRatio,a);
 opt.preparedProblem = prepare_wall_problem(q,rin,rout,opt);
 
 FT = randn(6*P,1); 

@@ -6,7 +6,7 @@ StokesMFS3D provides a minimal working implementation of the **Method of Fundame
 Two discretisations are available:
 
 - **Basic discretisation (proxy sources only):** used by `solve_resistance.m` and `solve_mobility.m`, and hence by `demo_spheres.m`, `demo_slip.m` and `ellipsoid_mobility_run.m`. It supports spheres and ellipsoids, FMM acceleration and prescribed slip.
-- **Image-enhanced discretisation (spheres, resistance and mobility):** used by `solve_resistance_with_images.m` and `solve_mobility_with_images.m`, and hence by `demo_resistance_with_images.m`, `demo_cluster_resistance_with_images.m`, `demo_mobility_with_images.m` and `demo_cluster_mobility_with_images.m`. Image lines and extra collocation caps are added at each close contact, following [Broms et al. (2025)](#publications). See [image resistance](images/README_resistance.md) and [image mobility](images/README_mobility.md).
+- **Image-enhanced discretisation (spheres, resistance and mobility):** used by `solve_resistance_images.m` and `solve_mobility_images.m`, and hence by `demo_resistance_with_images.m`, `demo_cluster_resistance_with_images.m`, `demo_mobility_with_images.m` and `demo_cluster_mobility_with_images.m`. Image lines and extra collocation caps are added at each close contact, following [Broms et al. (2025)](#publications). See [image resistance](images/README_resistance.md) and [image mobility](images/README_mobility.md).
 
 > **Note** With images, the discretisation of a sphere depends on its neighbours (gaps, contact directions and image counts). In the basic discretisation all identical spheres share one one-body matrix, which is factorised once. With images, the one-body matrix must be recomputed and refactorised for every unique discretisation, i.e. typically for every sphere that has close neighbours. Cross-sphere interactions are also summed directly, without FMM. The image solver is therefore considerably more expensive per sphere and is intended for close interactions. See `images/README_resistance.md`.
 
@@ -69,7 +69,7 @@ In the demo folder, we demonstrate the method using minimal input:
 - Run `demo_cluster_mobility_with_images.m` for the matching five-sphere cluster check.
 - Run `demo_wall_mobility.m` for a wall-bounded mobility/resistance round trip, or `demo_random_wall_torque.m` for a random wall cluster under unit torques.
 
-Several functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
+Many functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
 ## Publications
 
 This work is based on the following research papers:

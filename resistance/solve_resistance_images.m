@@ -1,9 +1,9 @@
 function [Fvec,iters,lambda_norm,err_res,details] = ...
-    solve_resistance_with_images(q,U,opt)
-%SOLVE_RESISTANCE_WITH_IMAGES Solve rigid-sphere Stokes resistance by image MFS.
+    solve_resistance_images(q,U,opt)
+%SOLVE_RESISTANCE_IMAGES Solve rigid-sphere Stokes resistance by image MFS.
 %   [Fvec,iters,lambda_norm,err_res,details] = ...
-%       solve_resistance_with_images(q,U,opt)
-%   solve_resistance_with_images() shows a three-sphere resistance example.
+%       solve_resistance_images(q,U,opt)
+%   solve_resistance_images() shows a three-sphere resistance example.
 % Reference: A. Broms, A. H. Barnett, and A.-K. Tornberg,
 % "Accurate close interactions of Stokes spheres using lubrication-adapted
 % image systems," Journal of Computational Physics 523 (2025), 113636.
@@ -42,7 +42,7 @@ function [Fvec,iters,lambda_norm,err_res,details] = ...
 % During one-body setup, progress reports give each body's SVD dimensions
 % and the storage needed for one double-precision copy of that matrix.
 % The velocity solve uses unit-viscosity coefficients. For physical viscosity
-% opt.viscosity, S/R/T strengths and the returned force/torque scale by it;
+% opt.viscosity (default 1), S/R/T strengths and the returned force/torque scale by it;
 % D strengths do not. details.lambda and lambda_norm remain normalized
 % unit-viscosity coefficients, suitable for direct_image_velocity.
 % The sphere radius is one.
@@ -229,9 +229,9 @@ N = 686;
 N_image = []; % Adaptive from each gap by paper Eq. (39).
 opt = struct('N',N,'proxyRadius',0.63,'N_image',N_image, ...
     'capMode',"exponential",'rowWeightMode',"local", ...
-    'validationCount',1000,'validationGapCount',401,'visosity',1);
+    'validationCount',1000,'validationGapCount',401,'viscosity',1);
 [F,iters,lambdaNorm,residual,details] = ...
-    solve_resistance_with_images(q,U,opt);
+    solve_resistance_images(q,U,opt);
 fprintf('Three-sphere triangle, gap %.1e, N=%d, N_image=%d per pair\n', ...
     gap,details.grid.N,details.grid.pairs(1,4));
 fprintf('GMRES iterations: %d; true weighted residual: %.3e\n', ...

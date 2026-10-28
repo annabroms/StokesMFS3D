@@ -122,8 +122,10 @@ end
 function self_test()
 % Exercise one resistance and one mobility solve, then display their geometry.
 q = [0,0,1.5;3,0,1.5];
-[s,t,o] = init_spheres_wall(q,1, ...
-    struct('N',400,'backend',"blake",'validationResolution',[24,16]));
+o = wall_solver_options(...
+    struct('N',400,'backend',"blake",'validationResolution',[24,16])); o.radius = 1;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,1);
 problem = prepare_wall_problem(q,s,t,o);
 o.preparedProblem = problem;
 U = [(1:6).'/6;-(1:6).'/6];

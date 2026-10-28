@@ -27,8 +27,10 @@ end
 
 function self_test()
 % Verify zero flow and that all check points lie on the physical sphere.
-q = [0,0,3]; [s,t,o] = init_spheres_wall(q,2,struct('N',18, ...
-    'backend',"blake",'validationResolution',[12,8]));
+q = [0,0,3]; o = wall_solver_options(struct('N',18, ...
+    'backend',"blake",'validationResolution',[12,8])); o.radius = 2;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,2);
 p = prepare_wall_problem(q,s,t,o);
 v = wall_surface_validation(p,zeros(3*size(s,1),1),zeros(6,1));
 assert(v.error==0 && ~v.isRelative);

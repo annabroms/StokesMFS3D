@@ -77,7 +77,7 @@ for motionIndex = 1:3
                 'solverMode',solverMode, ...
                 'validationCount',5000,'validationGapCount',2001);
             [F,it,lambdaNorm,err,detail] = ...
-                solve_resistance_with_images(q,U,opt);
+                solve_resistance_images(q,U,opt);
             forceError = NaN;
             if motionIndex == 1
                 forceError = abs(norm(F(1:3))-reference)/reference;

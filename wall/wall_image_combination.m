@@ -2,8 +2,9 @@ function selected = wall_image_combination(combination)
 %WALL_IMAGE_COMBINATION Decode a readable image-source combination string.
 % Order: [S,R,T_n,T_n2,T_t,D]. T expands to all three stresslet blocks.
 % Examples: "SRTD", "ST_tD", "ST_nT_n2D", "T_nT_n2", "R+T_t".
-% T_n and T_n2 are normal to the line (tangent to the wall); T_t is along
-% the line (normal to the wall). Standard proxy S is implicit in every solve.
+% T_n and T_n2 are normal to the line; T_t is along the line. On a wall
+% line n/n2 are wall-tangent and t is wall-normal; a particle-pair line has
+% its own axial/transverse frame. Standard proxy S is implicit in every solve.
 % No-argument invocation tests full, split and invalid specifications.
 
 if nargin == 0

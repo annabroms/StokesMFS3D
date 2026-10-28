@@ -37,13 +37,13 @@ baseOpt = struct('N',686,'proxyRadius',0.63, ...
     'gmresTolerance',1e-6,'validationCount',5000, ...
     'validationGapCount',2001);
 [~,coarseIterations,coarseNorm,coarseResidual,coarse] = ...
-    solve_resistance_with_images(triangle,triangleVelocity,baseOpt);
+    solve_resistance_images(triangle,triangleVelocity,baseOpt);
 fineOpt = baseOpt;
 fineOpt.N = 1353;
 fineOpt.proxyRadius = 0.7;
 fineOpt.N_image = 30;
 [~,fineIterations,fineNorm,fineResidual,fine] = ...
-    solve_resistance_with_images(triangle,triangleVelocity,fineOpt);
+    solve_resistance_images(triangle,triangleVelocity,fineOpt);
 planeResolution = [110,80];
 if runFullSweep, planeResolution = [250,180]; end
 [X,Y] = meshgrid(linspace(-0.5,side+0.5,planeResolution(1)), ...
@@ -132,14 +132,14 @@ for delta = tetraGaps
         enhancedOpt = baseOpt;
         enhancedOpt.N_image = [];
         [imageForce,imageIt,imageNorm,imageRes,imageDetail] = ...
-            solve_resistance_with_images(tetra,velocity,enhancedOpt);
+            solve_resistance_images(tetra,velocity,enhancedOpt);
         basicOpt = baseOpt;
         basicOpt.N_image = 0;
         [basicForce,basicIt,basicNorm,basicRes,basicDetail] = ...
-            solve_resistance_with_images(tetra,velocity,basicOpt);
+            solve_resistance_images(tetra,velocity,basicOpt);
         referenceOpt = fineOpt;
         [referenceForce,~,~,~] = ...
-            solve_resistance_with_images(tetra,velocity,referenceOpt);
+            solve_resistance_images(tetra,velocity,referenceOpt);
         forceScale = max(norm(referenceForce,inf),eps);
         row = struct('gap',delta,'realization',realization, ...
             'imageForceError',norm(imageForce-referenceForce,inf)/forceScale, ...

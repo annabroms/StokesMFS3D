@@ -57,7 +57,7 @@ for k = 1:nGaps
     F = zeros(12,1);
     F(1:3) = forceMagnitude*neighbourDirection.';
     F(7:9) = -F(1:3);
-    [~,it,~,err,details] = solve_mobility_with_images(q,F,opt);
+    [~,it,~,err,details] = solve_mobility_images(q,F,opt);
     deterministicStresslet(:,:,:,k) = ...
         apply_KS_transpose(details.grid,details.lambda);
     actualN(k) = details.grid.N;

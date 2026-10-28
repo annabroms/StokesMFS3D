@@ -33,8 +33,10 @@ function self_test()
 % Independently assemble both square operators for unequal-height bodies.
 q = [0,0,1.4;3,0,2];
 for pre = ["wall","freeSpace"]
-    [s,t,o] = init_spheres_wall(q,1,struct('N',18,'backend',"blake", ...
-        'preconditioner',pre,'computeResidual',false));
+    o = wall_solver_options(struct('N',18,'backend',"blake", ...
+        'preconditioner',pre,'computeResidual',false)); o.radius = 1;
+    [s,t] = init_spheres(q,o.proxyRadius, ...
+        o.N,o.collocationRatio,1);
     p = prepare_wall_problem(q,s,t,o);
     G = stokes_kernel_matrix(p.rin,p.rout,p.kernel.options);
     x = sin((1:3*p.M*p.P).');

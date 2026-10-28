@@ -59,7 +59,9 @@ for mode = ["equalHeight","threeDimensional"]
             plotOpt = struct('wall_height',0,'delta_body',0.7,'delta_wall',0.2, ...
                 'visible',get(groot,'DefaultFigureVisible'));
             % Display the actual mode, including the distinct 3D geometry.
-            [sources,~,~] = init_spheres_wall(q,2,struct('N',30,'backend',"blake"));
+            wallOpt = wall_solver_options(struct('N',30,'backend',"blake")); wallOpt.radius = 2;
+            [sources,~] = init_spheres(q,wallOpt.proxyRadius, ...
+                wallOpt.N,wallOpt.collocationRatio,2);
             fig = plot_wall_geometry(q,2,sources,plotOpt);
             set(fig,'Name',char("grow_cluster_wall self-test: "+mode));
         end

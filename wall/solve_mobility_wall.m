@@ -137,8 +137,10 @@ function self_test()
 % Verify prescribed moments of the reconstructed physical source vector.
 a = 1;
 q = [0,0,2];
-[s,t,o] = init_spheres_wall(q,a, ...
-    struct('N',300,'backend',"blake",'computeResidual',false));
+o = wall_solver_options(...
+    struct('N',300,'backend',"blake",'computeResidual',false)); o.radius = a;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,a);
 f = (1:6).'/6;
 [u,it,~,~,lambda,d] = solve_mobility_wall(q,s,t,f,o);
 assert(all(isfinite(u)) && norm(getKmat(s,q).'*lambda-f)<1e-11);

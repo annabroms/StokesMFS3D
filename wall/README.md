@@ -1,5 +1,12 @@
 # Proxy-only Stokes flow above a planar wall
 
+For the additional wall ST_tD and close-pair SDR solvers, see
+[Wall and close-pair image solvers](README_images.md). Their public functions
+live in the resistance and mobility folders and include plotted self-tests.
+The former wall-specific grid initializer has been replaced by
+[init_spheres](../geometry/spheres/init_spheres.m), whose optional fifth
+argument supplies the physical radius.
+
 The wall solvers impose rigid motion on equal spheres above an infinite,
 stationary, no-slip plane. They use standard interior proxy Stokeslets and
 the complete Blake Green function. No contact image lines or enhanced

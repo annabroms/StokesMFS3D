@@ -1,20 +1,22 @@
 # Image-enhanced mobility for unit spheres
 
-`solve_mobility_with_images(q,Fvec,opt)` computes the six rigid-body
+`solve_mobility_images(q,Fvec,opt)` computes the six rigid-body
 velocities per sphere from prescribed forces and torques. It combines the
 recompleted Stokes mobility formulation in [Broms, Barnett and Tornberg,
 §§3.2–3.3](https://arxiv.org/pdf/2409.04215) with the close-contact image
 discretisation and force extraction in [Broms, Barnett and Tornberg,
 §2.3 and Remark 4](https://doi.org/10.1016/j.jcp.2024.113636).
-Viscosity and sphere radius are one. `Fvec` has six entries per sphere,
+Sphere radius is one and opt.viscosity defaults to one. The formulas below
+use loads divided by viscosity; the solver performs that normalization and
+returns realisedForceTorque in physical units. `Fvec` has six entries per sphere,
 `[Fx;Fy;Fz;Tx;Ty;Tz]`, in the source-strength (force-on-fluid) sign used by
-`solve_resistance_with_images`. The returned `U` has
+`solve_resistance_images`. The returned `U` has
 `[vx;vy;vz;omega_x;omega_y;omega_z]` per sphere. Fluid-on-body loads have
 the opposite sign.
 
 ## Source ordering and moments
 
-The geometry and options are shared with `solve_resistance_with_images`.
+The geometry and options are shared with `solve_resistance_images`.
 Every body starts with coarse proxy Stokeslets. Selected image families
 follow in `imageFamilies` order (default `SRD`), with all nodes of one
 family contiguous. Each block uses interleaved components
@@ -113,7 +115,7 @@ strengths with `image_source_coefficients` and call `direct_image_velocity`.
 
 Compared with `solve_mobility`, this solver handles sphere-specific source
 families, contact caps, nonuniform row weights, and unequal one-body blocks.
-Compared with `solve_resistance_with_images`, it factors the recompleted
+Compared with `solve_resistance_images`, it factors the recompleted
 mobility block and adds the six-dimensional completion and velocity map.
 Its current path is direct and no-slip; the basic solver remains the path
 for ellipsoids, slip, and FMM acceleration.

@@ -8,7 +8,9 @@ Barnett, and Anna-Karin Tornberg, *Accurate close interactions of Stokes
 spheres using lubrication-adapted image systems*, *Journal of Computational
 Physics* **523** (2025), 113636. Prescribed
 rigid translations and rotations are inputs. Source strengths, forces and
-torques are outputs. Viscosity and sphere radius are one.
+torques are outputs. Sphere radius is one; opt.viscosity defaults to one.
+Returned forces and torques scale with viscosity, while the coefficients
+used internally for velocity evaluation have unit-viscosity normalization.
 
 ## Geometry and default discretisation
 
@@ -72,7 +74,7 @@ time at the paper's production resolutions.
 The image solver prints `starting GMRES`, one dot per completed iteration
 (wrapping after 50 dots), and `completed GMRES` around the iterative solve.
 
-`solve_resistance_with_images(q,U,opt)` returns
+`solve_resistance_images(q,U,opt)` returns
 `[Fvec,iters,lambda_norm,err_res,details]`. `U` and `Fvec` have six entries
 per sphere, `[translation;rotation]` and `[force;torque]` respectively.
 `Fvec` follows `solve_resistance` and Eq. (28): sum of Stokeslet forces,
@@ -114,7 +116,7 @@ scripts also expose `solverMode="oneBody"` or `"denseSVD"` near the top.
 Dedicated small tests are
 `test_oct16_image_two_body.m` and `test_oct16_image_multibody.m`. New
 numerical functions also run deterministic self-tests when called without
-arguments. In particular, `solve_resistance_with_images()` prints the
+arguments. In particular, `solve_resistance_images()` prints the
 three-sphere forces and surface residuals and plots computed surface
 velocities. MATLAB paths are set by the repository's `setpath.m`.
 The two-sphere resistance script keeps plotting in its final `%% Plot results`

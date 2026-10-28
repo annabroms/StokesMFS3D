@@ -7,7 +7,7 @@ function grid = build_image_discretization(q,opt,radii)
 % image systems," Journal of Computational Physics 523 (2025), 113636.
 %
 % q is P-by-3 of nonoverlapping unit-sphere centres. opt is the completed
-% option set from solve_resistance_with_images; important controls are
+% option set from solve_resistance_images; important controls are
 % proxyRadius, N, collocationRatio, nearThreshold, N_image
 % (empty selects the paper's gap rule), imageFamilies (S/R/D/T/T_n/T_t),
 % capMode, capAngles, capUpsampling or exact capPointCounts, capLayers,

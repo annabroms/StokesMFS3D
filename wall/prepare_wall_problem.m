@@ -176,12 +176,16 @@ end
 function self_test()
 % Verify scaling, lateral factor reuse, and distinct-height wall blocks.
 o = struct('N',30,'backend',"blake",'computeResidual',false,'radius',2,'mu',3);
-q = [0,0,3;6,0,3]; [s,t,o] = init_spheres_wall(q,2,o);
+q = [0,0,3;6,0,3]; o = wall_solver_options(o); o.radius = 2;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,2);
 p = prepare_wall_problem(q,s,t,o);
 assert(p.timing.uniqueBlocks == 1 && p.strengthUnit == 6);
 fprintf('prepare_wall_problem: equal heights reuse %d block; strength unit mu*a=%.3g.\n', ...
     p.timing.uniqueBlocks,p.strengthUnit);
-q(2,3) = 4; [s,t,o] = init_spheres_wall(q,2,o);
+q(2,3) = 4; o = wall_solver_options(o); o.radius = 2;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,2);
 p = prepare_wall_problem(q,s,t,o);
 assert(p.timing.uniqueBlocks == 2);
 fprintf('prepare_wall_problem: PASS; unequal heights require %d separate wall blocks.\n', ...

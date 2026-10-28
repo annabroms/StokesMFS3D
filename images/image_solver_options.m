@@ -10,7 +10,7 @@ end
 if isempty(opt)
     opt = struct();
 end
-defaults = struct('proxyRadius',0.63,'N',686, ...
+defaults = struct('proxyRadius',0.63,'N',686,'viscosity',1, ...
     'collocationRatio',1.2,'nearThreshold',0.15,'N_image',[], ...
     'imageOffsetFraction',0.05,'imageFamilies',"SRD",'useImages',true, ...
     'capMode',"fibonacci",'capAngles',[pi/5,pi/60], ...
@@ -32,6 +32,7 @@ opt.capMode = string(opt.capMode);
 opt.rowWeightMode = string(opt.rowWeightMode);
 opt.imageFamilies = string(opt.imageFamilies);
 opt.solverMode = string(opt.solverMode);
+validateattributes(opt.viscosity,{'double'},{'scalar','real','finite','positive'});
 if opt.rowWeightMode == ""
     if opt.capMode == "fibonacci"
         opt.rowWeightMode = "paper";

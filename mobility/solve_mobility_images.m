@@ -1,8 +1,8 @@
 function [U,iters,lambda_norm,uerr,details] = ...
-    solve_mobility_with_images(q,Fvec,opt)
-%SOLVE_MOBILITY_WITH_IMAGES Solve unit-sphere mobility by recompleted image MFS.
-%   [U,iters,lambda_norm,uerr,details] = solve_mobility_with_images(q,Fvec,opt)
-%   solve_mobility_with_images() runs a small resistance-to-mobility check.
+    solve_mobility_images(q,Fvec,opt)
+%SOLVE_MOBILITY_IMAGES Solve unit-sphere mobility by recompleted image MFS.
+%   [U,iters,lambda_norm,uerr,details] = solve_mobility_images(q,Fvec,opt)
+%   solve_mobility_images() runs a small resistance-to-mobility check.
 %
 % q is P-by-3; Fvec and U are 6P-by-1, with each body ordered
 % [force;torque] and [translation;angular velocity], respectively.
@@ -16,6 +16,8 @@ function [U,iters,lambda_norm,uerr,details] = ...
 % The unprojected unknown z stores rigid motion through U_k=-H_k*z_k.
 % Its projected part has zero total force and torque across all families;
 % completion supplies the prescribed six moments.
+% opt.viscosity defaults to 1. Applied loads are divided by viscosity for
+% the unit-viscosity solve; realisedForceTorque is returned in physical units.
 
 if nargin == 0
     self_test();
@@ -30,6 +32,7 @@ validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
 P = size(q,1);
 validateattributes(Fvec,{'numeric'}, ...
     {'real','finite','column','numel',6*P});
+Fvec = Fvec/opt.viscosity;
 hasPrepared = isfield(opt,'prepared') && ~isempty(opt.prepared);
 if hasPrepared
     grid = validate_prepared_image_problem(q,opt,"mobility");
@@ -163,7 +166,7 @@ end
 [uerr,validationPoints,validationVelocity,validationRelative, ...
     validationGap] = image_surface_validation(q,grid,lambda,U,opt);
 details = struct('grid',grid,'lambda',{lambda},'z',{z}, ...
-    'completion',{lambda0},'realisedForceTorque',realisedForceTorque, ...
+    'completion',{lambda0},'realisedForceTorque',opt.viscosity*realisedForceTorque, ...
     'retainedRanks',retainedRanks, ...
     'trueGmresResidual',trueGmresResidual, ...
     'linearSystemResidual',linearSystemResidual, ...
@@ -185,8 +188,8 @@ opt = struct('N',700,'collocationRatio',2,'N_image',4, ...
     'capLayers',[5,5],'capMinAzimuth',4, ...
     'validationCount',100,'validationGapCount',61, ...
     'gmresTolerance',1e-8,'maxIterations',150,'svdCutoff',1e-11,'viscosity',1);
-[F,~,~,~,~] = solve_resistance_with_images(q,Uref,opt);
-[U,~,~,err,details] = solve_mobility_with_images(q,F,opt);
+[F,~,~,~,~] = solve_resistance_images(q,Uref,opt);
+[U,~,~,err,details] = solve_mobility_images(q,F,opt);
 assert(norm(details.realisedForceTorque-F,inf) < ...
     1e-10*max(1,norm(F,inf)));
 assert(norm(U-Uref,inf) < 1e-3*max(1,norm(Uref,inf)));
@@ -210,7 +213,7 @@ small.N = 30;
 small.N_image = 2;
 small.useRowScaling = false;
 F3 = sin((1:18).');
-[U3,~,~,~,d3] = solve_mobility_with_images(q3,F3,small);
+[U3,~,~,~,d3] = solve_mobility_images(q3,F3,small);
 assert(all(isfinite(U3)) && ...
     norm(d3.realisedForceTorque-F3,inf) < 1e-10);
 assert(all(arrayfun(@(body) all(body.rowScale == 1),d3.grid.body)));
@@ -219,7 +222,7 @@ assert(size(d3.grid.body(2).collocation,1) > ...
 assert(numel(d3.lambda{2}) > numel(d3.lambda{1}));
 dense = small;
 dense.solverMode = "denseSVD";
-[Ud,itd,~,~,dd] = solve_mobility_with_images(q,F,dense);
+[Ud,itd,~,~,dd] = solve_mobility_images(q,F,dense);
 assert(itd == 0 && isnan(dd.trueGmresResidual));
 assert(isscalar(dd.retainedRanks) && dd.retainedRanks > 0);
 assert(norm(dd.realisedForceTorque-F,inf) < 1e-10);
@@ -243,5 +246,5 @@ end
 physicalResidual = norm(vertcat(weightedError{:}))/ ...
     norm(vertcat(weightedRhs{:}));
 assert(abs(physicalResidual-dd.linearSystemResidual) < 1e-11);
-fprintf('solve_mobility_with_images self-test passed: err %.3e.\n',err);
+fprintf('solve_mobility_images self-test passed: err %.3e.\n',err);
 end

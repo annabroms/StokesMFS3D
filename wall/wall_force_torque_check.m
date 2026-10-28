@@ -30,8 +30,10 @@ end
 
 function self_test()
 % Use a single off-centre force inside an enclosing sphere near the wall.
-q = [0,0,1.1]; [s,t,o] = init_spheres_wall(q,1, ...
-    struct('N',18,'backend',"blake",'computeResidual',false));
+q = [0,0,1.1]; o = wall_solver_options(...
+    struct('N',18,'backend',"blake",'computeResidual',false)); o.radius = 1;
+[s,t] = init_spheres(q,o.proxyRadius, ...
+    o.N,o.collocationRatio,1);
 p = prepare_wall_problem(q,s,t,o);
 p.N = 1; p.physical.rin = q+[0.1,-0.08,0.15];
 c = wall_force_torque_check(p,[0.7;-0.4;0.2]);

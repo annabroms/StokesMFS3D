@@ -44,7 +44,9 @@ for j = 1:gapCount
     j
     q(:,3) = wallHeight+radius+wallGaps(j);
     opt.preparedProblem = [];
-    [sources,targets,opt] = init_spheres_wall(q,radius,opt);
+    opt = wall_solver_options(opt); opt.radius = radius;
+    [sources,targets] = init_spheres(q,opt.proxyRadius, ...
+        opt.N,opt.collocationRatio,radius);
     opt.preparedProblem = prepare_wall_problem(q,sources,targets,opt);
 
     [resistance(:,j),resistanceIterations(j),~,resistanceResidual(j)] = ...

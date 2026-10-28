@@ -41,10 +41,10 @@ fprintf('Row scaling: resistance %d, mobility %d\n', ...
 
 %% Compute the resistance solution for the prescribed rigid motions
 % F uses the source-strength (force-on-fluid) sign required by mobility.
-[F,~,~,~,~] = solve_resistance_with_images(q,Uref,resOpt);
+[F,~,~,~,~] = solve_resistance_images(q,Uref,resOpt);
 
 %% Solve mobility and compare recovered motions and force/torque moments
-[U,iters,~,~,details] = solve_mobility_with_images(q,F,mobOpt);
+[U,iters,~,~,details] = solve_mobility_images(q,F,mobOpt);
 translationRows = reshape(6*(0:P-1)+(1:3).',[],1);
 rotationRows = reshape(6*(0:P-1)+(4:6).',[],1);
 fprintf('P=%d, gap=%.0e: mobility GMRES %d, residual %.3e\n', ...
@@ -78,7 +78,7 @@ else
 end
 alternative.capLayers = [18,18];
 alternative.capExponent = [3,3];
-[Ualt,~,~,~,altDetails] = solve_mobility_with_images(q,F,alternative);
+[Ualt,~,~,~,altDetails] = solve_mobility_images(q,F,alternative);
 [altErr,~,~,~,~] = image_surface_validation( ...
     q,altDetails.grid,altDetails.lambda,Ualt,checkOpt);
 fprintf('Alternative cap grid: translation difference %.3e, rotation difference %.3e\n', ...
