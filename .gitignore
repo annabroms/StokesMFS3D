@@ -9,6 +9,10 @@ brownian/archive/
 brownian/visuals/
 visuals/
 
+# Local computation notes and implementation plans.
+/doc/
+*[Pp][Ll][Aa][Nn]*.md
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof

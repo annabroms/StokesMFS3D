@@ -163,14 +163,14 @@ end
 
 function [U,iters,lambda_norm,uerr,lambda,details] = self_test()
 % Drive a configurable near-wall particle problem with independent loads.
-%q = [0,0,1.001;2.001,0,1.001;1,4,1.002];
-q = [0,0,1.001;1,4,1.002];
-[rin,rout] = init_spheres(q,0.63,700,2);
-opt = struct('N_image',40,'wallImageFamilies',"ST_tD", ...
+q = [0,0,1.001;2.001,0,1.001;1,4,1.001];
+%q = [0,0,1.001;1,4,1.002];
+[rin,rout] = init_spheres(q,0.40,700,2);
+opt = struct('N_image',40,'wallImageFamilies',"SRT_tD", ...
     'pairImageFamilies',"SDR",'viscosity',1,'SVDsolve',false, ...
-    'fmm',1,'fmm_tol',1e-12,'plot',1, ...
+    'fmm',0,'fmm_tol',1e-12,'plot',1, ...
     'tol',1e-10,'gmres_tol',1e-9,'maxit',400);
-Fvec = [1;0;-1;0;0.2;0; -1;0;0.5;0.1;0;0];% 0;1;0;0;0;0.5];
+Fvec = [1;0;-1;0;0.2;0; -1;0;0.5;0.1;0;0; 0;1;0;0;0;0.5];
 [U,iters,lambda_norm,uerr,lambda,details] = ...
     solve_mobility_wall_images(q,rin,rout,Fvec,opt);
 if ~all(isfinite([U;lambda])) || details.momentError > 1e-8*max(1,norm(Fvec,inf))
