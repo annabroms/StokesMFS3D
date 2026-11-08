@@ -22,7 +22,14 @@ hasEdge = hasPhysicalEdge && opt.useExtraCollocation && ...
     opt.ringLevels>0 && opt.edgeBandAngle>0;
 if hasEdge
     % Preserve every off-edge base node; rings only add edge resolution.
-    offsets = opt.edgeBandAngle*2.^(-(0:opt.ringLevels-1));
+    if opt.collocClustering=="tapered"
+        offsets = stagnant_cap_cluster_offsets(opt.ringLevels, ...
+            opt.edgeBandAngle,opt.collocClustering, ...
+            opt.collocClusterRatio,opt.collocClusterSigma);
+    else
+        % Retain the legacy half-spacing of the uniform-proxy geometry.
+        offsets = opt.edgeBandAngle*2.^(-(0:opt.ringLevels-1));
+    end
     if isempty(opt.ringAzimuthCount)
         spacing = sqrt(4*pi/ceil(opt.collocationRatio*N));
         nAz = max(12,ceil(2*pi*sin(opt.phi)/spacing));

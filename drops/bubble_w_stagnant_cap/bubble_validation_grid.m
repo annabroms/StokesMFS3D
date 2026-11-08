@@ -8,6 +8,24 @@ end
 assert(isfield(opt,'geometryOptions'),'Complete options with bubble_options.');
 validation = stagnant_cap_validation_grid( ...
     opt.geometryOptions,maxCollocation,finestOffset);
+if opt.useSourceRefinement
+    % Audit the narrow source footprints at denser, off-collocation points.
+    geometry = bubble_geometry(opt);
+    level = max(1,ceil(maxCollocation/geometry.collocationCount));
+    patch = bubble_source_refinement(geometry,opt,level);
+    isOld = ismembertol(patch.points,validation.points,1e-11*opt.radius, ...
+        'ByRows',true,'DataScale',1);
+    keep = ~isOld;
+    validation.points = [validation.points;patch.points(keep,:)];
+    validation.normals = [validation.normals;patch.normals(keep,:)];
+    validation.theta = [validation.theta;patch.theta(keep)];
+    validation.cap = [validation.cap;patch.cap(keep)];
+    validation.mobile = ~validation.cap;
+    validation.edgeDistance = [validation.edgeDistance;patch.edgeDistance(keep)];
+    validation.nearEdge = validation.edgeDistance<=opt.radius*opt.edgeBandAngle;
+    validation.minimumEdgeDistance = min(validation.edgeDistance);
+    validation.count = size(validation.points,1);
+end
 assert(validation.count>=5*maxCollocation);
 if opt.phi>0 && opt.phi<pi
     assert(any(validation.cap) && any(validation.mobile));

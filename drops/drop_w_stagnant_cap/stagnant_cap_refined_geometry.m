@@ -23,10 +23,13 @@ nFamily = numel(opt.refinementFamilies)+double(opt.derivative_direction~="none")
 nCollocLevel = ceil(opt.colloc_factor*nLevel*nFamily);
 innerAdded = zeros(nLevel*nAzSource,3);
 outerAdded = zeros(nLevel*nAzSource,3);
-innerDistance = opt.innerSourceStartDistance* ...
-    opt.sourceClusterRatio.^(0:nLevel-1);
-outerDistance = opt.outerSourceStartDistance* ...
-    opt.sourceClusterRatio.^(0:nLevel-1);
+% Preserve source counts and angles; change only the selected distance rule.
+innerDistance = stagnant_cap_cluster_offsets(nLevel, ...
+    opt.innerSourceStartDistance,opt.sourceClustering, ...
+    opt.sourceClusterRatio,opt.sourceClusterSigma);
+outerDistance = stagnant_cap_cluster_offsets(nLevel, ...
+    opt.outerSourceStartDistance,opt.sourceClustering, ...
+    opt.sourceClusterRatio,opt.sourceClusterSigma);
 tol = 1e-11*a;
 for k = 1:nLevel
     rows = (k-1)*nAzSource+(1:nAzSource);
@@ -116,8 +119,9 @@ else
     nAzColloc = 0;
 end
 
-offsets = opt.collocAngularExtent* ...
-    opt.collocClusterRatio.^(0:nCollocLevel-1);
+offsets = stagnant_cap_cluster_offsets(nCollocLevel, ...
+    opt.collocAngularExtent,opt.collocClustering, ...
+    opt.collocClusterRatio,opt.collocClusterSigma);
 ringIndex = zeros(geometry.baseCount+2*nCollocLevel*nAzColloc,1);
 unit = (geometry.points-c)/a;
 for k = 1:nCollocLevel

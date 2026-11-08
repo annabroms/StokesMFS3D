@@ -45,8 +45,9 @@ else
     % Reposition only the added rings; preserve the uniform base design.
     nRingLevel = numel(raw.ringOffsets);
     if nRingLevel>0
-        offsets = opt.edgeBandAngle* ...
-            opt.collocClusterRatio.^(0:nRingLevel-1);
+        offsets = stagnant_cap_cluster_offsets(nRingLevel, ...
+            opt.edgeBandAngle,opt.collocClustering, ...
+            opt.collocClusterRatio,opt.collocClusterSigma);
         nAz = raw.ringAzimuthCount;
         for level = 1:nRingLevel
             for side = [-1 1]
@@ -107,9 +108,30 @@ geometry.collocationRegion(raw.cap) = "cap";
 geometry.ringOffsets = raw.ringOffsets;
 geometry.ringAzimuthCount = raw.ringAzimuthCount;
 geometry.edgeDistance = raw.edgeDistance;
+geometry.sourceRefinementCount = 0;
+if opt.useSourceRefinement
+    % Add depth-scaled local samples while preserving all existing fit nodes.
+    patch = bubble_source_refinement(geometry,opt);
+    geometry.points = [geometry.points;patch.points];
+    geometry.normals = [geometry.normals;patch.normals];
+    geometry.theta = [geometry.theta;patch.theta];
+    geometry.cap = [geometry.cap;patch.cap];
+    geometry.mobile = [geometry.mobile;patch.mobile];
+    geometry.edgeDistance = [geometry.edgeDistance;patch.edgeDistance];
+    geometry.collocationRegion = [geometry.collocationRegion; ...
+        repmat("mobile",patch.count,1)];
+    geometry.collocationRegion(geometry.cap) = "cap";
+    % -1 marks local patches, distinct from base nodes (0) and uniform rings.
+    geometry.collocationRingIndex = [geometry.collocationRingIndex; ...
+        -ones(patch.count,1)];
+    geometry.collocationCount = size(geometry.points,1);
+    geometry.capCount = nnz(geometry.cap);
+    geometry.mobileCount = nnz(geometry.mobile);
+    geometry.sourceRefinementCount = patch.count;
+end
 geometry.minimumSourceDistance = min(opt.radius- ...
     vecnorm(geometry.sourcePoints-opt.centre,2,2));
-geometry.minimumEdgeDistance = min(raw.edgeDistance);
+geometry.minimumEdgeDistance = min(geometry.edgeDistance);
 geometry.minimumAddedEdgeDistance = NaN;
 if ~isempty(raw.ringOffsets)
     geometry.minimumAddedEdgeDistance = opt.radius*min(raw.ringOffsets);

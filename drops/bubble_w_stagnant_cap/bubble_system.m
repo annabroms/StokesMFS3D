@@ -1,4 +1,4 @@
-function system = bubble_system(geometry,opt,Fg)
+function system = bubble_system(geometry,opt,Fg,capMode)
 %BUBBLE_SYSTEM Assemble the projected exterior mixed-boundary system.
 % Preserve interleaved [x1;y1;z1;x2;...] source and target ordering.
 if nargin == 0
@@ -6,6 +6,9 @@ if nargin == 0
     system = [];
     return
 end
+if nargin<4, capMode = "split"; end
+capMode = string(capMode);
+assert(isscalar(capMode) && ismember(capMode,["split","cartesian"]));
 Fg = Fg(:);
 assert(numel(Fg)==3 && all(isfinite(Fg)) && isreal(Fg) && ...
     norm(Fg)>0 && norm(Fg(1:2))<1e-13*norm(Fg), ...
@@ -16,41 +19,16 @@ cap = find(geometry.cap);
 mobile = find(geometry.mobile);
 Mc = numel(cap);
 Mm = numel(mobile);
-[basis,coefficientCount] = bubble_basis(geometry,opt);
-assert(coefficientCount==N);
-G = stokes_mfs_velocity_matrix(basis,geometry.points)/opt.muOut;
-Tm = stokes_mfs_traction_matrix(basis,geometry.points(mobile,:), ...
-    geometry.normals(mobile,:));
-assert(isequal(size(G),[3*M,N]) && isequal(size(Tm),[3*Mm,N]));
-
-reference = repmat([1 0 0],M,1);
-reference(abs(geometry.normals(:,1))>0.9,:) = ...
-    repmat([0 1 0],nnz(abs(geometry.normals(:,1))>0.9),1);
-t1 = cross(geometry.normals,reference,2);
-t1 = t1./vecnorm(t1,2,2);
-t2 = cross(geometry.normals,t1,2);
-normalMap = sparse(repelem((1:M).',3), ...
-    (1:3*M).',reshape(geometry.normals.',[],1),M,3*M);
-tangentRows = zeros(6*M,1);
-tangentColumns = zeros(6*M,1);
-tangentValues = zeros(6*M,1);
-for p = 1:M
-    rows = 6*p-5:6*p;
-    columns = (3*p-2:3*p).';
-    tangentRows(rows) = [repmat(2*p-1,3,1);repmat(2*p,3,1)];
-    tangentColumns(rows) = [columns;columns];
-    tangentValues(rows) = [t1(p,:).';t2(p,:).'];
-end
-tangentMap = sparse(tangentRows,tangentColumns,tangentValues,2*M,3*M);
-capVectorRows = reshape([3*cap-2,3*cap-1,3*cap].',[],1);
-mobileVectorRows = reshape([3*mobile-2,3*mobile-1,3*mobile].',[],1);
-capTangentRows = reshape([2*cap-1,2*cap].',[],1);
-mobileTangentRows = reshape([2*mobile-1,2*mobile].',[],1);
-Dc = tangentMap(capTangentRows,capVectorRows);
-Dm = tangentMap(mobileTangentRows,mobileVectorRows);
-Gc = G(capVectorRows,:);
-KM = kron(ones(M,1),eye(3));
-KMc = kron(ones(Mc,1),eye(3));
+operators = bubble_boundary_operators(geometry,opt);
+basis = operators.basis;
+G = operators.G;
+Tm = operators.Tm;
+normalMap = operators.normalMap;
+Dc = operators.Dc;
+Dm = operators.Dm;
+Gc = operators.Gc;
+KM = operators.KM;
+KMc = operators.KMc;
 
 body.basis = basis;
 [moments,~] = image_mobility_maps(body,opt.centre);
@@ -62,17 +40,33 @@ Gp = G-(G*C)*K;
 Gcp = Gc-(Gc*C)*K;
 Tmp = Tm-(Tm*C)*K;
 beta = opt.completionScale;
-system.matrix = [normalMap*Gp+beta*(normalMap*KM)*K; ...
-    Dc*Gcp+beta*(Dc*KMc)*K; Dm*Tmp];
-system.rhs = -[normalMap*G*lambda0; ...
-    Dc*Gc*lambda0; Dm*Tm*lambda0];
+if capMode=="split"
+    system.matrix = [normalMap*Gp+beta*(normalMap*KM)*K; ...
+        Dc*Gcp+beta*(Dc*KMc)*K; Dm*Tmp];
+    system.rhs = -[normalMap*G*lambda0; ...
+        Dc*Gc*lambda0; Dm*Tm*lambda0];
+    system.normalRows = M;
+    system.capTangentRows = 2*Mc;
+    system.capVelocityRows = 0;
+    system.blockCounts = [M,2*Mc,2*Mm];
+else
+    % All physical unknown source forces remain projected; only cap rows change.
+    Bm = operators.Nm*operators.KMm;
+    system.matrix = [Gcp+beta*KMc*K; ...
+        operators.Nm*Gp(operators.mobileVectorRows,:)+beta*Bm*K; Dm*Tmp];
+    system.rhs = -[Gc*lambda0; ...
+        operators.Nm*G(operators.mobileVectorRows,:)*lambda0; Dm*Tm*lambda0];
+    system.normalRows = Mm;
+    system.capTangentRows = 0;
+    system.capVelocityRows = 3*Mc;
+    system.blockCounts = [3*Mc,Mm,2*Mm];
+end
+system.capMode = capMode;
 system.forceMap = K;
 system.forceCompletion = C;
 system.lambda0 = lambda0;
 system.momentMap = moments;
 system.basis = basis;
-system.normalRows = M;
-system.capTangentRows = 2*Mc;
 system.mobileTractionRows = 2*Mm;
 system.sourceCount = geometry.sourceCount;
 system.coefficientCount = N;
@@ -113,6 +107,14 @@ for families = ["S","SRT_t"]
     expectedNorm = norm([normal;capTangent(:);mobileTangent(:)]);
     actualNorm = norm(s.matrix*alpha-s.rhs);
     assert(abs(expectedNorm-actualNorm)<1e-10*max(1,actualNorm));
+    cartesian = bubble_system(g,o,Fg,"cartesian");
+    cartResidual = cartesian.matrix*alpha-cartesian.rhs;
+    capCartesian = reshape(velocity(g.cap,:).',[],1);
+    assert(norm(cartResidual(1:3*g.capCount)-capCartesian)<1e-10);
+    assert(norm(cartResidual(3*g.capCount+(1:g.mobileCount))-normal(g.mobile))<1e-10);
+    assert(abs(norm(cartResidual)-actualNorm)<1e-10*max(1,actualNorm));
+    assert(isequal(cartesian.blockCounts,[3*g.capCount,g.mobileCount,2*g.mobileCount]));
+    assert(cartesian.capTangentRows==0 && cartesian.normalRows==g.mobileCount);
 end
 derivativeOptions = bubble_options(struct('sourceRequest',50, ...
     'phi',pi/3,'n_level',1,'n_az_source',6,'n_az_colloc',8, ...

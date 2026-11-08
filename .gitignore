@@ -9,6 +9,7 @@ brownian/archive/
 brownian/visuals/
 visuals/
 drops/experiments/results
+doc/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux

@@ -8,6 +8,27 @@ infinity. The cap translates with the drop and has zero **relative** tangential
 velocity. No rotation, normal-stress equation, or surfactant-transport solve is
 included. The interior and exterior viscosities are both configurable.
 
+## Axisymmetric interior-band experiments
+
+After running `setpath`, `axisymmetric/nov6_ring_band_family_comparison.m`
+compares source-family combinations on the same interior band, and
+`axisymmetric/nov6_ring_band_depth_sweep.m` varies its depth for one fixed
+combination. Their top sections expose separate widths and target spacings
+for the source and physical-surface collocation bands. These lengths are
+measured on the physical sphere; depth is the radial distance from that
+sphere. Source rings have rotating cylindrical coefficients, while velocity
+and traction are evaluated in full Cartesian coordinates. All sources lie
+strictly inside the sphere.
+
+The surface collocation band supplements both the original design and the
+tapered edge-clustered rings. Its additional unweighted rows increase the
+least-squares emphasis on that band. Each script compares cases on common
+independent check and audit nodes and reports normalized boundary residuals,
+translation error, force, torque, swirl, coefficient sizes and SVD rank.
+Resolution warnings indicate when sampling may miss narrow residual spikes;
+they are not accuracy guarantees. Run `ring_band_geometry` without arguments
+to check and visualize the source and surface bands without solving the flow.
+
 ## Conical source refinement
 
 `drops/experiments/oct23_stagnant_cap_refinement.m` compares one prescribed-
@@ -347,3 +368,139 @@ It does not set computed edge values to zero.
 Results files produced before the base-node retention change use the old
 replacement grid and do not measure the current discretization. Rerun the
 experiments to refresh the counts, residuals, and benchmark errors.
+
+## Cartesian cap rows with force completion (29 October revision)
+
+The primary comparison now reuses [bubble_solve](./bubble_solve.m) and
+[bubble_system](./bubble_system.m) for both cap representations:
+
+```matlab
+split = bubble_solve(opt,Fg,geometry);  % default behavior unchanged
+cartesian = bubble_solve(opt,Fg,geometry,[],"cartesian");
+```
+
+Both use `H=KN'`, `C=H'/(H*H')`, `lambda0=C*Fg`, and
+`lambdaFree=alpha-C*(H*alpha)`. The physical coefficients are
+`lambda=lambdaFree+lambda0`, and translation is recovered by the existing
+`U=-completionScale*H*alpha` mapping. The known completion carries all force;
+the unknown physical source contribution is force-free. The auxiliary
+`alpha` itself also encodes translation and is not the physical source vector.
+No force penalty rows are fitted. The actual force defect, force-free residual
+and completion-force residual are still reported.
+
+The Cartesian mode has `3Mc` cap velocity rows, `Mm` mobile normal rows and
+`2Mm` mobile tangent-traction rows, giving the same `3M x 3N` Stokeslet matrix
+dimensions as the split mode. It has no additional cap normal rows. Equal
+effective cap-component weights make the two systems equivalent under an
+orthogonal row transformation. Area/column scaling reuse existing code;
+anisotropic effective cap weights are rejected for Cartesian mode.
+
+The revised surface figure annotates each recovered speed and force residual.
+Its upper row is signed `(u-U) dot e_theta/U*` (positive towards increasing
+polar angle); its lower row is total `norm(u-U)/U*`, including normal error.
+Both vanish on the stagnant cap. Nonzero mobile tangential velocity is
+permitted; the separate normal residual diagnoses penetration error. In the
+saved earlier direct-force run the explicit method's nearly zero colors
+accompanied a 92.5% force deficit and 92.8% speed error, rather than an accurate
+solution. Existing saved results are preserved; the revised experiment writes
+with the `oct29_bubble_cap_formulations_force_completion` prefix.
+
+The [updated plan](./oct29_bubble_cap_formulations_plan.md) records this revision
+before implementation and remains separate from the mathematical document.
+
+## Retained direct-force least-squares diagnostic
+
+[bubble_explicit_solve](./bubble_explicit_solve.m) adds a Stokeslet-only
+alternative to [bubble_solve](./bubble_solve.m). The previous solver retains
+its split cap rows and projection/completion behavior. The new unknown is
+`[lambda;U]`: physical node-interleaved Stokeslet forces followed by three
+translation components. Both evaluate laboratory exterior velocity with fluid
+at rest at infinity, using the same kernels and geometry.
+
+For `M=Mc+Mm` surface targets and `N` interior Stokeslets, the new matrix is
+`(3M+3) x (3N+3)`, with row blocks
+
+```text
+[ Gc        -KMc ] [lambda]   [ 0  ]   3Mc Cartesian cap-velocity rows
+[ Nm*Gm     -Bm  ] [  U   ] = [ 0  ]    Mm mobile normal-velocity rows
+[ Dm*Tm      0   ]            [ 0  ]   2Mm mobile tangential-traction rows
+[ KN'        0   ]            [ Fg ]     3 force rows
+```
+
+`KMc` and `KMm` repeat translation at the respective targets;
+`Bm=Nm*KMm` has one outward-normal transpose per mobile point. `Dm` retains
+the previous two orthonormal tangent rows. `KN'` sums **all** base and cone
+Stokeslet strengths. The signs are `FH=-KN'*lambda` and `KN'*lambda=Fg`.
+There are no extra normal rows on the cap and no translation term in the
+traction or force rows. Assembly lives in
+[bubble_explicit_system](./bubble_explicit_system.m); both formulations share
+[bubble_boundary_operators](./bubble_boundary_operators.m).
+
+Velocity rows are divided by `U*=norm(Fg)/zetaBubble`, traction rows by
+`muOut*U*/a`, and force rows by `norm(Fg)/forceWeight`, with `forceWeight=1`
+unless supplied explicitly. The new solver currently requires unit isotropic
+condition weights with area, column and condition-count scaling off. Equal
+component weights make the split cap normal/tangential squared norm equal to
+the Cartesian squared norm. The relative SVD threshold is applied to this
+row-scaled matrix with physical unknown columns left unscaled. Matrix sizes,
+absolute and relative thresholds, retained rank, and the physical force defect
+are printed. Least-squares force rows do **not** guarantee exact force balance;
+no projection or post-solve force correction is applied.
+
+```matlab
+setpath
+opt = bubble_options(struct('sourceRequest',50,'phi',pi/4, ...
+    'n_level',1,'n_az_source',6,'n_az_colloc',8));
+geometry = bubble_geometry(opt);
+Fg = [0;0;-1];
+previous = bubble_solve(opt,Fg,geometry);
+explicit = bubble_explicit_solve(opt,Fg,geometry,struct('forceWeight',1));
+```
+
+The primary comparison script is
+[oct29_bubble_cap_formulations](./experiments/oct29_bubble_cap_formulations.m).
+It compares the split and Cartesian force-completion modes described above;
+the direct-force solver remains available for separate diagnostics.
+Its comparison calculations and plots live directly in the script, reusing
+[bubble_evaluate](./bubble_evaluate.m) and the existing geometry/residual
+plotters. It constructs one shared geometry per paired resolution and common
+larger independent grids with off-edge refinement. Both methods use the same
+nonzero physical references. It reports theory errors, all boundary maxima,
+force residuals, translation and field differences, and an empirical agreement
+assessment from independent-grid and matched-resolution checks at one fixed
+SVD cutoff. Cutoff sensitivity is not assessed by this experiment.
+Source vectors are not compared.
+
+The script defaults to the current 700-source-request, five-cone-level
+Stokeslet setup with `svdTolerance=1e-8`, an 8 GB estimated SVD budget, and
+enabled matched-resolution checks at a single configured SVD cutoff. Library default `svdTolerance=1e-12` is
+unchanged. These are dense solves; the script prints a preflight and rejects a
+case exceeding its configured budget. Set `formulationInput.options` and the
+script's other documented controls before an explicit run to change the
+configuration. For uniform sources use `n_level=0`; the script then disables
+the inapplicable source-depth patches. No refinement law is changed between
+the two methods.
+
+All six requested visualization groups use shared grids and paired color
+limits: bubble-relative surface velocity, laboratory surface difference,
+region-masked boundary residuals, polar/edge profiles, masked exterior
+meridional fields, and identical geometry. CSV tables, complete MAT data,
+figures and a numerical results note use the new
+`oct29_bubble_cap_formulations_force_completion` prefix under
+[experiments/results/](./experiments/results/).
+The [implementation plan](./oct29_bubble_cap_formulations_plan.md) remains
+separate from the mathematical document.
+
+Small deterministic checks (no production experiment):
+
+```matlab
+bubble_boundary_operators
+bubble_explicit_system
+bubble_explicit_solve
+bubble_evaluate
+bubble_system
+bubble_validate
+bubble_plot_residuals
+```
+
+Each new function dispatches its no-argument call to its end-of-file self-test.
