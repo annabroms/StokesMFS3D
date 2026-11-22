@@ -231,8 +231,7 @@ end
 function check_dependencies()
 dependencies = { ...
     'stfmm3d', ...
-    'st3ddir_opt', ...
-    'SE0P_Stokestraction_direct_full_ext_mex'};
+    'st3ddir_opt'};
 
 for k = 1:numel(dependencies)
     if exist(dependencies{k},'file') == 0

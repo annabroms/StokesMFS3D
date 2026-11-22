@@ -61,9 +61,9 @@ To run simulations, ensure the following dependencies are available:
   ```bash
   git clone -b faster_st3ddir https://github.com/annabroms/FMM3D.git
   ```
-  Used for all free-space Stokeslet and stresslet sums in `getStokesletFlow.m` and `getStressletFlow.m`:
+  Used for all free-space Stokeslet and stresslet sums in `getStokesletFlow.m` and `getStressletFlow.m`, and for Stokeslet tractions in `getTractionFast.m`:
   - `stfmm3d` (`vars.fmm = true`): accelerated evaluation, recommended for many particles (typically >70 with default settings).
-  - `st3ddir_opt` (`vars.fmm = false`): optimized compiled direct summation (velocity only) of Stokeslets and/or stresslets, parallelized with OpenMP. It uses MATLAB's thread count, which by default is the number of physical cores. To change it, call e.g. `maxNumCompThreads(4)` before solving; setting the environment variable `OMP_NUM_THREADS` does not change it.
+  - `st3ddir_opt` (`vars.fmm = false`): optimized compiled direct summation of Stokeslet and/or stresslet velocities, and of Stokeslet tractions at targets with given normals (evaluated by their own kernel), parallelized with OpenMP. It uses MATLAB's thread count, which by default is the number of physical cores. To change it, call e.g. `maxNumCompThreads(4)` before solving; setting the environment variable `OMP_NUM_THREADS` does not change it.
 
   `setpath` adds `../FMM3D` when present. 
   
@@ -73,13 +73,10 @@ To run simulations, ensure the following dependencies are available:
   ```make
   STOKDIRFLAGS = -march=x86-64-v3 -ffast-math
   ```
-  then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes the Stokeslet sum in `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. With these flags, the stresslet sum in `st3ddir_opt` is 2–3x faster than the Stokes_Direct stresslet kernel. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
+  then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes the Stokeslet sum in `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. With these flags, the stresslet sum in `st3ddir_opt` is 2–3x faster, and the traction in `getTractionFast.m` 2.5–3.4x faster, than the corresponding kernels of the former Stokes_Direct dependency. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
 
 - **[StokesHalfspaceFMM](https://github.com/annabroms/StokesHalfspaceFMM)** (required only for wall-bounded Stokes solves)  
   The repository provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
-
-- **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
-  Used for compiled direct evaluation of tractions (`getTractionFast.m`), needed for e.g. slip and double-layer problems. Free-space Stokeslet and stresslet sums no longer use this repository. A precompiled binary is included in the `Stokes_Direct` repository.
 
 To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m. 
 
@@ -121,7 +118,7 @@ Many functions, including solve_mobility.m and solve_resistance.m, contain self-
 
 **Close cluster with images.** Resistance problem for five spheres, most of them at gaps of $10^{-3}$, with random rigid-body velocities (`demo_cluster_resistance_with_images`). The colours show the independent boundary-condition error on clustered surface nodes in the near contact regions. 
 
-![Close cluster of spheres with image-enhanced discretisation](figures/readme_image_cluster.png)
+<p align="center"><img src="figures/readme_image_cluster.png" alt="Close cluster of spheres with image-enhanced discretisation" width="560"></p>
 
 All figures except the two JCP figures can be regenerated with `tools/export_readme_figures.m`. It runs the demos unchanged and restyles their output with LaTeX-rendered labels.
 

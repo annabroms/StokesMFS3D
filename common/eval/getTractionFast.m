@@ -26,14 +26,19 @@ function res = getTractionFast(tau_stokes, rin, rout, nn,vars)
 %       - If vars.fmm is true, the function uses the FMM3D interface `stfmm3d`
 %         (requires FMM3D to be installed and compiled). Currently, this
 %         version is slow as it requires a lot more computation. 
-%       - Otherwise, it falls back to direct evaluation via a mex interface to SE0P_Stokestraction_direct_full_ext_mex.
+%       - Otherwise, it uses compiled direct summation via the FMM3D routine
+%         `st3ddir_opt` with target normals, which evaluates the Stokeslet
+%         traction by its own kernel (OpenMP-parallel).
+%       - Sign: the direct branch returns -sigma*n (the convention of the
+%         former Stokes_Direct traction kernel), while the FMM branch
+%         returns sigma*n, so the two branches differ in sign.
 %       - Modify this function for solving MFS with other fast summation
-%         technique or implementation of direction summation. 
+%         technique or implementation of direction summation.
 %
 %   DEPENDENCIES:
-%       - Evaluation via gradu and p: FMM3D (https://github.com/flatironinstitute/fmm3d)
-%       - Direct evaluation (much faster): SE0P_Stokestraction_direct_full_ext_mex
-%       (https://github.com/annabroms/Stokes_Direct -- precompiled binary exists)
+%       - FMM3D, branch faster_st3ddir of https://github.com/annabroms/FMM3D,
+%         built with 'make matlab': stfmm3d (evaluation via gradu and p)
+%         and st3ddir_opt (direct traction, much faster; this branch only).
 %
 %   See also: getTractionDirectSLP
 %
@@ -72,25 +77,20 @@ if vars.fmm
     res = T(:);
 
 else
-    % -------- Use direct evaluation --------
-    targ = rout;
-    srcinfo.stoklet = reshape(tau_stokes, 3, []); % 3 x N
+    % -------- Use compiled direct summation (FMM3D) --------
+    srcinfo.sources = rin';                       % 3 x Ns
+    srcinfo.stoklet = reshape(tau_stokes, 3, []); % 3 x Ns
 
-    % Traction at targets via direct sum (mex)
-    
-    U = SE0P_Stokestraction_direct_full_ext_mex( ...
-        rin, srcinfo.stoklet', nn, struct('eval_ext_x', targ));
- 
-
-    U = U';                 % 3 x M
-    res = (1/(8*pi)) * U(:); % Apply traction prefactor (mu=1)
+    % Traction only (flag 0) at targets rout with normals nn: sigma*n
+    U = st3ddir_opt(srcinfo, rout', 0, nn');
+    res = -U.tractarg(:); % keep the former Stokes_Direct sign, -sigma*n
 
 end
 
 function self_test()
 
-if exist('stfmm3d','file') ~= 2
-    fprintf('getTractionFast self-test skipped: stfmm3d not found.\n');
+if exist('stfmm3d','file') ~= 2 || exist('st3ddir_opt','file') ~= 2
+    fprintf('getTractionFast self-test skipped: stfmm3d or st3ddir_opt not found.\n');
     return;
 end
 
