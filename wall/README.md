@@ -16,7 +16,9 @@ source families are added. Background flow and prescribed slip are zero.
 
 [oct27_sphere_wall_image_combinations.m](../experiments/oct27_sphere_wall_image_combinations.m)
 adds independently fitted source families **inside one sphere** using the
-complete wall kernels in StokesHalfspaceFMM. The ordinary wall solver APIs
+complete wall kernels in the separate
+[StokesHalfspaceFMM](https://github.com/annabroms/StokesHalfspaceFMM)
+repository. The ordinary wall solver APIs
 remain proxy-only. The experiment fixes exactly **700** proxy Stokeslets,
 gap/a=1e-3, proxy radius/a=0.63 and rigid motion `[1;0;-1;0;0;0]`.
 Because the design loader rounds a request of 700 down to 686, the experiment
@@ -86,17 +88,24 @@ setpath;
 report = test_oct27_sphere_wall_images;
 ```
 
-The half-space evaluation is provided by the independent sibling repository
-`../StokesHalfspaceFMM`. Its fast representation is due to **Z. Gimbutas,
-L. Greengard and S. Veerapaneni**, *Simple and efficient representations for
-the fundamental solutions of Stokes flow in a half-space*, JFM 776 (2015), R1,
-<https://doi.org/10.1017/jfm.2015.302>. Its independent direct reference uses
-J. R. Blake (1971), equation (16), <https://doi.org/10.1017/S0305004100049902>.
+The half-space evaluation is provided by
+[StokesHalfspaceFMM](https://github.com/annabroms/StokesHalfspaceFMM), a
+separate, standalone repository with its own MATLAB and Python packages,
+documentation and tests. It is not part of StokesMFS3D. StokesMFS3D only
+calls its MATLAB package, which `setpath` adds when the repository is cloned
+next to this one, as `../StokesHalfspaceFMM`. Its fast representation is due
+to **Z. Gimbutas, L. Greengard and S. Veerapaneni**, *Simple and efficient
+representations for the fundamental solutions of Stokes flow in a
+half-space*, JFM 776 (2015), R1, <https://doi.org/10.1017/jfm.2015.302>. Its
+independent direct reference uses J. R. Blake (1971), equation (16),
+<https://doi.org/10.1017/S0305004100049902>.
 
 ## Demos
 
-Run the demos from the StokesMFS3D root. Both use `setpath`, which adds the
-sibling `../StokesHalfspaceFMM` MATLAB package.
+Run the demos from the StokesMFS3D root. Both need the separate
+[StokesHalfspaceFMM](https://github.com/annabroms/StokesHalfspaceFMM)
+repository cloned as `../StokesHalfspaceFMM`; `setpath` then adds its MATLAB
+package.
 
 `demo/demo_wall_mobility.m` is the small direct-Blake example. It solves
 mobility for five equal-height spheres with random force/torque data, then
