@@ -24,7 +24,10 @@ function u = getStressletFlow(rvec_in,rvec_out,nn,strslet,Ns,vars)
 %
 %   NOTES:
 %       - If vars.fmm is true, uses stfmm3d stresslet evaluation.
-%       - Otherwise, uses SE0P_Stresslet_direct_full_ext_mex (fast direct sum).
+%       - Otherwise, uses compiled direct summation via the FMM3D routine
+%         `st3ddir_opt` (stresslets only, velocity only, OpenMP-parallel).
+%       - FMM3D's stresslet has the opposite sign to the one used here, so
+%         both branches negate its output.
 %
 %   See also: getStokesletFlow, getTractionFast
 
@@ -52,38 +55,29 @@ if nargin<6
 end
 
 
+% Source/target layout shared by both FMM3D routines
+targ = rvec_out';                          % 3 x Nt
+srcinfo.sources = rvec_in';                % 3 x Ns
+srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x Ns
+srcinfo.strsvec = nn';                     % 3 x Ns
+ifppregtarg = 1;                           % just vel out
+
 if vars.fmm
     ifppreg = 0;      % no eval at sources
-    ifppregtarg = 1;  % just vel out
-    
-    targ = rvec_out';
-    
-    srcinfo.sources = rvec_in';
-    %srcinfo.stoklet = zeros(3,Ns); 
-    
-    srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x Ns   
-    srcinfo.strsvec = nn';
-    
     U = stfmm3d(vars.fmm_tol,srcinfo,ifppreg,targ,ifppregtarg);
-    u = U.pottarg;
-    u = -u(:); %there is a sign difference!
 else
-    targ = rvec_out; 
-    srcinfo.strslet = reshape(strslet, 3, []); % Format: 3 x N
-
-    % Evaluate stresslet flow at targets via direct sum
-    U = SE0P_Stresslet_direct_full_ext_mex(rvec_in, srcinfo.strslet', nn, struct('eval_ext_x', targ));
-    
-    U = U';              % Transpose to match output stacking
-    u = 1/(8*pi) * U(:); % Apply Stokeslet prefactor
+    % -------- Use compiled direct summation (FMM3D) --------
+    U = st3ddir_opt(srcinfo, targ, ifppregtarg);
 end
+
+u = -U.pottarg(:); % there is a sign difference with FMM3D's stresslet
 
 end
 
 function self_test()
 
-if exist('stfmm3d','file') ~= 2
-    fprintf('getStressletFlow self-test skipped: stfmm3d not found.\n');
+if exist('stfmm3d','file') ~= 2 || exist('st3ddir_opt','file') ~= 2
+    fprintf('getStressletFlow self-test skipped: stfmm3d or st3ddir_opt not found.\n');
     return;
 end
 

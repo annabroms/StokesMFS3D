@@ -30,6 +30,7 @@ if capMode == "exponential"
     % 18 exponentially graded rings.
     capPointCounts = 1078;
 end
+
 opt = struct('N',N,'N_image',N_image, ...
     'imageFamilies',imageFamilies, ... % See token legend above.
     'capMode',capMode,'capPointCounts',capPointCounts, ...
@@ -40,7 +41,7 @@ if useSVD
     opt.solverMode = "denseSVD";
 end
 [Fvec,iters,lambdaNorm,maxResidual,details] = ...
-    solve_resistance_with_images(q,U,opt);
+    solve_resistance_images(q,U,opt);
 if useSVD
     fprintf('Dense SVD solve, rank %d, linear system residual: %.3e\n', ...
         details.retainedRanks,details.linearSystemResidual);

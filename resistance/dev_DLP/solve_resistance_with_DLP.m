@@ -250,8 +250,7 @@ end
 
 if opt.lr
     %not yet implemented
-    lambda_gmres_old = lambda_gmres';
-    tau_stokes = applyQmat(lambda_gmres_old,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt);
+    tau_stokes = applyQmat(lambda_gmres,rvec_in,rvec_out,Rinv,Zi,Yi,R,opt);
     lambda_gmres = tau_stokes+tau_coarse; 
 
     for i = 1:P

@@ -1,22 +1,25 @@
 # Image-enhanced mobility for unit spheres
 
-`solve_mobility_with_images(q,Fvec,opt)` computes the six rigid-body
+`solve_mobility_images(q,Fvec,opt)` computes the six rigid-body
 velocities per sphere from prescribed forces and torques. It combines the
 recompleted Stokes mobility formulation in [Broms, Barnett and Tornberg,
 §§3.2–3.3](https://arxiv.org/pdf/2409.04215) with the close-contact image
 discretisation and force extraction in [Broms, Barnett and Tornberg,
 §2.3 and Remark 4](https://doi.org/10.1016/j.jcp.2024.113636).
-Viscosity and sphere radius are one. Nonunit `opt.viscosity` is rejected by
-this mobility solver; the resistance solver and its pressure/traction
-evaluators support positive viscosity. `Fvec` has six entries per sphere,
+Sphere radius is one and `opt.viscosity` defaults to one. Any positive
+viscosity is supported: applied loads are divided by viscosity for the
+unit-viscosity solve, and `details.realisedForceTorque` is returned in
+physical units. `details.lambda` stores unit-viscosity velocity coefficients;
+pass the physical viscosity to `image_pressure` or `image_traction` when
+evaluating pressure or traction. `Fvec` has six entries per sphere,
 `[Fx;Fy;Fz;Tx;Ty;Tz]`, in the source-strength (force-on-fluid) sign used by
-`solve_resistance_with_images`. The returned `U` has
+`solve_resistance_images`. The returned `U` has
 `[vx;vy;vz;omega_x;omega_y;omega_z]` per sphere. Fluid-on-body loads have
 the opposite sign.
 
 ## Source ordering and moments
 
-The geometry and options are shared with `solve_resistance_with_images`.
+The geometry and options are shared with `solve_resistance_images`.
 For stresslet images, `use_orth_dir_images=true` replaces the contact-ray
 source normal by a deterministic orthogonal direction.
 Every body starts with coarse proxy Stokeslets. Selected image families
@@ -49,18 +52,19 @@ moments and rotlet torques.
 Define `C_k=H_k'/(H_k*H_k')` (`n_k-by-6`) and the rank-six projector
 `L_k=C_k*H_k` (`n_k-by-n_k`). The implementation applies `L_k*z` as
 `C_k*(H_k*z)`, without storing the full projector. With prescribed
-`F_k=[force;torque]`, the minimum-norm completion is `lambda0_k=C_k*F_k`.
-Thus `H_k*lambda0_k=F_k`, while `H_k*(I-L_k)*z_k=0`. The total physical
+`F_k=[force;torque]/opt.viscosity`, the minimum-norm completion is `lambda0_k=C_k*F_k`.
+Thus `H_k*lambda0_k=F_k`, while `H_k*(I-L_k)*z_k=0`. The total unit-viscosity
 strengths and velocity are
 
 ```math
 \lambda_k=(I-L_k)z_k+\lambda_{0k},\qquad U_k=-H_kz_k.
 ```
 
-The six components removed from the physical strengths are therefore used
+The six components removed from the coefficients are therefore used
 to represent translation and angular velocity. The minus sign and the use
 of unprojected `z_k` are mobility-paper Eqs. (49)–(52). Applying `H_k` to
-the final physical strengths recovers the prescribed force and torque.
+the final coefficients recovers the prescribed force and torque divided by
+viscosity.
 With images disabled, `H_k=getKmat(proxy,q_k)'`, so these are exactly the
 basic mobility solver's projection and completion maps.
 
@@ -116,7 +120,7 @@ Dense mobility reports one global retained rank, zero GMRES iterations,
 `trueGmresResidual=NaN`, and its row-scaled least-squares residual in
 `details.linearSystemResidual`.
 The independent full-sphere and gap-cap check reports `uerr`; `details`
-contains the grid, physical strengths, completion, unprojected strengths,
+contains the grid, unit-viscosity coefficients, completion, unprojected coefficients,
 realised moments, retained ranks, solver residual, and validation samples.
 To evaluate flow at new points, use `stokes_mfs_velocity_matrix` with each
 body's `details.grid.body(k).basis` and `details.lambda{k}`, or split the
@@ -124,7 +128,7 @@ strengths with `image_source_coefficients` and call `direct_image_velocity`.
 
 Compared with `solve_mobility`, this solver handles sphere-specific source
 families, contact caps, nonuniform row weights, and unequal one-body blocks.
-Compared with `solve_resistance_with_images`, it factors the recompleted
+Compared with `solve_resistance_images`, it factors the recompleted
 mobility block and adds the six-dimensional completion and velocity map.
 Its current path is direct and no-slip; the basic solver remains the path
 for ellipsoids, slip, and FMM acceleration.

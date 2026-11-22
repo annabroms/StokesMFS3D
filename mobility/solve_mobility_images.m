@@ -1,8 +1,8 @@
 function [U,iters,lambda_norm,uerr,details] = ...
-    solve_mobility_with_images(q,Fvec,opt)
-%SOLVE_MOBILITY_WITH_IMAGES Solve unit-sphere mobility by recompleted image MFS.
-%   [U,iters,lambda_norm,uerr,details] = solve_mobility_with_images(q,Fvec,opt)
-%   solve_mobility_with_images() runs a small resistance-to-mobility check.
+    solve_mobility_images(q,Fvec,opt)
+%SOLVE_MOBILITY_IMAGES Solve unit-sphere mobility by recompleted image MFS.
+%   [U,iters,lambda_norm,uerr,details] = solve_mobility_images(q,Fvec,opt)
+%   solve_mobility_images() runs a small resistance-to-mobility check.
 %
 % q is P-by-3; Fvec and U are 6P-by-1, with each body ordered
 % [force;torque] and [translation;angular velocity], respectively.
@@ -10,7 +10,7 @@ function [U,iters,lambda_norm,uerr,details] = ...
 % solver. opt shares its geometry, row weights, SVD cutoff, and GMRES
 % controls; useRowScaling=false selects identity row scaling, while
 % solverMode is "oneBody" (default) or "denseSVD". details.grid and
-% details.lambda contain the complete basis and physical strengths for
+% details.lambda contain the complete basis and unit-viscosity coefficients for
 % evaluating the flow with direct_image_velocity or the dense kernel.
 % imageFamilies accepts ordered distinct tokens: S Stokeslet, R rotlet,
 % D potential dipole, T legacy stresslet, T_t line-parallel stresslet,
@@ -20,6 +20,8 @@ function [U,iters,lambda_norm,uerr,details] = ...
 % The unprojected unknown z stores rigid motion through U_k=-H_k*z_k.
 % Its projected part has zero total force and torque across all families;
 % completion supplies the prescribed six moments.
+% opt.viscosity defaults to 1. Applied loads are divided by viscosity for
+% the unit-viscosity solve; realisedForceTorque is returned in physical units.
 
 if nargin == 0
     self_test();
@@ -30,15 +32,17 @@ if nargin < 3
     opt = struct();
 end
 opt = image_solver_options(opt);
-if opt.viscosity ~= 1
-    error('solve_mobility_with_images:ViscosityUnsupported', ...
-        'This mobility solver currently requires viscosity = 1.');
-end
 validateattributes(q,{'numeric'},{'real','finite','2d','ncols',3});
 P = size(q,1);
 validateattributes(Fvec,{'numeric'}, ...
     {'real','finite','column','numel',6*P});
-grid = build_image_discretization(q,opt);
+Fvec = Fvec/opt.viscosity;
+hasPrepared = isfield(opt,'prepared') && ~isempty(opt.prepared);
+if hasPrepared
+    grid = validate_prepared_image_problem(q,opt,"mobility");
+else
+    grid = build_image_discretization(q,opt);
+end
 counts = arrayfun(@(body) size(body.collocation,1),grid.body);
 counts = counts(:).';
 offsets = [0,cumsum(3*counts)];
@@ -55,11 +59,15 @@ lambda0 = cell(P,1);
 coeff0 = cell(P,1);
 for k = 1:P
     if opt.solverMode == "oneBody"
-        memoryMiB = 8*double(3*counts(k))*double(sourceCounts(k))/2^20;
-        fprintf('mobility body %d: SVD %d x %d (%.1f MiB)\n', ...
-            k,3*counts(k),sourceCounts(k),memoryMiB);
-        factors(k) = one_body_image_mobility_preconditioner( ...
-            grid.body(k),q(k,:),opt.svdCutoff);
+        if hasPrepared
+            factors(k) = opt.prepared.mobilityFactors(k);
+        else
+            memoryMiB = 8*double(3*counts(k))*double(sourceCounts(k))/2^20;
+            fprintf('mobility body %d: SVD %d x %d (%.1f MiB)\n', ...
+                k,3*counts(k),sourceCounts(k),memoryMiB);
+            factors(k) = one_body_image_mobility_preconditioner( ...
+                grid.body(k),q(k,:),opt.svdCutoff);
+        end
         H{k} = factors(k).H;
         C{k} = factors(k).C;
     else
@@ -162,7 +170,7 @@ end
 [uerr,validationPoints,validationVelocity,validationRelative, ...
     validationGap] = image_surface_validation(q,grid,lambda,U,opt);
 details = struct('grid',grid,'lambda',{lambda},'z',{z}, ...
-    'completion',{lambda0},'realisedForceTorque',realisedForceTorque, ...
+    'completion',{lambda0},'realisedForceTorque',opt.viscosity*realisedForceTorque, ...
     'retainedRanks',retainedRanks, ...
     'trueGmresResidual',trueGmresResidual, ...
     'linearSystemResidual',linearSystemResidual, ...
@@ -180,12 +188,12 @@ oldPath = path; cleanup = onCleanup(@() path(oldPath));
 addpath(genpath(root));
 q = [0,0,0;2.08,0,0];
 Uref = [1;0.2;0;0;0;0.3;-0.7;0;0.1;0;0.2;0];
-opt = struct('N',50,'collocationRatio',2,'N_image',4, ...
+opt = struct('N',700,'collocationRatio',2,'N_image',4, ...
     'capLayers',[5,5],'capMinAzimuth',4, ...
     'validationCount',100,'validationGapCount',61, ...
-    'gmresTolerance',1e-8,'maxIterations',150,'svdCutoff',1e-11);
-[F,~,~,~,~] = solve_resistance_with_images(q,Uref,opt);
-[U,~,~,err,details] = solve_mobility_with_images(q,F,opt);
+    'gmresTolerance',1e-8,'maxIterations',150,'svdCutoff',1e-11,'viscosity',1);
+[F,~,~,~,~] = solve_resistance_images(q,Uref,opt);
+[U,~,~,err,details] = solve_mobility_images(q,F,opt);
 assert(norm(details.realisedForceTorque-F,inf) < ...
     1e-10*max(1,norm(F,inf)));
 assert(norm(U-Uref,inf) < 1e-3*max(1,norm(Uref,inf)));
@@ -209,7 +217,7 @@ small.N = 30;
 small.N_image = 2;
 small.useRowScaling = false;
 F3 = sin((1:18).');
-[U3,~,~,~,d3] = solve_mobility_with_images(q3,F3,small);
+[U3,~,~,~,d3] = solve_mobility_images(q3,F3,small);
 assert(all(isfinite(U3)) && ...
     norm(d3.realisedForceTorque-F3,inf) < 1e-10);
 assert(all(arrayfun(@(body) all(body.rowScale == 1),d3.grid.body)));
@@ -218,10 +226,16 @@ assert(size(d3.grid.body(2).collocation,1) > ...
 assert(numel(d3.lambda{2}) > numel(d3.lambda{1}));
 dense = small;
 dense.solverMode = "denseSVD";
-[Ud,itd,~,~,dd] = solve_mobility_with_images(q,F,dense);
+[Ud,itd,~,~,dd] = solve_mobility_images(q,F,dense);
 assert(itd == 0 && isnan(dd.trueGmresResidual));
 assert(isscalar(dd.retainedRanks) && dd.retainedRanks > 0);
 assert(norm(dd.realisedForceTorque-F,inf) < 1e-10);
+% Scaling viscosity and physical loads together preserves the velocity.
+viscous = dense;
+viscous.viscosity = 1.7;
+[Umu,~,~,~,dmu] = solve_mobility_images(q,1.7*F,viscous);
+assert(norm(Umu-Ud,inf) < 1e-10*max(1,norm(Ud,inf)));
+assert(norm(dmu.realisedForceTorque-1.7*F,inf) < 1e-10);
 weightedError = cell(2,1);
 weightedRhs = cell(2,1);
 for k = 1:2
@@ -242,5 +256,5 @@ end
 physicalResidual = norm(vertcat(weightedError{:}))/ ...
     norm(vertcat(weightedRhs{:}));
 assert(abs(physicalResidual-dd.linearSystemResidual) < 1e-11);
-fprintf('solve_mobility_with_images self-test passed: err %.3e.\n',err);
+fprintf('solve_mobility_images self-test passed: err %.3e.\n',err);
 end
