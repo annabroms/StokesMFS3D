@@ -1,24 +1,25 @@
 
 # StokesMFS3D
 
-StokesMFS3D is a reasearch code implementing the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies. Equal spheres can also be solved above a planar no-slip wall using the Blake half-space Green function.
+StokesMFS3D is a research code implementing the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies. Equal spheres can also be solved above a planar no-slip wall using the Blake half-space Green function.
 
 - **Resistance problem:** prescribe rigid-body velocities and compute net forces and torques.
 - **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with prescribed surface slip.
   * Large scale suspensions of spheres or ellipsoids simulated at low cost.
   * One-body preconditioning enables close-to-linear scaling via FMM acceleration. 
-  * On particle $i$, the generalised boundary condition is
-
-    ```math
-    \mathbf{u}(\mathbf{x})
-    =
-    \mathbf{v}^{(i)}
-    +
-    \boldsymbol{\omega}^{(i)} \times (\mathbf{x}-\mathbf{c}^{(i)})
-    +
-    \mathbf{u}_{\mathrm{slip}}^{(i)}(\mathbf{x}).
-    ```
 - **Wall-bounded problems:** equal spheres above an infinite no-slip plane, using the Blake tensor and either wall-aware or free-space one-body preconditioning. See [wall-bounded Stokes](wall/README.md). 
+
+With prescribed slip, the boundary condition on particle $i$ is
+
+```math
+\mathbf{u}(\mathbf{x})
+=
+\mathbf{v}^{(i)}
++
+\boldsymbol{\omega}^{(i)} \times (\mathbf{x}-\mathbf{c}^{(i)})
++
+\mathbf{u}_{\mathrm{slip}}^{(i)}(\mathbf{x}).
+```
 
 ## Publications
 
