@@ -34,8 +34,6 @@ Two discretisations are available:
 ```
 
 
-  
-
 ## Dependencies
 
 To run simulations, ensure the following dependencies are available:
@@ -53,8 +51,8 @@ To run simulations, ensure the following dependencies are available:
   ```
   then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
 
-- **StokesHalfspaceFMM** (required for wall-bounded Stokes solves)  
-  The sibling repository `../StokesHalfspaceFMM` provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
+- **[StokesHalfspaceFMM](https://github.com/flatironinstitute/StokesHalfspaceFMM)** (required for wall-bounded Stokes solves)  
+  The repository provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
   Used for compiled direct evaluation of stresslets and tractions (`getStressletFlow.m`, `getTractionFast.m`), needed for e.g. slip and double-layer problems. Free-space Stokeslet sums no longer use this repository. A precompiled binary is included in the `Stokes_Direct` repository.
