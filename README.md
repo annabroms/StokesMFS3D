@@ -33,15 +33,18 @@ Two discretisations are available:
 \mathbf{u}_{\mathrm{slip}}^{(i)}(\mathbf{x}).
 ```
 
-
 ## Dependencies
 
 To run simulations, ensure the following dependencies are available:
 
-- **[FMM3D](https://github.com/flatironinstitute/FMM3D)** (required, compiled with `make matlab`)  
-  Used for all free-space Stokeslet sums in `getStokesletFlow.m`:
+- **[FMM3D, branch `faster_st3ddir`](https://github.com/annabroms/FMM3D/tree/faster_st3ddir)** (required, compiled with `make matlab`)  
+  `st3ddir_opt` is only available on the `faster_st3ddir` branch of this fork, not on its `master` branch or in [upstream FMM3D](https://github.com/flatironinstitute/FMM3D). Clone it next to this repository with
+  ```bash
+  git clone -b faster_st3ddir https://github.com/annabroms/FMM3D.git
+  ```
+  Used for all free-space Stokeslet and stresslet sums in `getStokesletFlow.m` and `getStressletFlow.m`:
   - `stfmm3d` (`vars.fmm = true`): accelerated evaluation, recommended for many particles (typically >70 with default settings).
-  - `st3ddir_opt` (`vars.fmm = false`): optimized compiled direct summation (velocity only), parallelized with OpenMP. Inside MATLAB, the number of threads follows `maxNumCompThreads` (default: number of physical cores); `OMP_NUM_THREADS` has no effect.
+  - `st3ddir_opt` (`vars.fmm = false`): optimized compiled direct summation (velocity only) of Stokeslets and/or stresslets, parallelized with OpenMP. Inside MATLAB, the number of threads follows `maxNumCompThreads` (default: number of physical cores); `OMP_NUM_THREADS` has no effect.
 
   `setpath` adds `../FMM3D` when present. Small dense problems that build and apply a Stokeslet matrix explicitly do not use this routine.
 
@@ -49,13 +52,13 @@ To run simulations, ensure the following dependencies are available:
   ```make
   STOKDIRFLAGS = -march=x86-64-v3 -ffast-math
   ```
-  then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
+  then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes the Stokeslet sum in `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. With these flags, the stresslet sum in `st3ddir_opt` is 2–3x faster than the Stokes_Direct stresslet kernel. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
 
-- **[StokesHalfspaceFMM](https://github.com/flatironinstitute/StokesHalfspaceFMM)** (required for wall-bounded Stokes solves)  
+- **[StokesHalfspaceFMM](https://github.com/annabroms/StokesHalfspaceFMM)** (required only for wall-bounded Stokes solves)  
   The repository provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
-  Used for compiled direct evaluation of stresslets and tractions (`getStressletFlow.m`, `getTractionFast.m`), needed for e.g. slip and double-layer problems. Free-space Stokeslet sums no longer use this repository. A precompiled binary is included in the `Stokes_Direct` repository.
+  Used for compiled direct evaluation of tractions (`getTractionFast.m`), needed for e.g. slip and double-layer problems. Free-space Stokeslet and stresslet sums no longer use this repository. A precompiled binary is included in the `Stokes_Direct` repository.
 
 To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m.
 
@@ -77,20 +80,42 @@ In the demo folder, we demonstrate the method using minimal input:
 - Run `demo_wall_mobility.m` for a wall-bounded mobility/resistance round trip, or `demo_random_wall_torque.m` for a random wall cluster under unit torques.
 
 Many functions, including solve_mobility.m and solve_resistance.m, contain self-tests. When run without arguments, they execute an example simulation.
+
+## Illustrations
+
+**Ellipsoids.** Mobility problem for 100 ellipsoids (semi-axes 0.4, 0.6, 1) with minimum separation 0.5, coloured by the surface speed of the computed rigid-body motion. Produced by `ellipsoid_mobility_run(100,0.5,20,1,0,[],'')`, basic discretisation.
+
+![Mobility problem for 100 ellipsoids](figures/readme_ellipsoids.png)
+
+**Spheres above a wall.** 40 spheres above a no-slip wall, each driven by a unit torque about the wall normal, solved with the Blake tensor and FMM (`demo_random_wall_torque`). Left: surface speed of the computed rigid-body motion. Right: independent relative surface residual.
+
+![Torque-driven spheres above a wall](figures/readme_wall_spheres.png)
+
+**Image-enhanced discretisation of a close pair.** Figure 2 of [Broms, Barnett and Tornberg (2025)](https://doi.org/10.1016/j.jcp.2024.113636). (a) Basic discretisation: proxy sources $\boldsymbol y_j$ on a sphere of radius $R_p$ and collocation points $\boldsymbol x_i$ on the particle surface. (b) Sketch of the image enhancement: a line of images inside each sphere and collocation caps (angles $\beta_1$, $\beta_2$) around the point of closest approach at gap $\delta$. (c) The resulting point distributions, with $n_{\mathrm{im}}$ image points (red) per sphere.
+
+![Image-enhanced discretisation of two close spheres](figures/readme_jcp_pair_discretization.png)
+
+**Close cluster with images.** Resistance problem for five spheres, most of them at gaps of $10^{-3}$, with random rigid-body velocities (`demo_cluster_resistance_with_images`). The colours show the independent boundary-condition error on the image-enhanced grids. Points are concentrated in the collocation caps at each contact.
+
+![Close cluster of spheres with image-enhanced discretisation](figures/readme_image_cluster.png)
+
+**Large fixed cluster in shear flow.** Streamlines around a cluster of 2000 fixed spheres in a background shear flow, coloured by $\lVert\boldsymbol u\rVert$. From Figure 7 (shear-flow panel) of [Broms, Barnett and Tornberg (2025)](https://doi.org/10.1016/j.jcp.2024.113636). Each sphere is at a gap of $\delta = 10^{-3}$ from at least one neighbour and is discretised with $N = 686$ proxy sources, about 4.8 million unknowns in total. No image points are needed, since the particles do not move relative to each other.
+
+![Streamlines around a cluster of 2000 fixed spheres in shear flow](cluster.png)
+
+All figures except the two JCP figures can be regenerated with `tools/export_readme_figures.m`. It runs the demos unchanged and restyles their output with LaTeX-rendered labels.
+
 ## Publications
 
 This work is based on the following research papers:
 
 1. **Accurate close interactions of Stokes spheres using lubrication-adapted image systems**  
-   *A. Broms, A.H. Barnett, A.-K. Tornberg*, J. Comput. Phys. (2024)  
+   *A. Broms, A.H. Barnett, A.-K. Tornberg*, J. Comput. Phys. 523, 113636 (2025)  
    [https://doi.org/10.1016/j.jcp.2024.113636](https://doi.org/10.1016/j.jcp.2024.113636)
 
 2. **A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility Problems**  
    *A. Broms, A.H. Barnett, A.-K. Tornberg*, *Adv. Comput. Math.* (2025)  
    [https://doi.org/10.1007/s10444-025-10258-4](https://doi.org/10.1007/s10444-025-10258-4) 
-
-
-![Clustered particles](cluster.png)
 
 ## Roadmap
 

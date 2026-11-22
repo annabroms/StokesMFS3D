@@ -34,8 +34,9 @@ function res = getStokesletFlow(tau_stokes, rin, rout, vars)
 %   See also: getTractionFast, getStressletFlow
 %
 %   DEPENDENCIES:
-%       - FMM3D (https://github.com/flatironinstitute/fmm3d), built with
-%         'make matlab': stfmm3d (accelerated) and st3ddir_opt (direct).
+%       - FMM3D, branch faster_st3ddir of
+%         https://github.com/annabroms/FMM3D, built with 'make matlab':
+%         stfmm3d (accelerated) and st3ddir_opt (direct, this branch only).
 %
 % Anna Broms June 12, 2025, updated Nov 21 2026
 
