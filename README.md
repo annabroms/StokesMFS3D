@@ -40,15 +40,24 @@ Two discretisations are available:
 
 To run simulations, ensure the following dependencies are available:
 
-- **[FMM3D](https://github.com/flatironinstitute/FMM3D)**  
-  Recommended for accelerating calculations with many particles (typically >70 with default settings)
+- **[FMM3D](https://github.com/flatironinstitute/FMM3D)** (required, compiled with `make matlab`)  
+  Used for all free-space Stokeslet sums in `getStokesletFlow.m`:
+  - `stfmm3d` (`vars.fmm = true`): accelerated evaluation, recommended for many particles (typically >70 with default settings).
+  - `st3ddir_opt` (`vars.fmm = false`): optimized compiled direct summation (velocity only), parallelized with OpenMP. Inside MATLAB, the number of threads follows `maxNumCompThreads` (default: number of physical cores); `OMP_NUM_THREADS` has no effect.
+
+  `setpath` adds `../FMM3D` when present. Small dense problems that build and apply a Stokeslet matrix explicitly do not use this routine.
+
+  For a fast direct sum, build FMM3D with AVX2 and fast-math for the Stokes direct kernels (`stokkernels.f`) only, by adding to FMM3D's `make.inc`:
+  ```make
+  STOKDIRFLAGS = -march=x86-64-v3 -ffast-math
+  ```
+  then `rm -f src/Stokes/stokkernels.o && make matlab`. This makes `st3ddir_opt` about 3x faster than without these flags (for N = 10^3 to 2*10^4 sources and targets, 1 or 8 threads), with relative differences below 1e-14. The FMM (`stfmm3d`) is not affected. The resulting MEX files require a CPU with AVX2 (x86-64 since ~2013–2017); leave the line out on older or non-x86 machines.
 
 - **StokesHalfspaceFMM** (required for wall-bounded Stokes solves)  
   The sibling repository `../StokesHalfspaceFMM` provides direct Blake and accelerated half-space evaluation. `setpath` adds its MATLAB package when present. Its `fmm` backend also requires a compiled FMM3D installation; direct Blake backends do not.
 
 - **[Stokes_Direct](https://github.com/annabroms/Stokes_Direct)**  
-  Used for direct evaluation of fundamental solutions.  
-  Only `SE0P_Stokeslet_direct.c` needs to be compiled in the standard setting. A precompiled binary is included in the `Stokes_Direct` repository.
+  Used for compiled direct evaluation of stresslets and tractions (`getStressletFlow.m`, `getTractionFast.m`), needed for e.g. slip and double-layer problems. Free-space Stokeslet sums no longer use this repository. A precompiled binary is included in the `Stokes_Direct` repository.
 
 To use your own method for accelerated or direct evaluation of Stokeslets, just modify the function getStokesletFlow.m.
 

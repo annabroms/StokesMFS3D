@@ -24,19 +24,20 @@ function res = getStokesletFlow(tau_stokes, rin, rout, vars)
 %   NOTES:
 %       - If vars.fmm is true, the function uses the FMM3D interface `stfmm3d`
 %         (requires FMM3D to be installed and compiled).
-%       - Otherwise, it falls back to direct evaluation via a mex interface to
-%         SE0P_Stokeslet_direct_full_ext_mex (the fast direct branch).
+%       - Otherwise, it uses compiled direct summation via the FMM3D routine
+%         `st3ddir_opt` (velocity only, OpenMP-parallel; the number of
+%         threads is set by OMP_NUM_THREADS when MATLAB starts).
+%       - Both branches use the standard 1/(8*pi) Stokeslet scaling.
 %       - Modify this function for solving MFS with other fast summation
-%         technique or implementation of direction summation. 
+%         technique or implementation of direction summation.
 %
 %   See also: getTractionFast, getStressletFlow
-% 
-%   DEPENDENCIES:
-%       - Accelerated evaluation: FMM3D (https://github.com/flatironinstitute/fmm3d)
-%       - Direct evaluation: SE0P_Stokeslet_direct_full_ext_mex
-%       (https://github.com/annabroms/Stokes_Direct -- precompiled binary exists)
 %
-% Anna Broms June 12, 2025, updated Feb 3 2026
+%   DEPENDENCIES:
+%       - FMM3D (https://github.com/flatironinstitute/fmm3d), built with
+%         'make matlab': stfmm3d (accelerated) and st3ddir_opt (direct).
+%
+% Anna Broms June 12, 2025, updated Nov 21 2026
 
 if nargin < 1
     self_test;
@@ -55,43 +56,34 @@ if ~isvector(tau_stokes) && size(tau_stokes,2) ~= 3 && size(tau_stokes,1) == 3
 end
 
 
-if vars.fmm 
+% Source/target layout shared by both FMM3D routines
+srcinfo.nd = 1;                                % One density (velocity only)
+srcinfo.sources = rin';                        % Transpose: 3 x N
+srcinfo.stoklet = reshape(tau_stokes, 3, []);  % Format: 3 x N
+targ = rout';                                  % Transpose target: 3 x M
+ifppregtarg = 1;                               % Velocity at targets only
+
+if vars.fmm
     % -------- Use FMM3D for fast evaluation --------
-    nd = 1;                            % Number of densities per target (velocity only)
-    srcinfo.nd = nd;                  % Required field for FMM3D
     ifppreg = 0;                      % Don't compute potential at source
-    ifppregtarg = 1;                  % Evaluate potential at target
-    
-    srcinfo.sources = rin';           % Transpose: 3 x N
-    srcinfo.stoklet = reshape(tau_stokes, 3, []); % Format: 3 x N
-    
-    targ = rout';                     % Transpose target: 3 x M
     fmm_tol = vars.fmm_tol;           % FMM precision (e.g., 1e-6)
-    
+
     % Call FMM3D driver for Stokeslet potentials
     U = stfmm3d(fmm_tol, srcinfo, ifppreg, targ, ifppregtarg);
-    
-    % Extract and reshape velocity result
-    res = U.pottarg(:); 
-
-    clear U srcinfo;
-
 else
-    % -------- Use direct evaluation --------
-    targ = rout; 
-    srcinfo.stoklet = reshape(tau_stokes, 3, []); % Format: 3 x N
-
-    % Evaluate Stokeslet flow at targets via direct sum
-    U = SE0P_Stokeslet_direct_full_ext_mex(rin, srcinfo.stoklet', struct('eval_ext_x', targ));
-    
-    U = U';              % Transpose to match output stacking
-    res = 1/(8*pi) * U(:); % Apply Stokeslet prefactor
+    % -------- Use compiled direct summation (FMM3D) --------
+    U = st3ddir_opt(srcinfo, targ, ifppregtarg);
 end
+
+% Extract velocity result, stacked as [u1; u2; ...; uM]
+res = U.pottarg(:);
+
+clear U srcinfo;
 
 function self_test()
 
-if exist('stfmm3d','file') ~= 2
-    fprintf('getStokesletFlow self-test skipped: stfmm3d not found.\n');
+if exist('stfmm3d','file') ~= 2 || exist('st3ddir_opt','file') ~= 2
+    fprintf('getStokesletFlow self-test skipped: stfmm3d or st3ddir_opt not found.\n');
     return;
 end
 
