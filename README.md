@@ -3,10 +3,25 @@
 
 StokesMFS3D provides a minimal working implementation of the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies. Equal spheres can also be solved above a planar no-slip wall using the Blake half-space Green function; see [wall-bounded Stokes](wall/README.md).
 
-Two discretisations are available:
+## Publications
 
-- **Basic discretisation (proxy sources only):** used by `solve_resistance.m` and `solve_mobility.m`, and hence by `demo_spheres.m`, `demo_slip.m` and `ellipsoid_mobility_run.m`. It supports spheres and ellipsoids, FMM acceleration and prescribed slip.
-- **Image-enhanced discretisation (spheres, resistance and mobility):** used by `solve_resistance_images.m` and `solve_mobility_images.m`, and hence by `demo_resistance_with_images.m`, `demo_cluster_resistance_with_images.m`, `demo_mobility_with_images.m` and `demo_cluster_mobility_with_images.m`. Image lines and extra collocation caps are added at each close contact, following [Broms et al. (2025)](#publications). See [image resistance](images/README_resistance.md) and [image mobility](images/README_mobility.md).
+This work is based on the following research papers:
+
+1. **Accurate close interactions of Stokes spheres using lubrication-adapted image systems**  
+   *A. Broms, A.H. Barnett, A.-K. Tornberg*, J. Comput. Phys. 523, 113636 (2025)  
+   [https://doi.org/10.1016/j.jcp.2024.113636](https://doi.org/10.1016/j.jcp.2024.113636)
+
+2. **A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility Problems**  
+   *A. Broms, A.H. Barnett, A.-K. Tornberg*, *Adv. Comput. Math.* (2025)  
+   [https://doi.org/10.1007/s10444-025-10258-4](https://doi.org/10.1007/s10444-025-10258-4)
+
+## Discretisations
+
+Three discretisations are available:
+
+- **Basic discretisation (proxy sources only):** used by `solve_resistance.m` and `solve_mobility.m`, and hence by `demo_spheres.m`, `demo_slip.m` and `ellipsoid_mobility_run.m`. It supports spheres and ellipsoids, FMM acceleration and prescribed slip, following [[2]](#publications).
+- **Image-enhanced discretisation (spheres, resistance and mobility):** used by `solve_resistance_images.m` and `solve_mobility_images.m`, and hence by `demo_resistance_with_images.m`, `demo_cluster_resistance_with_images.m`, `demo_mobility_with_images.m` and `demo_cluster_mobility_with_images.m`. Image lines and extra collocation caps are added at each close contact, following [[1]](#publications). See [image resistance](images/README_resistance.md) and [image mobility](images/README_mobility.md).
+- **Image-enhanced discretisation above a wall (spheres, resistance and mobility):** used by `solve_resistance_wall_images.m` and `solve_mobility_wall_images.m`. Image lines are added both at close sphere–wall contacts and at close sphere–sphere contacts, and every source includes its complete Blake wall correction. See [wall and close-pair image solvers](wall/README_images.md).
 
 > **Note** With images, the discretisation of a sphere depends on its neighbours (gaps, contact directions and image counts). In the basic discretisation all identical spheres share one one-body matrix, which is factorised once. With images, the one-body matrix must be recomputed and refactorised for every unique discretisation, i.e. typically for every sphere that has close neighbours. Cross-sphere interactions are also summed directly, without FMM. The image solver is therefore considerably more expensive per sphere and is intended for close interactions. See `images/README_resistance.md`.
 
@@ -16,7 +31,7 @@ Two discretisations are available:
 
 ## Features
 
-- **Wall-bounded problems:** equal spheres above an infinite no-slip plane, using the Blake tensor and either wall-aware or free-space one-body preconditioning. See [wall-bounded Stokes](wall/README.md).
+- **Wall-bounded problems:** equal spheres above an infinite no-slip plane, using the Blake tensor and either wall-aware or free-space one-body preconditioning. See [wall-bounded Stokes](wall/README.md). Image-enhanced discretisations are also available in this setting, for spheres close to the wall and to each other; see [wall and close-pair image solvers](wall/README_images.md).
 - **Resistance problem:** prescribe rigid-body velocities and compute forces and torques.
 - **Mobility problem:** prescribe forces and torques and compute rigid-body velocities, optionally with prescribed surface slip.
   * Large scale suspensions of spheres or ellipsoidals simulated at low cost.
@@ -83,15 +98,15 @@ Many functions, including solve_mobility.m and solve_resistance.m, contain self-
 
 ## Illustrations
 
-**Ellipsoids.** Mobility problem for 100 ellipsoids (semi-axes 0.4, 0.6, 1) with minimum separation 0.5, coloured by the surface speed of the computed rigid-body motion. Produced by `ellipsoid_mobility_run(100,0.5,20,1,0,[],'')`, basic discretisation.
+**Ellipsoids.** Mobility problem for 100 ellipsoids (semi-axes 0.4, 0.6, 1) with minimum separation 0.5, coloured by the surface speed of the computed rigid-body motion. Produced by `ellipsoid_mobility_run(100,0.5,20,1,0,[],'')`, basic discretisation. This is a small version of the large-scale ellipsoid test (Example 4) in [[2]](#publications).
 
-![Mobility problem for 100 ellipsoids](figures/readme_ellipsoids.png)
+<p align="center"><img src="figures/readme_ellipsoids.png" alt="Mobility problem for 100 ellipsoids" width="420"></p>
 
 **Spheres above a wall.** 40 spheres above a no-slip wall, each driven by a unit torque about the wall normal, solved with the Blake tensor and FMM (`demo_random_wall_torque`). Left: surface speed of the computed rigid-body motion. Right: independent relative surface residual.
 
 ![Torque-driven spheres above a wall](figures/readme_wall_spheres.png)
 
-**Image-enhanced discretisation of a close pair.** Figure 2 of [Broms, Barnett and Tornberg (2025)](https://doi.org/10.1016/j.jcp.2024.113636). (a) Basic discretisation: proxy sources $\boldsymbol y_j$ on a sphere of radius $R_p$ and collocation points $\boldsymbol x_i$ on the particle surface. (b) Sketch of the image enhancement: a line of images inside each sphere and collocation caps (angles $\beta_1$, $\beta_2$) around the point of closest approach at gap $\delta$. (c) The resulting point distributions, with $n_{\mathrm{im}}$ image points (red) per sphere.
+**Image-enhanced discretisation of a close pair.** Figure 2 of [[1]](#publications). (a) Basic discretisation: proxy sources $\boldsymbol y_j$ on a sphere of radius $R_p$ and collocation points $\boldsymbol x_i$ on the particle surface. (b) Sketch of the image enhancement: a line of images inside each sphere and collocation caps (angles $\beta_1$, $\beta_2$) around the point of closest approach at gap $\delta$. (c) The resulting point distributions, with $n_{\mathrm{im}}$ image points (red) per sphere.
 
 ![Image-enhanced discretisation of two close spheres](figures/readme_jcp_pair_discretization.png)
 
@@ -99,23 +114,11 @@ Many functions, including solve_mobility.m and solve_resistance.m, contain self-
 
 ![Close cluster of spheres with image-enhanced discretisation](figures/readme_image_cluster.png)
 
-**Large fixed cluster in shear flow.** Streamlines around a cluster of 2000 fixed spheres in a background shear flow, coloured by $\lVert\boldsymbol u\rVert$. From Figure 7 (shear-flow panel) of [Broms, Barnett and Tornberg (2025)](https://doi.org/10.1016/j.jcp.2024.113636). Each sphere is at a gap of $\delta = 10^{-3}$ from at least one neighbour and is discretised with $N = 686$ proxy sources, about 4.8 million unknowns in total. No image points are needed, since the particles do not move relative to each other.
+**Large fixed cluster in shear flow.** Streamlines around a cluster of 2000 fixed spheres in a background shear flow, coloured by $\lVert\boldsymbol u\rVert$. From Figure 7 (shear-flow panel) of [[1]](#publications). Each sphere is at a gap of $\delta = 10^{-3}$ from at least one neighbour and is discretised with $N = 686$ proxy sources, about 4.8 million unknowns in total. No image points are needed, since the particles do not move relative to each other.
 
-![Streamlines around a cluster of 2000 fixed spheres in shear flow](cluster.png)
+<p align="center"><img src="cluster.png" alt="Streamlines around a cluster of 2000 fixed spheres in shear flow" width="460"></p>
 
 All figures except the two JCP figures can be regenerated with `tools/export_readme_figures.m`. It runs the demos unchanged and restyles their output with LaTeX-rendered labels.
-
-## Publications
-
-This work is based on the following research papers:
-
-1. **Accurate close interactions of Stokes spheres using lubrication-adapted image systems**  
-   *A. Broms, A.H. Barnett, A.-K. Tornberg*, J. Comput. Phys. 523, 113636 (2025)  
-   [https://doi.org/10.1016/j.jcp.2024.113636](https://doi.org/10.1016/j.jcp.2024.113636)
-
-2. **A Method of Fundamental Solutions for Large-Scale 3D Elastance and Mobility Problems**  
-   *A. Broms, A.H. Barnett, A.-K. Tornberg*, *Adv. Comput. Math.* (2025)  
-   [https://doi.org/10.1007/s10444-025-10258-4](https://doi.org/10.1007/s10444-025-10258-4) 
 
 ## Roadmap
 
