@@ -42,8 +42,7 @@ Three discretisations are available:
 
   ![Image-enhanced discretisation of two close spheres](figures/readme_jcp_pair_discretization.png)
 
-  Figure 2 of [[1]](#publications) <sub>CC BY 4.0; see [LICENSE](LICENSE)</sub>: 
-  (a) Proxy sources $\boldsymbol y_j$ and collocation points $\boldsymbol x_i$. (b) Line of images and collocation caps (angles $\beta_1$, $\beta_2$) at gap $\delta$. (c) Resulting point distributions, with $n_{\mathrm{im}}$ image points (red) per sphere.
+  Figure 2 of [[1]](#publications). (a) Proxy sources $\boldsymbol y_j$ and collocation points $\boldsymbol x_i$. (b) Line of images and collocation caps (angles $\beta_1$, $\beta_2$) at gap $\delta$. (c) Resulting point distributions, with $n_{\mathrm{im}}$ image points (red) per sphere.
 
 - **Image-enhanced discretisation above a wall (spheres, resistance and mobility):** used by `solve_resistance_wall_images.m` and `solve_mobility_wall_images.m`. Image lines are added both at close sphere–wall contacts and at close sphere–sphere contacts, and every source includes its complete Blake wall correction. See [wall and close-pair image solvers](wall/README_images.md).
 
@@ -108,7 +107,7 @@ Many functions, including solve_mobility.m and solve_resistance.m, contain self-
     <td align="center"><img src="figures/readme_ellipsoids.png" alt="Mobility problem for 100 ellipsoids" width="340"></td>
   </tr>
   <tr>
-    <td valign="top"><b>Large fixed cluster in shear flow.</b> Streamlines around 2000 fixed spheres in a background shear flow, coloured by ‖<b>u</b>‖. From Figure 7 (shear-flow panel) of <a href="#publications">[1]</a> <sub>CC BY 4.0; see <a href="LICENSE">LICENSE</a></sub>. Each sphere is at a gap of δ = 10<sup>−3</sup> from at least one neighbour and is discretised with N = 686 proxy sources, about 4.8 million unknowns in total. No image points are needed, since the particles do not move relative to each other.</td>
+    <td valign="top"><b>Large fixed cluster in shear flow.</b> Streamlines around 2000 fixed spheres in a background shear flow, coloured by ‖<b>u</b>‖. From Figure 7 (shear-flow panel) of <a href="#publications">[1]</a>. Each sphere is at a gap of δ = 10<sup>−3</sup> from at least one neighbour and is discretised with N = 686 proxy sources, about 4.8 million unknowns in total. No image points are needed, since the particles do not move relative to each other.</td>
     <td valign="top"><b>Ellipsoids.</b> Mobility problem for 100 ellipsoids (semi-axes 0.4, 0.6, 1) with minimum separation 0.5, coloured by the surface speed of the computed rigid-body motion. Produced by <code>ellipsoid_mobility_run(100,0.5,20,1,0,[],'')</code> with the basic discretisation; a small version of the large-scale ellipsoid test (Example 4) in <a href="#publications">[2]</a>.</td>
   </tr>
 </table>

@@ -19,21 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-Figure licensing
-----------------
-The following figures are licensed under CC BY 4.0, separately
-from the MIT-licensed software:
-
-figures/readme_jcp_pair_discretization.png: reproduced from Figure 2,
-figures/readme_cluster_streamlines.png: reproduced from Figure 7
-(shear-flow panel), in
-A. Broms, A. H. Barnett and A.-K. Tornberg,
-“Accurate close interactions of Stokes spheres using
-lubrication-adapted image systems,”
-Journal of Computational Physics 523 (2025), 113636.
-https://doi.org/10.1016/j.jcp.2024.113636
-
-© 2024 The Authors.
-https://creativecommons.org/licenses/by/4.0/
