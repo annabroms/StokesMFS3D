@@ -1,6 +1,8 @@
 
 # StokesMFS3D
 
+[![DOI](https://zenodo.org/badge/939928777.svg)](https://doi.org/10.5281/zenodo.24463974)
+
 StokesMFS3D is a research code implementing the **Method of Fundamental Solutions (MFS)** for solving **Stokes resistance**, **mobility**, and **prescribed-slip mobility problems** for spherical or ellipsoidal rigid bodies. Equal spheres can also be solved above a planar no-slip wall using the Blake half-space Green function.
 
 - **Resistance problem:** prescribe rigid-body velocities and compute net forces and torques.
